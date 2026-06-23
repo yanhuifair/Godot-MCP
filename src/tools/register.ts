@@ -49,12 +49,14 @@ import {
   handleListVisualShaders, handleReadVisualShader, handleReadShaderInclude,
   handleCreateShaderInclude, handleListShaderIncludes,
   handleAddScriptFunction, handleAddScriptSignal, handleAddScriptExport,
+  handleValidateShader, handleCompileShader,
   readScriptSchema, writeScriptSchema, createScriptSchema, listScriptsSchema,
   readShaderSchema, createShaderSchema, listShadersSchema, writeShaderSchema,
   validateScriptSchema, readScriptStructureSchema, searchInScriptsSchema,
   listVisualShadersSchema, readVisualShaderSchema, readShaderIncludeSchema,
   createShaderIncludeSchema, listShaderIncludesSchema,
   addScriptFunctionSchema, addScriptSignalSchema, addScriptExportSchema,
+  validateShaderSchema, compileShaderSchema,
 } from './script.js';
 
 // Resource tools
@@ -352,6 +354,8 @@ export function registerAllTools(registry: ToolRegistry): void {
   registry.register({ name: 'list_shaders', description: 'List all .gdshader files.', schema: listShadersSchema, handler: handleListShaders });
   registry.register({ name: 'write_shader', description: 'Write content to a .gdshader.', schema: writeShaderSchema, handler: handleWriteShader });
   registry.register({ name: 'validate_script', description: 'Validate GDScript for common issues.', schema: validateScriptSchema, handler: handleValidateScript });
+  registry.register({ name: 'validate_shader', description: 'Validate .gdshader for syntax issues (shader_type, braces, declarations).', schema: validateShaderSchema, handler: handleValidateShader });
+  registry.register({ name: 'compile_shader', description: 'Compile (reimport) a .gdshader via Godot editor or local validation.', schema: compileShaderSchema, handler: handleCompileShader });
   registry.register({ name: 'read_script_structure', description: 'Analyze GDScript structure.', schema: readScriptStructureSchema, handler: handleReadScriptStructure });
   registry.register({ name: 'search_in_scripts', description: 'Search in scripts with function context.', schema: searchInScriptsSchema, handler: handleSearchInScripts });
   registry.register({ name: 'list_visual_shaders', description: 'List VisualShader graph files.', schema: listVisualShadersSchema, handler: handleListVisualShaders });

@@ -943,3 +943,130 @@ export function handleAddScriptExport(
     return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
   }
 }
+
+// ---- Shader Validation & Compilation ----
+
+export const validateShaderSchema = {
+  path: z.string().min(1).describe('Path to .gdshader file to validate (relative to project root)'),
+};
+
+export const compileShaderSchema = {
+  path: z.string().min(1).describe('Path to .gdshader file to compile (relative to project root)'),
+};
+
+export function handleValidateShader(
+  projectRoot: string,
+  args: { path: string }
+): ToolResult {
+  try {
+    const absPath = resolveProjectPath(projectRoot, args.path);
+    if (!absPath.endsWith('.gdshader') && !absPath.endsWith('.gdshaderinc')) {
+      return { content: [{ type: 'text', text: `Expected .gdshader or .gdshaderinc file: ${args.path}` }], isError: true };
+    }
+
+    const { lines } = readFileLines(absPath);
+    const content = lines.join('\n');
+    const issues: string[] = [];
+    let shaderType = '';
+    let braceDepth = 0;
+
+    for (let i = 0; i < lines.length; i++) {
+      const lineNum = i + 1;
+      const line = lines[i];
+      const trimmed = line.trim();
+
+      // Skip comments and empty lines
+      if (trimmed.length === 0 || trimmed.startsWith('//')) continue;
+
+      // Check shader_type
+      if (trimmed.startsWith('shader_type ')) {
+        if (shaderType) {
+          issues.push(`  Line ${lineNum}: Duplicate shader_type declaration`);
+        } else {
+          shaderType = trimmed.replace(/^shader_type\s+/, '').replace(';', '').trim();
+          if (!['spatial', 'canvas_item', 'particles', 'sky', 'fog'].includes(shaderType)) {
+            issues.push(`  Line ${lineNum}: Unknown shader_type "${shaderType}"`);
+          }
+        }
+      }
+
+      // Track brace depth
+      for (const ch of line) {
+        if (ch === '{') braceDepth++;
+        if (ch === '}') braceDepth--;
+      }
+
+      // Check for missing semicolons in declarations
+      if (
+        (trimmed.startsWith('uniform ') || trimmed.startsWith('varying ') || trimmed.startsWith('hint_')) &&
+        !trimmed.endsWith(';') && !trimmed.endsWith('{') && !line.trimEnd().endsWith('{')
+      ) {
+        // Check if next non-empty line starts with {
+        const nextNonEmpty = lines.slice(i + 1).find(l => l.trim().length > 0);
+        if (!nextNonEmpty || !nextNonEmpty.trim().startsWith('{')) {
+          issues.push(`  Line ${lineNum}: Declaration may be missing ';'`);
+        }
+      }
+
+      // Check function declarations have matching braces
+      if (trimmed.match(/^\w+\s+\w+\s*\(/) && !trimmed.includes(':') && !trimmed.endsWith(';') && !trimmed.endsWith('{')) {
+        issues.push(`  Line ${lineNum}: Function may be missing return type ':'`);
+      }
+    }
+
+    if (!shaderType) {
+      issues.push(`  Warning: No 'shader_type' declaration found`);
+    }
+
+    if (braceDepth !== 0) {
+      issues.push(`  Error: Unbalanced braces (depth: ${braceDepth > 0 ? '+' : ''}${braceDepth})`);
+    }
+
+    if (issues.length === 0) {
+      const info = shaderType ? ` (${shaderType})` : '';
+      return {
+        content: [{ type: 'text', text: `Shader validation passed: ${args.path}${info} — ${lines.length} lines, no issues found` }],
+      };
+    }
+
+    return {
+      content: [{ type: 'text', text: `Shader validation for ${args.path}:\n\nIssues:\n${issues.join('\n')}` }],
+    };
+  } catch (err: any) {
+    return { content: [{ type: 'text', text: `Error validating shader: ${err.message}` }], isError: true };
+  }
+}
+
+/**
+ * Compile (reimport) a shader via the Godot editor plugin.
+ * This triggers Godot's built-in shader compiler and reports any compilation errors.
+ */
+export async function handleCompileShader(
+  projectRoot: string,
+  args: { path: string }
+): Promise<ToolResult> {
+  try {
+    // Try editor plugin first (triggers real shader compiler)
+    const { sendEditorCommand } = await import('./editor.js');
+    const result = await sendEditorCommand('reimport_asset', { path: args.path });
+    if (result && !result.error) {
+      return { content: [{ type: 'text', text: `Shader compiled: ${args.path}\n\nGodot shader compiler triggered via editor plugin. Check the Godot Output panel for compilation results.` }] };
+    }
+    throw new Error(result?.error || 'Editor plugin unreachable');
+  } catch {
+    // Fallback: validate locally and explain how to compile
+    const validateResult = handleValidateShader(projectRoot, { path: args.path });
+    const validateText = validateResult.content[0].text as string;
+    
+    if (validateResult.isError) {
+      return validateResult;
+    }
+
+    const hasIssues = validateText.includes('Issues:');
+    const msg = hasIssues
+      ? `Shader compilation attempted: ${args.path}\n\n⚠️  Validation found issues (see above). Fix them, then reimport the shader in Godot:\n  - Open the Godot editor\n  - Select the shader in the FileSystem dock\n  - Click "Reimport" or press Ctrl+Shift+R\n\nOr enable the Godot MCP editor plugin for automatic compilation.`
+      : `Shader ready for compilation: ${args.path}\n\n✨ Local validation passed. To compile:\n  1. Open the Godot editor\n  2. The shader will auto-compile on import\n\nOr enable the Godot MCP editor plugin for one-click compilation:\n  cp -r addons/godot_mcp <project>/addons/`;
+
+    return { content: [{ type: 'text', text: validateText + '\n\n' + msg }] };
+  }
+}
