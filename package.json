@@ -5,7 +5,7 @@
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "godot-mcp": "./dist/index.js"
+    "godot-mcp": "dist/index.js"
   },
   "publishConfig": {
     "access": "public"
@@ -38,21 +38,25 @@
   "icon": "godot.png",
   "repository": {
     "type": "git",
-    "url": "https://github.com/yanhuifair/Godot-MCP.git"
+    "url": "git+https://github.com/yanhuifair/Godot-MCP.git"
   },
   "engines": {
     "node": ">=18.0.0",
     "vscode": "^1.90.0"
   },
   "activationEvents": [],
-  "categories": ["Other"],
+  "categories": [
+    "Other"
+  ],
   "contributes": {
     "mcpServers": {
       "servers": {
         "godot-mcp": {
           "type": "stdio",
           "command": "node",
-          "args": ["${extensionPath}/dist/index.js"]
+          "args": [
+            "${extensionPath}/dist/index.js"
+          ]
         }
       }
     }
