@@ -1,0 +1,66 @@
+{
+  "name": "godot-mcp",
+  "version": "1.0.0",
+  "description": "Godot MCP — Model Context Protocol server for Godot Engine. 179 tools, 14 categories, 100% Godot 4.6 coverage. File-based + optional editor plugin.",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "godot-mcp": "./dist/index.js"
+  },
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc",
+    "postbuild": "node scripts/sync-addons.js",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "prepublish": "npm run build",
+    "vsix": "npm run build && vsce package"
+  },
+  "keywords": [
+    "godot",
+    "mcp",
+    "model-context-protocol",
+    "game-engine",
+    "ai",
+    "gdscript",
+    "godot-engine",
+    "game-development",
+    "mcp-server"
+  ],
+  "author": "",
+  "license": "MIT",
+  "icon": "godot.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/godot-mcp/godot-mcp"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "categories": ["Other"],
+  "contributes": {
+    "mcpServers": {
+      "servers": {
+        "godot-mcp": {
+          "type": "stdio",
+          "command": "node",
+          "args": ["${extensionPath}/dist/index.js"]
+        }
+      }
+    }
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "zod": "^3.24.0",
+    "zod-to-json-schema": "^3.24.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0",
+    "@types/node": "^22.0.0",
+    "tsx": "^4.0.0",
+    "vitest": "^2.0.0",
+    "@vscode/vsce": "^3.0.0"
+  }
+}

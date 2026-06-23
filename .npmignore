@@ -1,0 +1,9 @@
+src/
+test/
+.vscodeignore
+.gitignore
+tsconfig.json
+vitest.config.ts
+scripts/
+.workbuddy/
+*.vsix

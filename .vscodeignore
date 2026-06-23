@@ -1,0 +1,10 @@
+node_modules/
+src/
+test/
+*.ts
+tsconfig.json
+vitest.config.ts
+.git/
+.gitignore
+.workbuddy/
+.DS_Store

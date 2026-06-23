@@ -1,0 +1,4 @@
+[gd_scene format=3
+
+[node name="Broken" type="Node2D"
+position = Vector2(1, 2, 3

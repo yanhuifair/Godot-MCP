@@ -1,0 +1,25 @@
+[gd_scene load_steps=5 format=3 uid="uid://cm1vdsyoj27qy"]
+
+[ext_resource type="Script" path="res://player.gd" id="1_fi3rq"]
+[ext_resource type="PackedScene" uid="uid://d3dkhp3a0fde" path="res://enemy.tscn" id="2_xibng"]
+
+[sub_resource type="Animation" id="Anim_mnq0g"]
+length = 2.0
+loop_mode = 1
+
+[node name="Game" type="Node2D"]
+script = ExtResource("1_fi3rq")
+
+[node name="Player" type="CharacterBody2D" parent="Game"]
+position = Vector2(100, 200)
+rotation = 0.5
+script = ExtResource("1_fi3rq")
+
+[node name="Sprite" type="Sprite2D" parent="Game/Player"]
+texture = ExtResource("2_xibng")
+modulate = Color(1, 0.5, 0.5, 1)
+
+[node name="EnemySpawner" type="Node2D" parent="Game" index=1]
+position = Vector2(400, 300)
+
+[connection signal="body_entered" from="Game/Player" to="Game" method="_on_player_body_entered"]

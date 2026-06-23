@@ -1,0 +1,14 @@
+; Engine configuration file.
+; Godot 4.x project configuration.
+
+[application]
+config/name="My Game"
+config/description="A test game"
+run/main_scene="res://main.tscn"
+
+[rendering]
+renderer/rendering_method="forward_plus"
+textures/vram_compression/import_etc2_astc=true
+
+[autoload]
+GameManager="res://game_manager.gd"
