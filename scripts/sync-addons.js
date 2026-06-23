@@ -39,8 +39,8 @@ const targetAddons = path.join(target, 'addons', 'godot_mcp');
 // 复制目录
 fs.cpSync(sourceAddons, targetAddons, { recursive: true, force: true });
 
-// 复制 plugin.cfg 中的 UID（保持 Godot 能识别为同一插件）
-const srcPluginCfg = path.join(sourceAddons, 'godot_mcp', 'plugin.cfg');
+// 复制 plugin.cfg（保持 Godot 能识别为同一插件）
+const srcPluginCfg = path.join(sourceAddons, 'plugin.cfg');
 const dstPluginCfg = path.join(targetAddons, 'plugin.cfg');
 if (fs.existsSync(srcPluginCfg)) {
   fs.copyFileSync(srcPluginCfg, dstPluginCfg);

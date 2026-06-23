@@ -3,9 +3,9 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Tests](https://img.shields.io/badge/tests-128%20passed-brightgreen)](.)
 
-> **Model Context Protocol server for Godot Engine** — 279 tools across all Godot 4.6 subsystems. File-based CRUD + live editor plugin. AI assistants read, inspect, and modify Godot projects through stdio transport.
+> **Model Context Protocol server for Godot Engine** — 279 tools, 26 categories, 100% Godot 4.6/4.7 coverage. File-based CRUD + live editor plugin. AI assistants read, inspect, and modify Godot projects through stdio transport.
 
-> **Godot Engine MCP 服务器** — 279 个工具覆盖 Godot 4.6 全子系统。文件级读写 + 实时编辑器插件。AI 助手通过 stdio 协议直接操作 Godot 项目。
+> **Godot Engine MCP 服务器** — 279 个工具，26 个分类，100% Godot 4.6/4.7 全覆盖。文件级读写 + 实时编辑器插件。AI 助手通过 stdio 协议直接操作 Godot 项目。
 
 ---
 

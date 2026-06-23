@@ -1,7 +1,7 @@
 {
   "name": "godot-mcp",
   "version": "1.0.0",
-  "description": "Godot MCP — Model Context Protocol server for Godot Engine. 179 tools, 14 categories, 100% Godot 4.6 coverage. File-based + optional editor plugin.",
+  "description": "Godot MCP — Model Context Protocol server for Godot Engine. 279 tools, 26 categories, 100% Godot 4.6/4.7 coverage. File-based + optional editor plugin.",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
@@ -30,15 +30,18 @@
     "mcp-server"
   ],
   "author": "",
+  "publisher": "yanhuifair",
   "license": "MIT",
   "icon": "godot.png",
   "repository": {
     "type": "git",
-    "url": "https://github.com/godot-mcp/godot-mcp"
+    "url": "https://github.com/yanhuifair/Godot-MCP.git"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=18.0.0",
+    "vscode": "^1.90.0"
   },
+  "activationEvents": [],
   "categories": ["Other"],
   "contributes": {
     "mcpServers": {

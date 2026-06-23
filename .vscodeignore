@@ -7,4 +7,10 @@ vitest.config.ts
 .git/
 .gitignore
 .workbuddy/
+.reasonix/
+.dahuang/
+.mcp.json
+.npmignore
+reasonix.toml
+scripts/
 .DS_Store
