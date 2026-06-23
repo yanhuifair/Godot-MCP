@@ -29,10 +29,10 @@
 
 ```bash
 # 方式一：npx（无需安装，发布到 npm 后可用）
-npx -y godot-mcp -p /path/to/your/godot/project
+npx -y @yanhuifair/godot-mcp -p /path/to/your/godot/project
 
 # 方式二：全局安装
-npm install -g godot-mcp
+npm install -g @yanhuifair/godot-mcp
 godot-mcp -p /path/to/your/godot/project
 ```
 
@@ -85,13 +85,13 @@ AI 客户端会自动启动 MCP 服务器，无需手动运行。配置完成后
 
 ```bash
 # 发布到 npm 后，AI 客户端可直接配置 npx 命令
-npx -y godot-mcp -p /path/to/your/godot/project
+npx -y @yanhuifair/godot-mcp -p /path/to/your/godot/project
 ```
 
 ### 全局安装
 
 ```bash
-npm install -g godot-mcp
+npm install -g @yanhuifair/godot-mcp
 ```
 
 ### 从源码安装
@@ -124,7 +124,7 @@ Godot 自动检测顺序：`GODOT_PATH` → `/Applications/Godot.app` → `PATH`
   "mcpServers": {
     "godot-mcp": {
       "command": "npx",
-      "args": ["-y", "godot-mcp", "-p", "/path/to/your/godot/project"]
+      "args": ["-y", "@yanhuifair/godot-mcp", "-p", "/path/to/your/godot/project"]
     }
   }
 }
@@ -152,7 +152,7 @@ Godot 自动检测顺序：`GODOT_PATH` → `/Applications/Godot.app` → `PATH`
   "mcpServers": {
     "godot-mcp": {
       "command": "npx",
-      "args": ["-y", "godot-mcp", "-p", "/path/to/your/godot/project"]
+      "args": ["-y", "@yanhuifair/godot-mcp", "-p", "/path/to/your/godot/project"]
     }
   }
 }
@@ -167,7 +167,7 @@ Godot 自动检测顺序：`GODOT_PATH` → `/Applications/Godot.app` → `PATH`
   "mcpServers": {
     "godot-mcp": {
       "command": "npx",
-      "args": ["-y", "godot-mcp", "-p", "/path/to/your/godot/project"]
+      "args": ["-y", "@yanhuifair/godot-mcp", "-p", "/path/to/your/godot/project"]
     }
   }
 }
