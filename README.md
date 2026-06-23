@@ -6,7 +6,7 @@
 
 [中文文档](README-zh.md)
 
-> **Model Context Protocol server for Godot Engine** — 279 tools, 26 categories, Godot 4.6/4.7 coverage. File-based CRUD + live editor plugin. AI assistants read, inspect, and modify Godot projects through stdio transport.
+> **Model Context Protocol server for Godot Engine** — 281 tools, 26 categories, Godot 4.6/4.7 coverage. File-based CRUD + live editor plugin. AI assistants read, inspect, and modify Godot projects through stdio transport.
 
 ---
 
@@ -51,7 +51,7 @@ The AI client launches the MCP server automatically — no manual run needed. Ju
 | **Editor** | 78 | Live editor control: select, play, undo, save, breakpoints, search, file ops, performance |
 | **Scene** | 21 | Full scene CRUD + node add/remove/modify/clone + signals + transforms + collision + sprites |
 | **Project** | 22 | Config read/write, input map, file ops, autoloads, validation, unused asset detection |
-| **Script** | 19 | GDScript/Shader CRUD + structure analysis + code search + signal/function/export injection |
+| **Script** | 21 | GDScript/Shader CRUD + structure analysis + code search + signal/function/export injection + shader validation/compilation |
 | **Domain** | 11 | Curve, Gradient, Path, Skeleton, ReflectionProbe, MultiMesh, NoiseTexture |
 | **Animation** | 10 | AnimationPlayer/AnimationTree full pipeline: create, tracks, keyframes, params |
 | **Godot Engine** | 9 | Engine detection, launch editor, run/export project, screenshot, process control |
@@ -75,7 +75,7 @@ The AI client launches the MCP server automatically — no manual run needed. Ju
 | **Diff** | 2 | Scene and resource line-by-line/property comparison |
 | **Other** | 8 | GDExtension, C#, World3D, CameraAttributes, SpriteFrames, GridMap, Texture |
 
-**Total: 279 tools across 26 categories**
+**Total: 281 tools across 26 categories**
 
 ---
 
@@ -234,6 +234,9 @@ Or with a global install:
 → run_project → launches game
 → capture_screenshot → gameplay.png
 
+"Capture the game window with a custom name"
+→ capture_screenshot output_path="gameplay.png" window_title="My Game" delay=2
+
 "Stop the running game"
 → stop_project → terminates all Godot processes
 ```
@@ -249,6 +252,16 @@ Or with a global install:
 
 "Validate all scripts"
 → validate_script → per-file syntax/logic check
+```
+
+### Shader Validation & Compilation
+
+```
+"Validate hurricane.gdshader for syntax errors"
+→ validate_shader → shader_type, braces, declarations check
+
+"Compile the hurricane shader"
+→ compile_shader → triggers Godot's shader compiler via editor plugin
 ```
 
 ### Animation Editing

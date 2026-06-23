@@ -6,7 +6,7 @@
 
 [English Documentation](README.md)
 
-> **Godot Engine MCP 服务器** — 279 个工具，26 个分类，覆盖 Godot 4.6/4.7。文件级 CRUD + 可选实时编辑器插件。AI 助手通过 stdio 协议直接操作 Godot 项目。
+> **Godot Engine MCP 服务器** — 281 个工具，26 个分类，覆盖 Godot 4.6/4.7。文件级 CRUD + 可选实时编辑器插件。AI 助手通过 stdio 协议直接操作 Godot 项目。
 
 ---
 
@@ -51,7 +51,7 @@ AI 客户端会自动启动 MCP 服务器，无需手动运行。配置完成后
 | **Editor** | 78 | 实时编辑器控制：选中、播放、撤销、保存、断点、全局搜索、文件操作、性能监控 |
 | **Scene** | 21 | 场景完整 CRUD + 节点增删改克隆 + 信号连接 + 变换 + 碰撞 + 精灵 |
 | **Project** | 22 | 项目配置读写、输入映射管理、文件操作、自动加载、验证报告、无用资源清理 |
-| **Script** | 19 | GDScript/Shader 读写创建 + 结构分析 + 代码搜索 + 信号/函数/导出注入 |
+| **Script** | 21 | GDScript/Shader 读写创建 + 结构分析 + 代码搜索 + 信号/函数/导出注入 + 着色器验证/编译 |
 | **Domain** | 11 | 曲线、渐变、路径、骨骼、反射探针、MultiMesh、NoiseTexture |
 | **Animation** | 10 | AnimationPlayer/AnimationTree 全管道：创建、轨道、关键帧、参数 |
 | **Godot Engine** | 9 | 引擎检测、启动编辑器、运行/导出项目、截图、进程管理 |
@@ -75,7 +75,7 @@ AI 客户端会自动启动 MCP 服务器，无需手动运行。配置完成后
 | **Diff** | 2 | 场景、资源逐行/逐属性对比 |
 | **Other** | 8 | GDExtension、C#、World3D、CameraAttributes、SpriteFrames、GridMap、Texture 等 |
 
-**总计：279 个工具，26 个分类**
+**总计：281 个工具，26 个分类**
 
 ---
 
@@ -234,6 +234,9 @@ Godot 自动检测顺序：`GODOT_PATH` → `/Applications/Godot.app` → `PATH`
 → run_project → 启动游戏
 → capture_screenshot → gameplay.png
 
+"截取指定标题的游戏窗口"
+→ capture_screenshot output_path="gameplay.png" window_title="MCP_Test" delay=2
+
 "停止运行中的游戏"
 → stop_project → 终止所有 Godot 进程
 ```
@@ -249,6 +252,16 @@ Godot 自动检测顺序：`GODOT_PATH` → `/Applications/Godot.app` → `PATH`
 
 "验证所有脚本"
 → validate_script → 逐文件语法/逻辑检查
+```
+
+### 着色器验证与编译
+
+```
+"验证 hurricane.gdshader 的语法"
+→ validate_shader → 检查 shader_type、花括号、声明
+
+"编译 hurricane 着色器"
+→ compile_shader → 通过编辑器插件触发 Godot 着色器编译器
 ```
 
 ### 动画编辑
