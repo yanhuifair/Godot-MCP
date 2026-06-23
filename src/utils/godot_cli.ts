@@ -363,12 +363,54 @@ export function captureScreenshot(
 
   try {
     if (platform === 'darwin') {
-      // macOS: use screencapture with delay, then try to capture the specific window
-      // First, give the window time to render
       const absPath = path.resolve(outputPath);
-      execSync(`screencapture -T ${delay} -w "${absPath}" 2>/dev/null`, { timeout: 10000 });
+      
+      // Try to find the Godot game window by title
+      let windowID = '';
+      try {
+        // List all windows, find the one matching the title
+        const script = `tell application "System Events" to get name of every window of every process whose name contains "godot"`
+        const osaOutput = execSync(`osascript -e '${script}' 2>/dev/null`, { timeout: 5000, encoding: 'utf-8' }).trim();
+        
+        // Find window ID for the matching title
+        if (osaOutput) {
+          const findWindowScript = `
+            set windowList to {}
+            tell application "System Events"
+              repeat with p in (every process whose name contains "godot")
+                repeat with w in (every window of p)
+                  set end of windowList to (id of w) & "," & (name of w)
+                end repeat
+              end repeat
+            end tell
+            return windowList
+          `;
+          const windowList = execSync(`osascript -e '${findWindowScript}' 2>/dev/null`, { timeout: 5000, encoding: 'utf-8' }).trim();
+          const lines = windowList.split(', ');
+          for (let i = 0; i < lines.length - 1; i += 2) {
+            const id = lines[i];
+            const name = lines[i + 1];
+            // Match: game window typically has the project name or "Godot Engine" / "Godot"
+            if (name && (name.includes(windowTitle) || name.toLowerCase().includes('godot') || id.length > 0)) {
+              windowID = id;
+              break;
+            }
+          }
+        }
+      } catch {
+        // osascript failed, fall back to active window capture
+      }
+
+      if (windowID) {
+        // Capture by window ID
+        execSync(`screencapture -T ${delay} -l ${windowID} "${absPath}" 2>/dev/null`, { timeout: 15000 });
+      } else {
+        // Fallback: capture all windows matching the title pattern, or capture interactive selection
+        execSync(`screencapture -T ${delay} -w "${absPath}" 2>/dev/null`, { timeout: 15000 });
+      }
+
       if (fs.existsSync(absPath)) {
-        return { success: true, message: `Screenshot saved to ${absPath}`, path: absPath };
+        return { success: true, message: `Screenshot saved to ${absPath} (${windowID ? `window #${windowID}` : 'active window'})`, path: absPath };
       }
       return { success: false, message: 'screencapture failed to create output file' };
     }
