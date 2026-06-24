@@ -14,6 +14,7 @@
 
 - [Quick Start](#quick-start)
 - [Feature Overview](#feature-overview)
+- [All Tools](#all-tools)
 - [Installation](#installation)
 - [AI Client Configuration](#ai-client-configuration)
 - [Usage Examples](#usage-examples)
@@ -93,6 +94,194 @@ The AI client auto-launches the MCP server. **File-based tools** (.tscn, .tres, 
 | **Other** | 8 | GDExtension, C#, World3D, CameraAttributes, SpriteFrames, GridMap, Texture |
 
 **Total: 281 tools across 26 categories**
+
+---
+
+## All Tools
+
+> 🔍 Click each category to expand and see all tool names. For detailed usage examples, see [Usage Examples](#usage-examples). Editor tools are also listed with descriptions in [Editor Tools](#editor-tools-78-tools).
+
+<details>
+<summary><b>🎬 Editor</b> (89 tools) — Live editor control</summary>
+
+`editor_get_selection` `editor_set_selection` `editor_get_open_scene` `editor_read_current_scene` `editor_get_info` `editor_get_rect` `editor_focus` `editor_show_in_filesystem` `editor_open_dock` `editor_play` `editor_stop` `editor_run_specific_scene` `editor_get_running_scene_tree` `editor_get_performance_monitors` `editor_undo` `editor_redo` `editor_save` `editor_save_all` `editor_reload_scene` `editor_delete_selected` `editor_create_scene` `editor_instantiate_scene` `editor_set_main_scene` `editor_get_scene_changes` `editor_add_node` `editor_remove_node` `editor_duplicate_node` `editor_rename_node` `editor_reparent_node` `editor_move_node` `editor_get_node_properties` `editor_set_node_properties` `editor_create_script` `editor_attach_script` `editor_run_gdscript` `editor_evaluate_expression` `editor_set_breakpoint` `editor_remove_breakpoint` `editor_get_breakpoints` `editor_debug_continue` `editor_debug_step` `editor_debug_step_over` `editor_debug_break` `editor_get_stack_trace` `editor_get_debug_variables` `editor_connect_signal` `editor_disconnect_signal` `editor_list_node_signals` `editor_open_asset` `editor_list_filesystem` `editor_create_folder` `editor_delete_asset` `editor_rename_asset` `editor_move_asset` `editor_duplicate_asset` `editor_reimport_asset` `editor_get_dependency_list` `editor_get_project_setting` `editor_set_project_setting` `editor_get_editor_setting` `editor_set_editor_setting` `editor_get_project_directory` `editor_get_input_map` `editor_add_input_action` `editor_remove_input_action` `editor_get_autoload_list` `editor_add_autoload` `editor_remove_autoload` `editor_bake_lightmaps` `editor_bake_navigation` `editor_take_screenshot` `editor_get_class_list` `editor_get_method_list` `editor_get_class_property_list` `editor_get_class_signal_list` `editor_get_class_doc` `editor_search_help` `editor_get_editor_camera` `editor_set_editor_camera` `editor_toggle_grid` `editor_toggle_snap` `editor_get_recent_scenes` `editor_simulate_key` `editor_get_plugin_list` `editor_enable_plugin` `editor_disable_plugin` `editor_get_error_list` `editor_clear_errors` `editor_health_check`
+
+</details>
+
+<details>
+<summary><b>🏗️ Scene</b> (22 tools) — Full scene CRUD + nodes + signals + transforms</summary>
+
+`read_scene` `create_scene` `edit_scene` `list_scenes` `search_scene_content` `scene_dependency_graph` `add_node` `remove_node` `modify_node` `clone_node` `rename_node` `attach_script` `connect_signal` `disconnect_signal` `set_node_position` `set_node_rotation` `set_node_scale` `transform_node` `set_collision_shape` `load_sprite` `list_ui_nodes` `find_nodes_in_scenes`
+
+</details>
+
+<details>
+<summary><b>📁 Project</b> (22 tools) — Config, input map, file ops, autoloads, validation</summary>
+
+`list_project_files` `read_project_config` `write_project_config` `read_export_presets` `read_input_map` `write_input_action` `remove_input_action` `add_input_binding` `list_autoloads` `add_autoload` `remove_autoload` `search_in_project` `delete_file` `move_file` `create_directory` `duplicate_scene` `duplicate_resource` `generate_project_report` `find_unused_assets` `validate_project` `list_groups`
+
+</details>
+
+<details>
+<summary><b>📝 Script</b> (21 tools) — GDScript/Shader CRUD + analysis + injection + validation</summary>
+
+`read_script` `write_script` `create_script` `list_scripts` `read_script_structure` `search_in_scripts` `validate_script` `add_script_function` `add_script_signal` `add_script_export` `read_shader` `create_shader` `list_shaders` `write_shader` `validate_shader` `compile_shader` `list_visual_shaders` `read_visual_shader` `read_shader_include` `create_shader_include` `list_shader_includes`
+
+</details>
+
+<details>
+<summary><b>🎯 Domain</b> (11 tools) — Curve, Gradient, Path, Skeleton, ReflectionProbe, MultiMesh, NoiseTexture</summary>
+
+`read_curve` `create_curve` `read_gradient` `create_gradient` `list_paths` `read_path` `list_skeletons` `read_skeleton` `read_reflection_probe` `read_multi_mesh` `create_noise_texture`
+
+</details>
+
+<details>
+<summary><b>🎞️ Animation</b> (10 tools) — AnimationPlayer/AnimationTree full pipeline</summary>
+
+`list_animations` `read_animation` `create_animation` `set_animation_param` `add_animation_library` `add_animation_track` `set_keyframe` `remove_animation_track` `read_animation_tree` `set_animation_tree_param`
+
+</details>
+
+<details>
+<summary><b>⚙️ Godot Engine</b> (9 tools) — Engine detection, launch, run, export, screenshot</summary>
+
+`get_godot_version` `launch_editor` `run_project` `stop_project` `export_project` `capture_screenshot` `monitor_output` `is_editor_running` `list_projects`
+
+</details>
+
+<details>
+<summary><b>🎨 Coverage</b> (18 tools) — Mesh primitives, 2D lights, VehicleBody, SpringArm, Decal & more</summary>
+
+`create_mesh_primitive` `read_light_2d` `set_light_2d_param` `create_vehicle_body` `read_vehicle_body` `create_spring_arm` `read_spring_arm` `read_decal` `read_occluder` `read_marker` `read_audio_stream` `read_audio_listener` `create_camera_attributes` `create_sprite_frames` `read_sprite_frames` `read_soft_body` `read_grid_map` `create_grid_map`
+
+</details>
+
+<details>
+<summary><b>🔲 Nodes</b> (8 tools) — CharacterBody, AnimatedSprite, Audio, Video, Parallax, RichText, Container, Tab</summary>
+
+`read_character_body` `read_animated_sprite` `read_audio_player` `read_video_player` `read_parallax` `read_rich_text` `read_container` `read_tab_container`
+
+</details>
+
+<details>
+<summary><b>📦 Resource</b> (8 tools) — .tres CRUD, PBR materials, themes, templates</summary>
+
+`read_resource` `list_resources` `create_resource` `write_resource` `list_materials` `read_material` `set_material_param` `read_theme`
+
+</details>
+
+<details>
+<summary><b>🔊 Audio</b> (7 tools) — Audio bus layout CRUD, effects, volume</summary>
+
+`read_audio_bus_layout` `list_audio_files` `create_audio_bus_layout` `add_audio_bus` `remove_audio_bus` `add_bus_effect` `set_bus_volume`
+
+</details>
+
+<details>
+<summary><b>🧩 Shader Graph</b> (8 tools) — VisualShader graph node add/remove/connect, param editing</summary>
+
+`create_visual_shader` `add_shader_graph_node` `remove_shader_graph_node` `connect_shader_graph_nodes` `disconnect_shader_graph_nodes` `set_shader_node_param` `list_shader_node_types` `get_shader_node_defaults`
+
+</details>
+
+<details>
+<summary><b>🛠️ Utility</b> (6 tools) — Signals list, StyleBox, AtlasTexture, Popup, project icon, cohesion report</summary>
+
+`list_all_signals` `read_project_icon` `read_stylebox` `create_atlas_texture` `list_popups` `generate_cohesion_report`
+
+</details>
+
+<details>
+<summary><b>🖼️ Rendering</b> (5 tools) — MeshInstance, Viewport, Area, RayCast/ShapeCast</summary>
+
+`read_mesh_instance` `set_mesh_surface_material` `read_viewport` `read_area` `read_raycast`
+
+</details>
+
+<details>
+<summary><b>🌍 Environment</b> (4 tools) — Environment .tres read/write + presets</summary>
+
+`read_environment` `list_environments` `create_environment` `set_environment_param`
+
+</details>
+
+<details>
+<summary><b>🔍 Inspector</b> (5 tools) — Camera, Light, Particle node inspection and editing</summary>
+
+`list_cameras` `read_camera` `list_lights` `set_light_param` `read_particles`
+
+</details>
+
+<details>
+<summary><b>⚡ Physics</b> (4 tools) — PhysicsMaterial CRUD, collision layer names</summary>
+
+`list_physics_materials` `read_physics_material` `create_physics_material` `read_collision_layers`
+
+</details>
+
+<details>
+<summary><b>📥 Import</b> (3 tools) — .import file read/write and listing</summary>
+
+`read_import_config` `list_import_files` `write_import_config`
+
+</details>
+
+<details>
+<summary><b>🗺️ TileMap</b> (3 tools) — TileSet resource parsing, TileMapLayer inspection</summary>
+
+`list_tilesets` `read_tileset` `read_tilemap`
+
+</details>
+
+<details>
+<summary><b>🧭 Navigation</b> (3 tools) — NavigationRegion inspection + NavigationMesh creation</summary>
+
+`list_nav_regions` `read_nav_region` `create_nav_mesh`
+
+</details>
+
+<details>
+<summary><b>🌐 Translation</b> (3 tools) — CSV/PO translation file read/write</summary>
+
+`list_translations` `read_translation` `create_translation`
+
+</details>
+
+<details>
+<summary><b>🔗 Joints</b> (3 tools) — Physics joint creation, params, listing</summary>
+
+`create_joint` `set_joint_param` `list_joints`
+
+</details>
+
+<details>
+<summary><b>🆔 UID</b> (3 tools) — File UID query, batch update, missing UID detection</summary>
+
+`get_uid` `update_project_uids` `list_missing_uids`
+
+</details>
+
+<details>
+<summary><b>📐 2D Geometry</b> (2 tools) — CollisionPolygon2D, CollisionShape2D shape config</summary>
+
+`create_collision_polygon` `set_shape_points`
+
+</details>
+
+<details>
+<summary><b>🔄 Diff</b> (2 tools) — Scene and resource comparison</summary>
+
+`diff_scene` `diff_resource`
+
+</details>
+
+<details>
+<summary><b>📋 Other</b> (8 tools) — GDExtension, C#, World3D, GridMap, Texture & more</summary>
+
+`read_gdextension` `list_csproj` `create_world` `read_texture_info`
+
+</details>
 
 ---
 
