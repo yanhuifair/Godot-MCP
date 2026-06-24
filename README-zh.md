@@ -137,9 +137,9 @@ Godot 自动检测顺序：`GODOT_PATH` → `/Applications/Godot.app` → `PATH`
 
 ```bash
 npm run vsix
-# → godot-mcp-1.1.2.vsix
+# → godot-mcp-1.2.0.vsix
 
-code --install-extension godot-mcp-1.1.2.vsix
+code --install-extension godot-mcp-1.2.0.vsix
 ```
 
 安装后 MCP 服务器自动注册，Copilot / Cline / Roo Code 自动发现——**无需手动配置**。跳到[验证安装](#验证安装)。
@@ -198,7 +198,7 @@ npx @yanhuifair/godot-mcp --install-addons -p .
 然后在 Godot 编辑器中启用：**项目 → 项目设置 → 插件 → Godot MCP → 启用**。在**输出**面板确认：
 
 ```
-[Godot MCP] Plugin v1.1.2 loaded — ready on stdin/stdout
+[Godot MCP] Plugin v1.2.0 loaded — ready on stdin/stdout
 ```
 
 > 💡 启用一次后即可关闭 Godot，MCP 会在你使用编辑器命令时自动启动。
@@ -440,7 +440,7 @@ cp -r addons/godot_mcp /path/to/your/godot/project/addons/
 在 **输出** 面板确认：
 
 ```
-[Godot MCP] Plugin v1.1.2 loaded — ready on stdin/stdout
+[Godot MCP] Plugin v1.2.0 loaded — ready on stdin/stdout
 ```
 
 > 💡 插件启用一次后即可关闭 Godot，MCP 会在需要时自动启动。
@@ -635,7 +635,7 @@ npm run test:watch       # 监视模式
 
 ```bash
 npm run vsix
-# → godot-mcp-1.1.2.vsix
+# → godot-mcp-1.2.0.vsix
 ```
 
 详细安装和使用见 [VS Code 配置](#vs-code--github-copilot)。

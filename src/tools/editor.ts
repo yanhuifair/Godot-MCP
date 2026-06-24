@@ -1,19 +1,22 @@
 // ============================================================
-// Godot MCP Server — Live Editor Bridge v1.1.0 (stdio)
+// Godot MCP Server — Live Editor Bridge v1.2.0 (dual-mode)
 // ============================================================
-// Communicates with the Godot Editor via stdin/stdout.
-// The MCP server spawns Godot as a child process. Commands are
-// sent as JSON-RPC lines to Godot's stdin. Responses are read
-// from Godot's stdout, filtered by a marker prefix.
+// Communicates with Godot Editor via TCP (preferred) or by
+// spawning Godot as a child process with stdin/stdout.
+// - TCP mode: connects to an already-running Godot on port 9876
+// - stdio mode: spawns Godot if no existing instance is reachable
 // ============================================================
 
 import { z } from 'zod';
+import net from 'node:net';
 import { spawn, ChildProcess } from 'node:child_process';
 import { ToolResult } from '../utils/types.js';
 import { ErrorCode, toolError, wrapError } from '../utils/errors.js';
 import { findGodotBinary } from '../utils/godot_cli.js';
 
-const CONNECTION_TIMEOUT = 15000; // longer timeout for process startup
+const EDITOR_PORT = 9876;
+const TCP_TIMEOUT = 3000; // quick check for existing editor
+const SPAWN_TIMEOUT = 15000;
 const RESPONSE_MARKER = '__MCP__:';
 
 let _editorProcess: ChildProcess | null = null;
@@ -22,8 +25,71 @@ let _stdoutBuffer = '';
 let _projectRoot: string | null = null;
 let _lastHealthCheck = 0;
 let _lastHealthStatus = false;
+let _useTcp: boolean | null = null; // null = unknown, true = TCP, false = spawn
 
-// ---- Editor Process Lifecycle ----
+// ---- Dual-mode send ----
+
+export function sendEditorCommand(method: string, params: Record<string, any> = {}): Promise<any> {
+  // If we already know which mode works, use it
+  if (_useTcp === true) return sendViaTcp(method, params);
+  if (_useTcp === false) return sendViaSpawn(method, params);
+
+  // First call: try TCP first, fall back to spawn
+  return sendViaTcp(method, params).catch(() => {
+    return sendViaSpawn(method, params);
+  });
+}
+
+// ---- TCP mode (connect to already-running Godot) ----
+
+function sendViaTcp(method: string, params: Record<string, any> = {}): Promise<any> {
+  return new Promise((resolve, reject) => {
+    const client = new net.Socket();
+    const request = JSON.stringify({ jsonrpc: '2.0', id: Date.now(), method, params });
+    let data = '';
+    let settled = false;
+    let timeout: NodeJS.Timeout;
+
+    const finish = (err: Error | null, result?: any) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      client.destroy();
+      if (err) reject(err);
+      else resolve(result);
+    };
+
+    client.connect(EDITOR_PORT, '127.0.0.1', () => {
+      client.write(request);
+    });
+
+    client.on('data', (chunk: Buffer) => {
+      data += chunk.toString();
+      _lastHealthCheck = Date.now();
+      _lastHealthStatus = true;
+      _useTcp = true;
+      try {
+        const response = JSON.parse(data);
+        if (response.error) {
+          finish(new Error(response.error.message || 'Editor error'));
+        } else {
+          finish(null, response.result);
+        }
+      } catch {
+        finish(new Error('Invalid response from editor'));
+      }
+    });
+
+    client.on('error', () => {
+      _lastHealthStatus = false;
+      finish(new Error('Editor not reachable via TCP'));
+    });
+
+    timeout = setTimeout(() => finish(new Error('TCP connection timed out')), TCP_TIMEOUT);
+  });
+}
+
+// ---- Spawn mode (launch Godot as child process) ----
 
 function ensureEditorProcess(): ChildProcess {
   if (_editorProcess && !_editorProcess.killed && _editorProcess.exitCode === null) {
@@ -39,7 +105,6 @@ function ensureEditorProcess(): ChildProcess {
     throw new Error('Godot binary not found. Set GODOT_PATH environment variable.');
   }
 
-  // Spawn Godot editor as child process with piped stdio
   _editorProcess = spawn(godotPath, ['--editor', '--path', _projectRoot], {
     stdio: ['pipe', 'pipe', 'pipe'],
     env: { ...process.env, MCP_STDIO: 'true' },
@@ -47,11 +112,10 @@ function ensureEditorProcess(): ChildProcess {
 
   _stdoutBuffer = '';
 
-  // Parse stdout for MCP responses (marked lines)
   _editorProcess.stdout!.on('data', (data: Buffer) => {
     _stdoutBuffer += data.toString();
     const lines = _stdoutBuffer.split('\n');
-    _stdoutBuffer = lines.pop() || ''; // keep incomplete line
+    _stdoutBuffer = lines.pop() || '';
 
     for (const line of lines) {
       if (line.startsWith(RESPONSE_MARKER)) {
@@ -68,27 +132,21 @@ function ensureEditorProcess(): ChildProcess {
               _lastHealthStatus = true;
             }
           }
-        } catch {
-          // skip malformed lines
-        }
+        } catch { /* skip malformed */ }
       }
     }
   });
 
-  // Log stderr for debugging
   _editorProcess.stderr!.on('data', (data: Buffer) => {
     const text = data.toString().trim();
-    if (text) {
-      console.error(`[godot-editor] ${text}`);
-    }
+    if (text) console.error(`[godot-editor] ${text}`);
   });
 
   _editorProcess.on('exit', (code) => {
     console.error(`[Godot MCP] Editor process exited (code=${code})`);
     _lastHealthStatus = false;
-    // Reject all pending requests
     for (const [, resolver] of _pendingRequests) {
-      resolver.reject(new Error(`Editor process exited unexpectedly (code=${code})`));
+      resolver.reject(new Error(`Editor process exited (code=${code})`));
     }
     _pendingRequests.clear();
     _editorProcess = null;
@@ -103,13 +161,7 @@ function ensureEditorProcess(): ChildProcess {
   return _editorProcess;
 }
 
-/** Initialize the editor bridge with the project root. Call once on startup. */
-export function initEditorBridge(projectRoot: string): void {
-  _projectRoot = projectRoot;
-}
-
-/** Send a JSON-RPC command to the editor and wait for response. */
-export function sendEditorCommand(method: string, params: Record<string, any> = {}): Promise<any> {
+function sendViaSpawn(method: string, params: Record<string, any> = {}): Promise<any> {
   return new Promise((resolve, reject) => {
     try {
       const proc = ensureEditorProcess();
@@ -117,20 +169,25 @@ export function sendEditorCommand(method: string, params: Record<string, any> = 
       const request = JSON.stringify({ jsonrpc: '2.0', id, method, params }) + '\n';
 
       _pendingRequests.set(id, { resolve, reject });
+      _useTcp = false;
       proc.stdin!.write(request);
 
-      // Timeout guard
       setTimeout(() => {
         if (_pendingRequests.has(id)) {
           _pendingRequests.delete(id);
           reject(new Error(`Editor command timed out: ${method}`));
         }
-      }, CONNECTION_TIMEOUT);
+      }, SPAWN_TIMEOUT);
     } catch (err: any) {
       _lastHealthStatus = false;
-      reject(new Error(`Editor not available: ${err.message}. Ensure Godot is installed and the project path is correct.`));
+      reject(new Error(`Editor not available: ${err.message}`));
     }
   });
+}
+
+/** Initialize the editor bridge with the project root. Call once on startup. */
+export function initEditorBridge(projectRoot: string): void {
+  _projectRoot = projectRoot;
 }
 
 /** Check if editor is currently reachable */
