@@ -104,182 +104,490 @@ AI 客户端自动启动 MCP 服务器。**文件级工具**（.tscn、.tres、.
 <details>
 <summary><b>🎬 Editor</b> (89 个工具) — 实时编辑器控制</summary>
 
-`editor_get_selection` `editor_set_selection` `editor_get_open_scene` `editor_read_current_scene` `editor_get_info` `editor_get_rect` `editor_focus` `editor_show_in_filesystem` `editor_open_dock` `editor_play` `editor_stop` `editor_run_specific_scene` `editor_get_running_scene_tree` `editor_get_performance_monitors` `editor_undo` `editor_redo` `editor_save` `editor_save_all` `editor_reload_scene` `editor_delete_selected` `editor_create_scene` `editor_instantiate_scene` `editor_set_main_scene` `editor_get_scene_changes` `editor_add_node` `editor_remove_node` `editor_duplicate_node` `editor_rename_node` `editor_reparent_node` `editor_move_node` `editor_get_node_properties` `editor_set_node_properties` `editor_create_script` `editor_attach_script` `editor_run_gdscript` `editor_evaluate_expression` `editor_set_breakpoint` `editor_remove_breakpoint` `editor_get_breakpoints` `editor_debug_continue` `editor_debug_step` `editor_debug_step_over` `editor_debug_break` `editor_get_stack_trace` `editor_get_debug_variables` `editor_connect_signal` `editor_disconnect_signal` `editor_list_node_signals` `editor_open_asset` `editor_list_filesystem` `editor_create_folder` `editor_delete_asset` `editor_rename_asset` `editor_move_asset` `editor_duplicate_asset` `editor_reimport_asset` `editor_get_dependency_list` `editor_get_project_setting` `editor_set_project_setting` `editor_get_editor_setting` `editor_set_editor_setting` `editor_get_project_directory` `editor_get_input_map` `editor_add_input_action` `editor_remove_input_action` `editor_get_autoload_list` `editor_add_autoload` `editor_remove_autoload` `editor_bake_lightmaps` `editor_bake_navigation` `editor_take_screenshot` `editor_get_class_list` `editor_get_method_list` `editor_get_class_property_list` `editor_get_class_signal_list` `editor_get_class_doc` `editor_search_help` `editor_get_editor_camera` `editor_set_editor_camera` `editor_toggle_grid` `editor_toggle_snap` `editor_get_recent_scenes` `editor_simulate_key` `editor_get_plugin_list` `editor_enable_plugin` `editor_disable_plugin` `editor_get_error_list` `editor_clear_errors` `editor_health_check`
+| 工具 | 描述 |
+|---|---|
+| `editor_get_selection` | 获取编辑器中选中的节点。 |
+| `editor_set_selection` | 在编辑器中选择节点。 |
+| `editor_get_open_scene` | 获取当前打开的场景路径。 |
+| `editor_read_current_scene` | 读取编辑器实时场景树。 |
+| `editor_get_info` | 获取编辑器状态信息。 |
+| `editor_get_rect` | 获取编辑器窗口尺寸。 |
+| `editor_focus` | 将 Godot 编辑器窗口置于前台。 |
+| `editor_show_in_filesystem` | 在文件系统面板中定位文件。 |
+| `editor_open_dock` | 打开面板：文件系统、检查器、场景、输出。 |
+| `editor_play` | 从编辑器运行项目。 |
+| `editor_stop` | 在编辑器中停止运行。 |
+| `editor_run_specific_scene` | 运行指定场景（非主场景）。 |
+| `editor_get_running_scene_tree` | 获取游戏运行时的实时场景树。 |
+| `editor_get_performance_monitors` | 获取运行时的 FPS、绘制调用、内存使用。 |
+| `editor_undo` | 撤销上一步编辑器操作。 |
+| `editor_redo` | 重做上一步撤销操作。 |
+| `editor_save` | 保存编辑器中的当前场景。 |
+| `editor_save_all` | 保存所有打开的场景。 |
+| `editor_reload_scene` | 保存并重新加载当前场景。 |
+| `editor_delete_selected` | 删除当前选中的节点。 |
+| `editor_create_scene` | 在编辑器中创建并打开新场景。 |
+| `editor_instantiate_scene` | 将 PackedScene 实例化到当前场景。 |
+| `editor_set_main_scene` | 设置项目主场景。 |
+| `editor_get_scene_changes` | 检查当前场景是否有未保存的修改。 |
+| `editor_add_node` | 向当前打开的场景添加节点。 |
+| `editor_remove_node` | 从当前打开的场景移除节点。 |
+| `editor_duplicate_node` | 复制节点（含子节点、脚本和信号）。 |
+| `editor_rename_node` | 在编辑器中重命名节点。 |
+| `editor_reparent_node` | 将节点移动到新的父节点。 |
+| `editor_move_node` | 将 2D/3D 节点移动到新位置。 |
+| `editor_get_node_properties` | 读取节点所有编辑器可见属性。 |
+| `editor_set_node_properties` | 一次性设置节点的多个属性。 |
+| `editor_create_script` | 在编辑器中创建并打开新的 GDScript。 |
+| `editor_attach_script` | 在编辑器中为节点挂载脚本。 |
+| `editor_run_gdscript` | 在编辑器上下文中执行任意 GDScript 代码。 |
+| `editor_evaluate_expression` | 在调试器/编辑器上下文中计算 GDScript 表达式。 |
+| `editor_set_breakpoint` | 在脚本中设置断点。 |
+| `editor_remove_breakpoint` | 从脚本中移除断点。 |
+| `editor_get_breakpoints` | 列出所有断点。 |
+| `editor_debug_continue` | 在调试器中继续执行。 |
+| `editor_debug_step` | 调试器中单步进入。 |
+| `editor_debug_step_over` | 调试器中单步跳过。 |
+| `editor_debug_break` | 在调试器中停止执行（中断）。 |
+| `editor_get_stack_trace` | 从调试器获取当前调用堆栈。 |
+| `editor_get_debug_variables` | 从调试器获取局部变量。 |
+| `editor_connect_signal` | 在编辑器中连接节点间信号。 |
+| `editor_disconnect_signal` | 断开节点间的信号连接。 |
+| `editor_list_node_signals` | 列出节点上的信号及其连接。 |
+| `editor_open_asset` | 在编辑器中打开资源。 |
+| `editor_list_filesystem` | 列出编辑器文件系统中的文件和目录。 |
+| `editor_create_folder` | 通过编辑器文件系统创建目录。 |
+| `editor_delete_asset` | 通过编辑器删除文件或文件夹。 |
+| `editor_rename_asset` | 通过编辑器文件系统重命名文件。 |
+| `editor_move_asset` | 通过编辑器将文件移动到新位置。 |
+| `editor_duplicate_asset` | 通过编辑器文件系统复制文件。 |
+| `editor_reimport_asset` | 强制重新导入资源。 |
+| `editor_get_dependency_list` | 获取文件的所有资源依赖。 |
+| `editor_get_project_setting` | 通过编辑器 API 读取项目设置。 |
+| `editor_set_project_setting` | 通过编辑器 API 设置项目设置（自动保存）。 |
+| `editor_get_editor_setting` | 读取编辑器偏好设置。 |
+| `editor_set_editor_setting` | 设置编辑器偏好。 |
+| `editor_get_project_directory` | 获取项目 res:// 和 user:// 路径。 |
+| `editor_get_input_map` | 通过编辑器 API 读取输入映射。 |
+| `editor_add_input_action` | 通过编辑器 API 添加输入动作。 |
+| `editor_remove_input_action` | 通过编辑器 API 移除输入动作。 |
+| `editor_get_autoload_list` | 通过编辑器 API 列出自动加载单例。 |
+| `editor_add_autoload` | 通过编辑器 API 添加自动加载单例。 |
+| `editor_remove_autoload` | 通过编辑器 API 移除自动加载单例。 |
+| `editor_bake_lightmaps` | 触发光照贴图烘焙。 |
+| `editor_bake_navigation` | 为当前场景所有 NavigationRegion 节点烘焙导航网格。 |
+| `editor_take_screenshot` | 捕获编辑器视口为 PNG。 |
+| `editor_get_class_list` | 列出所有 Godot 类（可筛选）。 |
+| `editor_get_method_list` | 列出 Godot 类的所有方法。 |
+| `editor_get_class_property_list` | 列出类的所有编辑器可见属性。 |
+| `editor_get_class_signal_list` | 列出 Godot 类的所有信号。 |
+| `editor_get_class_doc` | 在浏览器中打开 Godot 类文档。 |
+| `editor_search_help` | 在浏览器中搜索 Godot 文档。 |
+| `editor_get_editor_camera` | 获取 3D 编辑器视口相机位置。 |
+| `editor_set_editor_camera` | 设置 3D 编辑器视口相机位置。 |
+| `editor_toggle_grid` | 切换 3D 网格可见性。 |
+| `editor_toggle_snap` | 切换 3D 吸附模式。 |
+| `editor_get_recent_scenes` | 列出最近打开的场景路径。 |
+| `editor_simulate_key` | 在编辑器中模拟按键（如 F5 运行、Ctrl+S 保存）。 |
+| `editor_get_plugin_list` | 列出所有已安装的编辑器插件及启用状态。 |
+| `editor_enable_plugin` | 启用指定的编辑器插件。 |
+| `editor_disable_plugin` | 禁用指定的编辑器插件。 |
+| `editor_get_error_list` | 获取当前编辑器错误/日志列表。 |
+| `editor_clear_errors` | 清除编辑器错误列表。 |
+| `editor_health_check` | 检查 Godot 编辑器插件是否可达。 |
 
 </details>
 
 <details>
 <summary><b>🏗️ Scene</b> (22 个工具) — 场景完整 CRUD + 节点 + 信号 + 变换</summary>
 
-`read_scene` `create_scene` `edit_scene` `list_scenes` `search_scene_content` `scene_dependency_graph` `add_node` `remove_node` `modify_node` `clone_node` `rename_node` `attach_script` `connect_signal` `disconnect_signal` `set_node_position` `set_node_rotation` `set_node_scale` `transform_node` `set_collision_shape` `load_sprite` `list_ui_nodes` `find_nodes_in_scenes`
+| 工具 | 描述 |
+|---|---|
+| `read_scene` | 读取 .tscn 场景文件。 |
+| `create_scene` | 从模板创建新场景。 |
+| `edit_scene` | 对场景应用批量操作。 |
+| `list_scenes` | 列出所有 .tscn 场景文件。 |
+| `search_scene_content` | 在 .tscn 内容中进行全文搜索。 |
+| `scene_dependency_graph` | 分析场景间依赖关系。 |
+| `add_node` | 向场景添加节点。 |
+| `remove_node` | 从场景中移除节点。 |
+| `modify_node` | 修改节点属性或重命名。 |
+| `clone_node` | 深度克隆场景中的节点。 |
+| `rename_node` | 重命名场景中的节点。 |
+| `attach_script` | 为节点挂载脚本。 |
+| `connect_signal` | 连接节点间信号。 |
+| `disconnect_signal` | 断开信号连接。 |
+| `set_node_position` | 设置节点位置（自动识别 2D/3D）。 |
+| `set_node_rotation` | 设置节点旋转（2D/3D）。 |
+| `set_node_scale` | 设置节点缩放（2D/3D）。 |
+| `transform_node` | 对节点应用变换。 |
+| `set_collision_shape` | 设置碰撞形状节点的形状。 |
+| `load_sprite` | 为 Sprite2D 节点加载纹理。 |
+| `list_ui_nodes` | 列出 Control 派生 UI 节点。 |
+| `find_nodes_in_scenes` | 按类型/属性跨场景搜索节点。 |
 
 </details>
 
 <details>
 <summary><b>📁 Project</b> (22 个工具) — 项目配置、输入映射、文件操作、自动加载、验证</summary>
 
-`list_project_files` `read_project_config` `write_project_config` `read_export_presets` `read_input_map` `write_input_action` `remove_input_action` `add_input_binding` `list_autoloads` `add_autoload` `remove_autoload` `search_in_project` `delete_file` `move_file` `create_directory` `duplicate_scene` `duplicate_resource` `generate_project_report` `find_unused_assets` `validate_project` `list_groups`
+| 工具 | 描述 |
+|---|---|
+| `list_project_files` | 列出 Godot 项目中的文件和目录。 |
+| `read_project_config` | 读取并解析 project.godot。 |
+| `write_project_config` | 向 project.godot 写入配置值。 |
+| `read_export_presets` | 读取 export_presets.cfg 中的导出预设。 |
+| `read_input_map` | 读取带按键绑定的输入映射。 |
+| `write_input_action` | 创建新的输入动作。 |
+| `remove_input_action` | 移除输入动作。 |
+| `add_input_binding` | 为动作添加按键/鼠标/手柄绑定。 |
+| `list_autoloads` | 列出所有自动加载单例。 |
+| `add_autoload` | 添加自动加载条目。 |
+| `remove_autoload` | 移除自动加载条目。 |
+| `search_in_project` | 在项目文件中搜索文本。 |
+| `delete_file` | 删除文件（保留 .bak 备份）。 |
+| `move_file` | 在项目中移动/重命名文件。 |
+| `create_directory` | 在项目中创建目录。 |
+| `duplicate_scene` | 复制场景文件。 |
+| `duplicate_resource` | 复制 .tres 资源。 |
+| `generate_project_report` | 生成全面的项目概览。 |
+| `find_unused_assets` | 查找孤立项目文件。 |
+| `validate_project` | 验证项目是否有损坏引用、缺失 UID。 |
+| `list_groups` | 列出跨场景的所有节点分组。 |
 
 </details>
 
 <details>
 <summary><b>📝 Script</b> (21 个工具) — GDScript/Shader 读写创建 + 分析 + 注入 + 验证</summary>
 
-`read_script` `write_script` `create_script` `list_scripts` `read_script_structure` `search_in_scripts` `validate_script` `add_script_function` `add_script_signal` `add_script_export` `read_shader` `create_shader` `list_shaders` `write_shader` `validate_shader` `compile_shader` `list_visual_shaders` `read_visual_shader` `read_shader_include` `create_shader_include` `list_shader_includes`
+| 工具 | 描述 |
+|---|---|
+| `read_script` | 读取带行号的脚本文件。 |
+| `write_script` | 向脚本文件写入内容。 |
+| `create_script` | 从模板创建新脚本。 |
+| `list_scripts` | 按类型分组列出所有脚本文件。 |
+| `read_script_structure` | 分析 GDScript 结构。 |
+| `search_in_scripts` | 在脚本中搜索，包含函数上下文。 |
+| `validate_script` | 验证 GDScript 的常见问题。 |
+| `add_script_function` | 向 GDScript 追加函数。 |
+| `add_script_signal` | 向 GDScript 添加信号声明。 |
+| `add_script_export` | 向 GDScript 添加 @export 变量。 |
+| `read_shader` | 读取 .gdshader 文件。 |
+| `create_shader` | 从模板创建新的 .gdshader。 |
+| `list_shaders` | 列出所有 .gdshader 文件。 |
+| `write_shader` | 向 .gdshader 写入内容。 |
+| `validate_shader` | 验证 .gdshader 语法问题（shader_type、括号、声明）。 |
+| `compile_shader` | 通过 Godot 编辑器或本地验证编译（重新导入）.gdshader。 |
+| `list_visual_shaders` | 列出 VisualShader 图文件。 |
+| `read_visual_shader` | 读取 VisualShader 图。 |
+| `read_shader_include` | 读取 .gdshaderinc 文件。 |
+| `create_shader_include` | 创建 .gdshaderinc 文件。 |
+| `list_shader_includes` | 列出所有 .gdshaderinc 文件。 |
 
 </details>
 
 <details>
 <summary><b>🎯 Domain</b> (11 个工具) — 曲线、渐变、路径、骨骼、反射探针、MultiMesh、NoiseTexture</summary>
 
-`read_curve` `create_curve` `read_gradient` `create_gradient` `list_paths` `read_path` `list_skeletons` `read_skeleton` `read_reflection_probe` `read_multi_mesh` `create_noise_texture`
+| 工具 | 描述 |
+|---|---|
+| `read_curve` | 读取 Curve 资源。 |
+| `create_curve` | 创建 Curve .tres 资源。 |
+| `read_gradient` | 读取 Gradient 资源。 |
+| `create_gradient` | 创建 Gradient .tres 资源。 |
+| `list_paths` | 列出跨场景的 Path2D/Path3D 节点。 |
+| `read_path` | 读取 Path2D/Path3D 节点及曲线点。 |
+| `list_skeletons` | 列出 Skeleton3D 节点。 |
+| `read_skeleton` | 读取 Skeleton3D 骨骼层级。 |
+| `read_reflection_probe` | 读取 ReflectionProbe 设置。 |
+| `read_multi_mesh` | 读取 MultiMeshInstance 设置。 |
+| `create_noise_texture` | 创建 NoiseTexture2D/3D .tres。 |
 
 </details>
 
 <details>
 <summary><b>🎞️ Animation</b> (10 个工具) — AnimationPlayer/AnimationTree 全管道</summary>
 
-`list_animations` `read_animation` `create_animation` `set_animation_param` `add_animation_library` `add_animation_track` `set_keyframe` `remove_animation_track` `read_animation_tree` `set_animation_tree_param`
+| 工具 | 描述 |
+|---|---|
+| `list_animations` | 列出 AnimationPlayer 和动画。 |
+| `read_animation` | 读取动画轨道和关键帧。 |
+| `create_animation` | 创建 Animation .tres 资源。 |
+| `set_animation_param` | 设置动画参数。 |
+| `add_animation_library` | 向播放器添加动画库。 |
+| `add_animation_track` | 向动画添加轨道。 |
+| `set_keyframe` | 在轨道上设置关键帧。 |
+| `remove_animation_track` | 从动画中移除轨道。 |
+| `read_animation_tree` | 读取带状态机的 AnimationTree。 |
+| `set_animation_tree_param` | 设置 AnimationTree 参数。 |
 
 </details>
 
 <details>
 <summary><b>⚙️ Godot Engine</b> (9 个工具) — 引擎检测、启动、运行、导出、截图</summary>
 
-`get_godot_version` `launch_editor` `run_project` `stop_project` `export_project` `capture_screenshot` `monitor_output` `is_editor_running` `list_projects`
+| 工具 | 描述 |
+|---|---|
+| `get_godot_version` | 检测已安装的 Godot 版本。 |
+| `launch_editor` | 启动 Godot 编辑器并加载项目。 |
+| `run_project` | 运行 Godot 项目。 |
+| `stop_project` | 停止所有运行中的 Godot 进程。 |
+| `export_project` | 通过 Godot CLI 预设导出项目。 |
+| `capture_screenshot` | 捕获运行中游戏的截图。 |
+| `monitor_output` | 读取 Godot 进程输出。 |
+| `is_editor_running` | 检查 Godot 编辑器是否在运行。 |
+| `list_projects` | 扫描目录中的 Godot 项目。 |
 
 </details>
 
 <details>
 <summary><b>🎨 Coverage</b> (18 个工具) — Mesh 原始体、2D 灯光、VehicleBody、SpringArm、Decal 等</summary>
 
-`create_mesh_primitive` `read_light_2d` `set_light_2d_param` `create_vehicle_body` `read_vehicle_body` `create_spring_arm` `read_spring_arm` `read_decal` `read_occluder` `read_marker` `read_audio_stream` `read_audio_listener` `create_camera_attributes` `create_sprite_frames` `read_sprite_frames` `read_soft_body` `read_grid_map` `create_grid_map`
+| 工具 | 描述 |
+|---|---|
+| `create_mesh_primitive` | 创建 3D 网格资源：Box、Capsule、Cylinder、Plane、Sphere、Torus 等（11 种类型）。 |
+| `read_light_2d` | 列出 PointLight2D/DirectionalLight2D 节点及其能量和阴影设置。 |
+| `set_light_2d_param` | 设置 2D 灯光节点的参数。 |
+| `create_vehicle_body` | 创建 VehicleBody3D 及 VehicleWheel 节点用于车辆物理。 |
+| `read_vehicle_body` | 列出 VehicleBody3D 节点及车轮数量。 |
+| `create_spring_arm` | 创建 SpringArm3D 用于平滑相机跟随。 |
+| `read_spring_arm` | 列出 SpringArm3D 节点及弹簧长度和碰撞设置。 |
+| `read_decal` | 列出 Decal 节点及尺寸和纹理信息。 |
+| `read_occluder` | 列出 OccluderInstance3D 和 OcclusionPolygon2D 节点。 |
+| `read_marker` | 列出跨场景的 Marker2D/Marker3D 位置标记。 |
+| `read_audio_stream` | 读取音频文件信息：格式、大小、循环、比特率（来自 .import 配置）。 |
+| `read_audio_listener` | 列出 AudioListener2D/3D 节点用于空间音频定位。 |
+| `create_camera_attributes` | 创建 CameraAttributes（Practical 或 Physical）用于 3D 相机景深和自动曝光。 |
+| `create_sprite_frames` | 创建带命名动画的 SpriteFrames .tres 资源。 |
+| `read_sprite_frames` | 列出 AnimatedSprite 节点及其 SpriteFrames 资源。 |
+| `read_soft_body` | 列出 SoftBody3D 节点及质量和刚度。 |
+| `read_grid_map` | 列出 GridMap 节点及单元格大小和网格库引用。 |
+| `create_grid_map` | 创建 GridMap 节点用于 3D 瓦片式关卡设计。 |
 
 </details>
 
 <details>
 <summary><b>🔲 Nodes</b> (8 个工具) — CharacterBody、AnimatedSprite、Audio、Video、Parallax、RichText、Container、Tab</summary>
 
-`read_character_body` `read_animated_sprite` `read_audio_player` `read_video_player` `read_parallax` `read_rich_text` `read_container` `read_tab_container`
+| 工具 | 描述 |
+|---|---|
+| `read_character_body` | 读取 CharacterBody2D/3D 属性。 |
+| `read_animated_sprite` | 读取 AnimatedSprite2D/3D 及动画和帧数据。 |
+| `read_audio_player` | 读取 AudioStreamPlayer2D/3D 及音频流和播放设置。 |
+| `read_video_player` | 读取 VideoStreamPlayer 及视频流和播放设置。 |
+| `read_parallax` | 读取 ParallaxBackground/Parallax2D 及层级配置。 |
+| `read_rich_text` | 读取 RichTextLabel 及 BBCode 内容。 |
+| `read_container` | 读取 Container 派生节点及子布局信息。 |
+| `read_tab_container` | 读取 TabContainer 及标签页名称和数量。 |
 
 </details>
 
 <details>
 <summary><b>📦 Resource</b> (8 个工具) — .tres 读写创建、材质 PBR、主题、模板</summary>
 
-`read_resource` `list_resources` `create_resource` `write_resource` `list_materials` `read_material` `set_material_param` `read_theme`
+| 工具 | 描述 |
+|---|---|
+| `read_resource` | 读取 .tres 资源文件。 |
+| `list_resources` | 列出所有资源文件。 |
+| `create_resource` | 从模板创建资源。 |
+| `write_resource` | 向资源写入属性。 |
+| `list_materials` | 按类型分组列出材质。 |
+| `read_material` | 读取材质（PBR 格式化）。 |
+| `set_material_param` | 设置单个材质参数。 |
+| `read_theme` | 读取 Theme 资源（按类型分组）。 |
 
 </details>
 
 <details>
 <summary><b>🔊 Audio</b> (7 个工具) — 音频总线布局 CRUD、效果器、音量控制</summary>
 
-`read_audio_bus_layout` `list_audio_files` `create_audio_bus_layout` `add_audio_bus` `remove_audio_bus` `add_bus_effect` `set_bus_volume`
+| 工具 | 描述 |
+|---|---|
+| `read_audio_bus_layout` | 读取 AudioBusLayout。 |
+| `list_audio_files` | 按格式列出音频文件。 |
+| `create_audio_bus_layout` | 创建 AudioBusLayout。 |
+| `add_audio_bus` | 向布局添加音频总线。 |
+| `remove_audio_bus` | 移除音频总线。 |
+| `add_bus_effect` | 向音频总线添加效果器。 |
+| `set_bus_volume` | 设置总线音量（dB）。 |
 
 </details>
 
 <details>
 <summary><b>🧩 Shader Graph</b> (8 个工具) — VisualShader 图谱节点增删连、参数设置</summary>
 
-`create_visual_shader` `add_shader_graph_node` `remove_shader_graph_node` `connect_shader_graph_nodes` `disconnect_shader_graph_nodes` `set_shader_node_param` `list_shader_node_types` `get_shader_node_defaults`
+| 工具 | 描述 |
+|---|---|
+| `create_visual_shader` | 创建新的 VisualShader .tres 图文件。 |
+| `add_shader_graph_node` | 向 VisualShader 图添加节点（40+ 节点类型：常量、数学、纹理、效果）。 |
+| `remove_shader_graph_node` | 按索引从 VisualShader 图移除节点。 |
+| `connect_shader_graph_nodes` | 在 VisualShader 图中连接两个节点端口。 |
+| `disconnect_shader_graph_nodes` | 在 VisualShader 图中断开两个节点端口。 |
+| `set_shader_node_param` | 设置 VisualShader 节点参数（常量、表达式、运算符等）。 |
+| `list_shader_node_types` | 按类别列出所有 VisualShader 节点类型及输入/输出数量。 |
+| `get_shader_node_defaults` | 获取特定 VisualShader 节点类型的默认端口和参数。 |
 
 </details>
 
 <details>
 <summary><b>🛠️ Utility</b> (6 个工具) — 全局信号列表、StyleBox、AtlasTexture、Popup、项目图标、内聚报告</summary>
 
-`list_all_signals` `read_project_icon` `read_stylebox` `create_atlas_texture` `list_popups` `generate_cohesion_report`
+| 工具 | 描述 |
+|---|---|
+| `list_all_signals` | 列出 Godot 所有内置信号。 |
+| `read_project_icon` | 读取项目图标文件。 |
+| `read_stylebox` | 读取主题和场景中的 StyleBox 资源。 |
+| `create_atlas_texture` | 从精灵表创建 AtlasTexture .tres。 |
+| `list_popups` | 列出跨场景的 Popup/PopupMenu/AcceptDialog 节点。 |
+| `generate_cohesion_report` | 生成项目代码内聚和耦合报告。 |
 
 </details>
 
 <details>
 <summary><b>🖼️ Rendering</b> (5 个工具) — MeshInstance、Viewport、Area、RayCast/ShapeCast</summary>
 
-`read_mesh_instance` `set_mesh_surface_material` `read_viewport` `read_area` `read_raycast`
+| 工具 | 描述 |
+|---|---|
+| `read_mesh_instance` | 读取 MeshInstance3D 及网格和材质槽。 |
+| `set_mesh_surface_material` | 设置网格表面槽的材质。 |
+| `read_viewport` | 读取 Viewport 节点配置。 |
+| `read_area` | 读取 Area2D/Area3D 及碰撞和重叠设置。 |
+| `read_raycast` | 读取 RayCast2D/3D 或 ShapeCast2D/3D 配置。 |
 
 </details>
 
 <details>
 <summary><b>🌍 Environment</b> (4 个工具) — Environment .tres 读写 + 预设</summary>
 
-`read_environment` `list_environments` `create_environment` `set_environment_param`
+| 工具 | 描述 |
+|---|---|
+| `read_environment` | 读取 Environment 资源。 |
+| `list_environments` | 列出 Environment 资源。 |
+| `create_environment` | 从预设创建 Environment。 |
+| `set_environment_param` | 设置环境参数。 |
 
 </details>
 
 <details>
 <summary><b>🔍 Inspector</b> (5 个工具) — Camera、Light、Particle 节点检测与编辑</summary>
 
-`list_cameras` `read_camera` `list_lights` `set_light_param` `read_particles`
+| 工具 | 描述 |
+|---|---|
+| `list_cameras` | 列出 Camera 节点。 |
+| `read_camera` | 读取相机配置。 |
+| `list_lights` | 列出灯光节点。 |
+| `set_light_param` | 设置灯光参数。 |
+| `read_particles` | 列出粒子系统。 |
 
 </details>
 
 <details>
 <summary><b>⚡ Physics</b> (4 个工具) — PhysicsMaterial CRUD、碰撞层名称</summary>
 
-`list_physics_materials` `read_physics_material` `create_physics_material` `read_collision_layers`
+| 工具 | 描述 |
+|---|---|
+| `list_physics_materials` | 列出 PhysicsMaterial。 |
+| `read_physics_material` | 读取 PhysicsMaterial。 |
+| `create_physics_material` | 创建 PhysicsMaterial。 |
+| `read_collision_layers` | 读取碰撞层名称。 |
 
 </details>
 
 <details>
 <summary><b>📥 Import</b> (3 个工具) — .import 文件读写与列表</summary>
 
-`read_import_config` `list_import_files` `write_import_config`
+| 工具 | 描述 |
+|---|---|
+| `read_import_config` | 读取 .import 文件配置。 |
+| `list_import_files` | 按类型分组列出 .import 文件。 |
+| `write_import_config` | 写入导入设置。 |
 
 </details>
 
 <details>
 <summary><b>🗺️ TileMap</b> (3 个工具) — TileSet 资源解析、TileMapLayer 节点</summary>
 
-`list_tilesets` `read_tileset` `read_tilemap`
+| 工具 | 描述 |
+|---|---|
+| `list_tilesets` | 列出 TileSet 资源。 |
+| `read_tileset` | 读取 TileSet 资源。 |
+| `read_tilemap` | 读取场景中的 TileMapLayer。 |
 
 </details>
 
 <details>
 <summary><b>🧭 Navigation</b> (3 个工具) — NavigationRegion 检测 + NavigationMesh 创建</summary>
 
-`list_nav_regions` `read_nav_region` `create_nav_mesh`
+| 工具 | 描述 |
+|---|---|
+| `list_nav_regions` | 列出 NavigationRegion 节点。 |
+| `read_nav_region` | 读取导航区域。 |
+| `create_nav_mesh` | 创建 NavigationMesh .tres。 |
 
 </details>
 
 <details>
 <summary><b>🌐 Translation</b> (3 个工具) — CSV/PO 翻译文件读写</summary>
 
-`list_translations` `read_translation` `create_translation`
+| 工具 | 描述 |
+|---|---|
+| `list_translations` | 列出翻译文件。 |
+| `read_translation` | 读取翻译文件。 |
+| `create_translation` | 创建翻译 CSV。 |
 
 </details>
 
 <details>
 <summary><b>🔗 Joints</b> (3 个工具) — 物理关节创建、参数设置、列表</summary>
 
-`create_joint` `set_joint_param` `list_joints`
+| 工具 | 描述 |
+|---|---|
+| `create_joint` | 创建物理关节（PinJoint、HingeJoint、SliderJoint 等）。 |
+| `set_joint_param` | 设置物理关节参数。 |
+| `list_joints` | 列出场景中的所有物理关节。 |
 
 </details>
 
 <details>
 <summary><b>🆔 UID</b> (3 个工具) — 文件 UID 查询、批量更新、缺失检测</summary>
 
-`get_uid` `update_project_uids` `list_missing_uids`
+| 工具 | 描述 |
+|---|---|
+| `get_uid` | 获取文件的 UID。 |
+| `update_project_uids` | 扫描缺失的 UID。 |
+| `list_missing_uids` | 列出缺少 UID 的文件。 |
 
 </details>
 
 <details>
 <summary><b>📐 2D Geometry</b> (2 个工具) — CollisionPolygon2D、CollisionShape2D 形状设置</summary>
 
-`create_collision_polygon` `set_shape_points`
+| 工具 | 描述 |
+|---|---|
+| `create_collision_polygon` | 创建带顶点集的 CollisionPolygon2D。 |
+| `set_shape_points` | 设置 CollisionShape2D 的形状点。 |
 
 </details>
 
 <details>
 <summary><b>🔄 Diff</b> (2 个工具) — 场景与资源对比</summary>
 
-`diff_scene` `diff_resource`
+| 工具 | 描述 |
+|---|---|
+| `diff_scene` | 比较两个场景文件。 |
+| `diff_resource` | 比较两个资源文件。 |
 
 </details>
 
 <details>
 <summary><b>📋 Other</b> (8 个工具) — GDExtension、C#、World3D、GridMap、Texture 等</summary>
 
-`read_gdextension` `list_csproj` `create_world` `read_texture_info`
+| 工具 | 描述 |
+|---|---|
+| `read_gdextension` | 读取 .gdextension 配置。 |
+| `list_csproj` | 列出 C# 项目文件。 |
+| `create_world` | 创建 World3D .tres。 |
+| `read_texture_info` | 读取纹理资源信息。 |
 
 </details>
 

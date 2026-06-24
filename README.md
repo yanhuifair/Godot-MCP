@@ -104,182 +104,490 @@ The AI client auto-launches the MCP server. **File-based tools** (.tscn, .tres, 
 <details>
 <summary><b>🎬 Editor</b> (89 tools) — Live editor control</summary>
 
-`editor_get_selection` `editor_set_selection` `editor_get_open_scene` `editor_read_current_scene` `editor_get_info` `editor_get_rect` `editor_focus` `editor_show_in_filesystem` `editor_open_dock` `editor_play` `editor_stop` `editor_run_specific_scene` `editor_get_running_scene_tree` `editor_get_performance_monitors` `editor_undo` `editor_redo` `editor_save` `editor_save_all` `editor_reload_scene` `editor_delete_selected` `editor_create_scene` `editor_instantiate_scene` `editor_set_main_scene` `editor_get_scene_changes` `editor_add_node` `editor_remove_node` `editor_duplicate_node` `editor_rename_node` `editor_reparent_node` `editor_move_node` `editor_get_node_properties` `editor_set_node_properties` `editor_create_script` `editor_attach_script` `editor_run_gdscript` `editor_evaluate_expression` `editor_set_breakpoint` `editor_remove_breakpoint` `editor_get_breakpoints` `editor_debug_continue` `editor_debug_step` `editor_debug_step_over` `editor_debug_break` `editor_get_stack_trace` `editor_get_debug_variables` `editor_connect_signal` `editor_disconnect_signal` `editor_list_node_signals` `editor_open_asset` `editor_list_filesystem` `editor_create_folder` `editor_delete_asset` `editor_rename_asset` `editor_move_asset` `editor_duplicate_asset` `editor_reimport_asset` `editor_get_dependency_list` `editor_get_project_setting` `editor_set_project_setting` `editor_get_editor_setting` `editor_set_editor_setting` `editor_get_project_directory` `editor_get_input_map` `editor_add_input_action` `editor_remove_input_action` `editor_get_autoload_list` `editor_add_autoload` `editor_remove_autoload` `editor_bake_lightmaps` `editor_bake_navigation` `editor_take_screenshot` `editor_get_class_list` `editor_get_method_list` `editor_get_class_property_list` `editor_get_class_signal_list` `editor_get_class_doc` `editor_search_help` `editor_get_editor_camera` `editor_set_editor_camera` `editor_toggle_grid` `editor_toggle_snap` `editor_get_recent_scenes` `editor_simulate_key` `editor_get_plugin_list` `editor_enable_plugin` `editor_disable_plugin` `editor_get_error_list` `editor_clear_errors` `editor_health_check`
+| Tool | Description |
+|---|---|
+| `editor_get_selection` | Get selected nodes in editor. |
+| `editor_set_selection` | Select node in editor. |
+| `editor_get_open_scene` | Get currently open scene path. |
+| `editor_read_current_scene` | Read live editor scene tree. |
+| `editor_get_info` | Get editor status info. |
+| `editor_get_rect` | Get editor window dimensions. |
+| `editor_focus` | Bring the Godot editor window to the foreground. |
+| `editor_show_in_filesystem` | Reveal a file in the FileSystem dock. |
+| `editor_open_dock` | Open a dock: filesystem, inspector, scene, output. |
+| `editor_play` | Play project from editor. |
+| `editor_stop` | Stop playing in editor. |
+| `editor_run_specific_scene` | Run a specific scene (not just main). |
+| `editor_get_running_scene_tree` | Get the live scene tree while the game is running. |
+| `editor_get_performance_monitors` | Get FPS, draw calls, memory usage while game is running. |
+| `editor_undo` | Undo last editor action. |
+| `editor_redo` | Redo last undone action. |
+| `editor_save` | Save current scene in editor. |
+| `editor_save_all` | Save all open scenes. |
+| `editor_reload_scene` | Save and reload current scene. |
+| `editor_delete_selected` | Delete currently selected nodes. |
+| `editor_create_scene` | Create and open a new scene in the editor. |
+| `editor_instantiate_scene` | Instantiate a PackedScene into the current scene. |
+| `editor_set_main_scene` | Set the project main scene. |
+| `editor_get_scene_changes` | Check if current scene has unsaved changes. |
+| `editor_add_node` | Add a node to the currently open scene in editor. |
+| `editor_remove_node` | Remove a node from the currently open scene. |
+| `editor_duplicate_node` | Duplicate a node with children, scripts, and signals. |
+| `editor_rename_node` | Rename a node in the editor. |
+| `editor_reparent_node` | Move a node to a new parent. |
+| `editor_move_node` | Move a 2D/3D node to a new position. |
+| `editor_get_node_properties` | Read all editor-visible properties of a node. |
+| `editor_set_node_properties` | Set multiple properties on a node at once. |
+| `editor_create_script` | Create and open a new GDScript in the editor. |
+| `editor_attach_script` | Attach a script to a node in the editor. |
+| `editor_run_gdscript` | Execute arbitrary GDScript code in editor context. |
+| `editor_evaluate_expression` | Evaluate a GDScript expression in debugger/editor context. |
+| `editor_set_breakpoint` | Set a breakpoint in a script. |
+| `editor_remove_breakpoint` | Remove a breakpoint from a script. |
+| `editor_get_breakpoints` | List all breakpoints. |
+| `editor_debug_continue` | Resume execution in debugger. |
+| `editor_debug_step` | Step into next line in debugger. |
+| `editor_debug_step_over` | Step over current line in debugger. |
+| `editor_debug_break` | Stop execution (break) in debugger. |
+| `editor_get_stack_trace` | Get current call stack from debugger. |
+| `editor_get_debug_variables` | Get local variables from debugger. |
+| `editor_connect_signal` | Connect a signal between nodes in the editor. |
+| `editor_disconnect_signal` | Disconnect a signal between nodes. |
+| `editor_list_node_signals` | List signals and their connections on a node. |
+| `editor_open_asset` | Open an asset in editor. |
+| `editor_list_filesystem` | List files and directories in the editor filesystem. |
+| `editor_create_folder` | Create a directory in the project via editor filesystem. |
+| `editor_delete_asset` | Delete a file or folder via editor. |
+| `editor_rename_asset` | Rename a file via editor filesystem. |
+| `editor_move_asset` | Move a file to a new location via editor. |
+| `editor_duplicate_asset` | Duplicate a file via editor filesystem. |
+| `editor_reimport_asset` | Force reimport of an asset. |
+| `editor_get_dependency_list` | Get all resource dependencies for a file. |
+| `editor_get_project_setting` | Read a project setting via editor API. |
+| `editor_set_project_setting` | Set a project setting via editor API (auto-saves). |
+| `editor_get_editor_setting` | Read an editor preference value. |
+| `editor_set_editor_setting` | Set an editor preference. |
+| `editor_get_project_directory` | Get project res:// and user:// paths. |
+| `editor_get_input_map` | Read the Input Map via editor API. |
+| `editor_add_input_action` | Add an input action via editor API. |
+| `editor_remove_input_action` | Remove an input action via editor API. |
+| `editor_get_autoload_list` | List autoload singletons via editor API. |
+| `editor_add_autoload` | Add an autoload singleton via editor API. |
+| `editor_remove_autoload` | Remove an autoload singleton via editor API. |
+| `editor_bake_lightmaps` | Trigger lightmap baking. |
+| `editor_bake_navigation` | Bake navigation meshes for all NavigationRegion nodes in current scene. |
+| `editor_take_screenshot` | Capture the editor viewport as a PNG. |
+| `editor_get_class_list` | List all Godot classes, optionally filtered. |
+| `editor_get_method_list` | List all methods of a Godot class. |
+| `editor_get_class_property_list` | List all editor-visible properties of a class. |
+| `editor_get_class_signal_list` | List all signals of a Godot class. |
+| `editor_get_class_doc` | Open Godot documentation for a class in browser. |
+| `editor_search_help` | Search Godot documentation in browser. |
+| `editor_get_editor_camera` | Get the 3D editor viewport camera position. |
+| `editor_set_editor_camera` | Set the 3D editor viewport camera position. |
+| `editor_toggle_grid` | Toggle 3D grid visibility. |
+| `editor_toggle_snap` | Toggle 3D snap mode. |
+| `editor_get_recent_scenes` | List recently opened scene paths. |
+| `editor_simulate_key` | Simulate a key press in the editor (e.g. F5 to run, Ctrl+S to save). |
+| `editor_get_plugin_list` | List all installed editor plugins with enabled state. |
+| `editor_enable_plugin` | Enable a named editor plugin. |
+| `editor_disable_plugin` | Disable a named editor plugin. |
+| `editor_get_error_list` | Get current editor error/log list. |
+| `editor_clear_errors` | Clear the editor error list. |
+| `editor_health_check` | Check if the Godot editor plugin is reachable. |
 
 </details>
 
 <details>
 <summary><b>🏗️ Scene</b> (22 tools) — Full scene CRUD + nodes + signals + transforms</summary>
 
-`read_scene` `create_scene` `edit_scene` `list_scenes` `search_scene_content` `scene_dependency_graph` `add_node` `remove_node` `modify_node` `clone_node` `rename_node` `attach_script` `connect_signal` `disconnect_signal` `set_node_position` `set_node_rotation` `set_node_scale` `transform_node` `set_collision_shape` `load_sprite` `list_ui_nodes` `find_nodes_in_scenes`
+| Tool | Description |
+|---|---|
+| `read_scene` | Read a .tscn scene file. |
+| `create_scene` | Create a new scene from template. |
+| `edit_scene` | Apply batch operations to a scene. |
+| `list_scenes` | List all .tscn scene files. |
+| `search_scene_content` | Full-text search in .tscn content. |
+| `scene_dependency_graph` | Analyze inter-scene dependencies. |
+| `add_node` | Add a node to a scene. |
+| `remove_node` | Remove a node from a scene. |
+| `modify_node` | Modify node properties or rename. |
+| `clone_node` | Deep-clone a node in a scene. |
+| `rename_node` | Rename a node in a scene. |
+| `attach_script` | Attach a script to a node. |
+| `connect_signal` | Connect a signal between nodes. |
+| `disconnect_signal` | Disconnect a signal. |
+| `set_node_position` | Set node position (2D/3D auto-detect). |
+| `set_node_rotation` | Set node rotation (2D/3D). |
+| `set_node_scale` | Set node scale (2D/3D). |
+| `transform_node` | Apply a transform to a node. |
+| `set_collision_shape` | Set collision shape for CollisionShape node. |
+| `load_sprite` | Load a texture onto a Sprite2D node. |
+| `list_ui_nodes` | List Control-derived UI nodes. |
+| `find_nodes_in_scenes` | Search nodes across scenes by type/property. |
 
 </details>
 
 <details>
 <summary><b>📁 Project</b> (22 tools) — Config, input map, file ops, autoloads, validation</summary>
 
-`list_project_files` `read_project_config` `write_project_config` `read_export_presets` `read_input_map` `write_input_action` `remove_input_action` `add_input_binding` `list_autoloads` `add_autoload` `remove_autoload` `search_in_project` `delete_file` `move_file` `create_directory` `duplicate_scene` `duplicate_resource` `generate_project_report` `find_unused_assets` `validate_project` `list_groups`
+| Tool | Description |
+|---|---|
+| `list_project_files` | List files and directories in the Godot project. |
+| `read_project_config` | Read and parse project.godot. |
+| `write_project_config` | Write a config value to project.godot. |
+| `read_export_presets` | Read export presets from export_presets.cfg. |
+| `read_input_map` | Read input map with key bindings. |
+| `write_input_action` | Create a new input action. |
+| `remove_input_action` | Remove an input action. |
+| `add_input_binding` | Add key/mouse/joypad binding to action. |
+| `list_autoloads` | List all autoload singletons. |
+| `add_autoload` | Add an autoload entry. |
+| `remove_autoload` | Remove an autoload entry. |
+| `search_in_project` | Search for text across project files. |
+| `delete_file` | Delete a file with .bak backup. |
+| `move_file` | Move/rename a file within project. |
+| `create_directory` | Create a directory in project. |
+| `duplicate_scene` | Duplicate a scene file. |
+| `duplicate_resource` | Duplicate a .tres resource. |
+| `generate_project_report` | Generate comprehensive project overview. |
+| `find_unused_assets` | Find orphaned project files. |
+| `validate_project` | Validate project for broken refs, empty UIDs. |
+| `list_groups` | List all node groups across scenes. |
 
 </details>
 
 <details>
 <summary><b>📝 Script</b> (21 tools) — GDScript/Shader CRUD + analysis + injection + validation</summary>
 
-`read_script` `write_script` `create_script` `list_scripts` `read_script_structure` `search_in_scripts` `validate_script` `add_script_function` `add_script_signal` `add_script_export` `read_shader` `create_shader` `list_shaders` `write_shader` `validate_shader` `compile_shader` `list_visual_shaders` `read_visual_shader` `read_shader_include` `create_shader_include` `list_shader_includes`
+| Tool | Description |
+|---|---|
+| `read_script` | Read a script file with line numbers. |
+| `write_script` | Write content to a script file. |
+| `create_script` | Create a new script from template. |
+| `list_scripts` | List all script files grouped by type. |
+| `read_script_structure` | Analyze GDScript structure. |
+| `search_in_scripts` | Search in scripts with function context. |
+| `validate_script` | Validate GDScript for common issues. |
+| `add_script_function` | Append a function to GDScript. |
+| `add_script_signal` | Add a signal declaration to GDScript. |
+| `add_script_export` | Add @export variable to GDScript. |
+| `read_shader` | Read a .gdshader file. |
+| `create_shader` | Create a new .gdshader from template. |
+| `list_shaders` | List all .gdshader files. |
+| `write_shader` | Write content to a .gdshader. |
+| `validate_shader` | Validate .gdshader for syntax issues (shader_type, braces, declarations). |
+| `compile_shader` | Compile (reimport) a .gdshader via Godot editor or local validation. |
+| `list_visual_shaders` | List VisualShader graph files. |
+| `read_visual_shader` | Read a VisualShader graph. |
+| `read_shader_include` | Read a .gdshaderinc file. |
+| `create_shader_include` | Create a .gdshaderinc file. |
+| `list_shader_includes` | List all .gdshaderinc files. |
 
 </details>
 
 <details>
 <summary><b>🎯 Domain</b> (11 tools) — Curve, Gradient, Path, Skeleton, ReflectionProbe, MultiMesh, NoiseTexture</summary>
 
-`read_curve` `create_curve` `read_gradient` `create_gradient` `list_paths` `read_path` `list_skeletons` `read_skeleton` `read_reflection_probe` `read_multi_mesh` `create_noise_texture`
+| Tool | Description |
+|---|---|
+| `read_curve` | Read a Curve resource. |
+| `create_curve` | Create a Curve .tres resource. |
+| `read_gradient` | Read a Gradient resource. |
+| `create_gradient` | Create a Gradient .tres resource. |
+| `list_paths` | List Path2D/Path3D nodes across scenes. |
+| `read_path` | Read a Path2D/Path3D node with curve points. |
+| `list_skeletons` | List Skeleton3D nodes. |
+| `read_skeleton` | Read Skeleton3D bone hierarchy. |
+| `read_reflection_probe` | Read ReflectionProbe settings. |
+| `read_multi_mesh` | Read MultiMeshInstance settings. |
+| `create_noise_texture` | Create a NoiseTexture2D/3D .tres. |
 
 </details>
 
 <details>
 <summary><b>🎞️ Animation</b> (10 tools) — AnimationPlayer/AnimationTree full pipeline</summary>
 
-`list_animations` `read_animation` `create_animation` `set_animation_param` `add_animation_library` `add_animation_track` `set_keyframe` `remove_animation_track` `read_animation_tree` `set_animation_tree_param`
+| Tool | Description |
+|---|---|
+| `list_animations` | List AnimationPlayers and animations. |
+| `read_animation` | Read animation tracks and keyframes. |
+| `create_animation` | Create Animation .tres resource. |
+| `set_animation_param` | Set animation parameter. |
+| `add_animation_library` | Add animation library to player. |
+| `add_animation_track` | Add track to animation. |
+| `set_keyframe` | Set keyframe on track. |
+| `remove_animation_track` | Remove track from animation. |
+| `read_animation_tree` | Read AnimationTree with state machine. |
+| `set_animation_tree_param` | Set AnimationTree parameter. |
 
 </details>
 
 <details>
 <summary><b>⚙️ Godot Engine</b> (9 tools) — Engine detection, launch, run, export, screenshot</summary>
 
-`get_godot_version` `launch_editor` `run_project` `stop_project` `export_project` `capture_screenshot` `monitor_output` `is_editor_running` `list_projects`
+| Tool | Description |
+|---|---|
+| `get_godot_version` | Detect installed Godot version. |
+| `launch_editor` | Launch Godot editor with project. |
+| `run_project` | Run the Godot project. |
+| `stop_project` | Stop all running Godot processes. |
+| `export_project` | Export project via Godot CLI preset. |
+| `capture_screenshot` | Capture screenshot of running game. |
+| `monitor_output` | Read Godot process output. |
+| `is_editor_running` | Check if Godot editor is running. |
+| `list_projects` | Scan directory for Godot projects. |
 
 </details>
 
 <details>
 <summary><b>🎨 Coverage</b> (18 tools) — Mesh primitives, 2D lights, VehicleBody, SpringArm, Decal & more</summary>
 
-`create_mesh_primitive` `read_light_2d` `set_light_2d_param` `create_vehicle_body` `read_vehicle_body` `create_spring_arm` `read_spring_arm` `read_decal` `read_occluder` `read_marker` `read_audio_stream` `read_audio_listener` `create_camera_attributes` `create_sprite_frames` `read_sprite_frames` `read_soft_body` `read_grid_map` `create_grid_map`
+| Tool | Description |
+|---|---|
+| `create_mesh_primitive` | Create 3D mesh resource: Box, Capsule, Cylinder, Plane, Sphere, Torus, etc. (11 types). |
+| `read_light_2d` | List PointLight2D/DirectionalLight2D nodes with energy and shadow settings. |
+| `set_light_2d_param` | Set a parameter on a 2D light node. |
+| `create_vehicle_body` | Create a VehicleBody3D with VehicleWheel nodes for car physics. |
+| `read_vehicle_body` | List VehicleBody3D nodes with wheel counts. |
+| `create_spring_arm` | Create a SpringArm3D for smooth camera follow. |
+| `read_spring_arm` | List SpringArm3D nodes with spring length and collision settings. |
+| `read_decal` | List Decal nodes with size and texture info. |
+| `read_occluder` | List OccluderInstance3D and OcclusionPolygon2D nodes. |
+| `read_marker` | List Marker2D/Marker3D position markers across scenes. |
+| `read_audio_stream` | Read audio file info: format, size, loop, bitrate from .import config. |
+| `read_audio_listener` | List AudioListener2D/3D nodes for spatial audio positioning. |
+| `create_camera_attributes` | Create CameraAttributes (Practical or Physical) for 3D camera DOF and auto-exposure. |
+| `create_sprite_frames` | Create a SpriteFrames .tres resource with named animations. |
+| `read_sprite_frames` | List AnimatedSprite nodes and their SpriteFrames resources. |
+| `read_soft_body` | List SoftBody3D nodes with mass and stiffness. |
+| `read_grid_map` | List GridMap nodes with cell size and mesh library references. |
+| `create_grid_map` | Create a GridMap node for 3D tile-based level design. |
 
 </details>
 
 <details>
 <summary><b>🔲 Nodes</b> (8 tools) — CharacterBody, AnimatedSprite, Audio, Video, Parallax, RichText, Container, Tab</summary>
 
-`read_character_body` `read_animated_sprite` `read_audio_player` `read_video_player` `read_parallax` `read_rich_text` `read_container` `read_tab_container`
+| Tool | Description |
+|---|---|
+| `read_character_body` | Read CharacterBody2D/3D properties. |
+| `read_animated_sprite` | Read AnimatedSprite2D/3D with animation and frame data. |
+| `read_audio_player` | Read AudioStreamPlayer2D/3D with stream and playback settings. |
+| `read_video_player` | Read VideoStreamPlayer with video stream and playback settings. |
+| `read_parallax` | Read ParallaxBackground/Parallax2D with layer configuration. |
+| `read_rich_text` | Read RichTextLabel with BBCode content. |
+| `read_container` | Read Container-derived nodes with child layout info. |
+| `read_tab_container` | Read TabContainer with tab names and counts. |
 
 </details>
 
 <details>
 <summary><b>📦 Resource</b> (8 tools) — .tres CRUD, PBR materials, themes, templates</summary>
 
-`read_resource` `list_resources` `create_resource` `write_resource` `list_materials` `read_material` `set_material_param` `read_theme`
+| Tool | Description |
+|---|---|
+| `read_resource` | Read a .tres resource file. |
+| `list_resources` | List all resource files. |
+| `create_resource` | Create a resource from template. |
+| `write_resource` | Write properties to a resource. |
+| `list_materials` | List materials grouped by type. |
+| `read_material` | Read material with PBR formatting. |
+| `set_material_param` | Set a single material parameter. |
+| `read_theme` | Read Theme resource with type-aware grouping. |
 
 </details>
 
 <details>
 <summary><b>🔊 Audio</b> (7 tools) — Audio bus layout CRUD, effects, volume</summary>
 
-`read_audio_bus_layout` `list_audio_files` `create_audio_bus_layout` `add_audio_bus` `remove_audio_bus` `add_bus_effect` `set_bus_volume`
+| Tool | Description |
+|---|---|
+| `read_audio_bus_layout` | Read AudioBusLayout. |
+| `list_audio_files` | List audio files by format. |
+| `create_audio_bus_layout` | Create AudioBusLayout. |
+| `add_audio_bus` | Add audio bus to layout. |
+| `remove_audio_bus` | Remove audio bus. |
+| `add_bus_effect` | Add effect to audio bus. |
+| `set_bus_volume` | Set bus volume in dB. |
 
 </details>
 
 <details>
 <summary><b>🧩 Shader Graph</b> (8 tools) — VisualShader graph node add/remove/connect, param editing</summary>
 
-`create_visual_shader` `add_shader_graph_node` `remove_shader_graph_node` `connect_shader_graph_nodes` `disconnect_shader_graph_nodes` `set_shader_node_param` `list_shader_node_types` `get_shader_node_defaults`
+| Tool | Description |
+|---|---|
+| `create_visual_shader` | Create a new VisualShader .tres graph file. |
+| `add_shader_graph_node` | Add a node to a VisualShader graph. 40+ node types available (constants, math, textures, effects). |
+| `remove_shader_graph_node` | Remove a node from a VisualShader graph by index. |
+| `connect_shader_graph_nodes` | Connect two node ports in a VisualShader graph. |
+| `disconnect_shader_graph_nodes` | Disconnect two node ports in a VisualShader graph. |
+| `set_shader_node_param` | Set a parameter on a VisualShader node (constant, expression, operator, etc.). |
+| `list_shader_node_types` | List all VisualShader node types organized by category with input/output counts. |
+| `get_shader_node_defaults` | Get default ports and parameters for a specific VisualShader node type. |
 
 </details>
 
 <details>
 <summary><b>🛠️ Utility</b> (6 tools) — Signals list, StyleBox, AtlasTexture, Popup, project icon, cohesion report</summary>
 
-`list_all_signals` `read_project_icon` `read_stylebox` `create_atlas_texture` `list_popups` `generate_cohesion_report`
+| Tool | Description |
+|---|---|
+| `list_all_signals` | List all built-in signals across Godot classes. |
+| `read_project_icon` | Read the project icon file. |
+| `read_stylebox` | Read StyleBox resources in themes and scenes. |
+| `create_atlas_texture` | Create an AtlasTexture .tres from a sprite sheet. |
+| `list_popups` | List Popup/PopupMenu/AcceptDialog nodes across scenes. |
+| `generate_cohesion_report` | Generate project code cohesion and coupling report. |
 
 </details>
 
 <details>
 <summary><b>🖼️ Rendering</b> (5 tools) — MeshInstance, Viewport, Area, RayCast/ShapeCast</summary>
 
-`read_mesh_instance` `set_mesh_surface_material` `read_viewport` `read_area` `read_raycast`
+| Tool | Description |
+|---|---|
+| `read_mesh_instance` | Read MeshInstance3D with mesh and material slots. |
+| `set_mesh_surface_material` | Set material on a mesh surface slot. |
+| `read_viewport` | Read Viewport node configuration. |
+| `read_area` | Read Area2D/Area3D with collision and overlap settings. |
+| `read_raycast` | Read RayCast2D/3D or ShapeCast2D/3D configuration. |
 
 </details>
 
 <details>
 <summary><b>🌍 Environment</b> (4 tools) — Environment .tres read/write + presets</summary>
 
-`read_environment` `list_environments` `create_environment` `set_environment_param`
+| Tool | Description |
+|---|---|
+| `read_environment` | Read Environment resource. |
+| `list_environments` | List Environment resources. |
+| `create_environment` | Create Environment from preset. |
+| `set_environment_param` | Set environment parameter. |
 
 </details>
 
 <details>
 <summary><b>🔍 Inspector</b> (5 tools) — Camera, Light, Particle node inspection and editing</summary>
 
-`list_cameras` `read_camera` `list_lights` `set_light_param` `read_particles`
+| Tool | Description |
+|---|---|
+| `list_cameras` | List Camera nodes. |
+| `read_camera` | Read camera configuration. |
+| `list_lights` | List light nodes. |
+| `set_light_param` | Set light parameter. |
+| `read_particles` | List particle systems. |
 
 </details>
 
 <details>
 <summary><b>⚡ Physics</b> (4 tools) — PhysicsMaterial CRUD, collision layer names</summary>
 
-`list_physics_materials` `read_physics_material` `create_physics_material` `read_collision_layers`
+| Tool | Description |
+|---|---|
+| `list_physics_materials` | List PhysicsMaterials. |
+| `read_physics_material` | Read PhysicsMaterial. |
+| `create_physics_material` | Create PhysicsMaterial. |
+| `read_collision_layers` | Read collision layer names. |
 
 </details>
 
 <details>
 <summary><b>📥 Import</b> (3 tools) — .import file read/write and listing</summary>
 
-`read_import_config` `list_import_files` `write_import_config`
+| Tool | Description |
+|---|---|
+| `read_import_config` | Read .import file config. |
+| `list_import_files` | List .import files grouped by type. |
+| `write_import_config` | Write import settings. |
 
 </details>
 
 <details>
 <summary><b>🗺️ TileMap</b> (3 tools) — TileSet resource parsing, TileMapLayer inspection</summary>
 
-`list_tilesets` `read_tileset` `read_tilemap`
+| Tool | Description |
+|---|---|
+| `list_tilesets` | List TileSet resources. |
+| `read_tileset` | Read TileSet resource. |
+| `read_tilemap` | Read TileMapLayer in scene. |
 
 </details>
 
 <details>
 <summary><b>🧭 Navigation</b> (3 tools) — NavigationRegion inspection + NavigationMesh creation</summary>
 
-`list_nav_regions` `read_nav_region` `create_nav_mesh`
+| Tool | Description |
+|---|---|
+| `list_nav_regions` | List NavigationRegion nodes. |
+| `read_nav_region` | Read navigation region. |
+| `create_nav_mesh` | Create NavigationMesh .tres. |
 
 </details>
 
 <details>
 <summary><b>🌐 Translation</b> (3 tools) — CSV/PO translation file read/write</summary>
 
-`list_translations` `read_translation` `create_translation`
+| Tool | Description |
+|---|---|
+| `list_translations` | List translation files. |
+| `read_translation` | Read translation file. |
+| `create_translation` | Create translation CSV. |
 
 </details>
 
 <details>
 <summary><b>🔗 Joints</b> (3 tools) — Physics joint creation, params, listing</summary>
 
-`create_joint` `set_joint_param` `list_joints`
+| Tool | Description |
+|---|---|
+| `create_joint` | Create a physics joint (PinJoint, HingeJoint, SliderJoint, etc.). |
+| `set_joint_param` | Set a parameter on a physics joint. |
+| `list_joints` | List all physics joints in a scene. |
 
 </details>
 
 <details>
 <summary><b>🆔 UID</b> (3 tools) — File UID query, batch update, missing UID detection</summary>
 
-`get_uid` `update_project_uids` `list_missing_uids`
+| Tool | Description |
+|---|---|
+| `get_uid` | Get UID for a file. |
+| `update_project_uids` | Scan for missing UIDs. |
+| `list_missing_uids` | List files missing UIDs. |
 
 </details>
 
 <details>
 <summary><b>📐 2D Geometry</b> (2 tools) — CollisionPolygon2D, CollisionShape2D shape config</summary>
 
-`create_collision_polygon` `set_shape_points`
+| Tool | Description |
+|---|---|
+| `create_collision_polygon` | Create a CollisionPolygon2D with vertex points. |
+| `set_shape_points` | Set the shape points on a CollisionShape2D. |
 
 </details>
 
 <details>
 <summary><b>🔄 Diff</b> (2 tools) — Scene and resource comparison</summary>
 
-`diff_scene` `diff_resource`
+| Tool | Description |
+|---|---|
+| `diff_scene` | Compare two scene files. |
+| `diff_resource` | Compare two resource files. |
 
 </details>
 
 <details>
 <summary><b>📋 Other</b> (8 tools) — GDExtension, C#, World3D, GridMap, Texture & more</summary>
 
-`read_gdextension` `list_csproj` `create_world` `read_texture_info`
+| Tool | Description |
+|---|---|
+| `read_gdextension` | Read .gdextension config. |
+| `list_csproj` | List C# project files. |
+| `create_world` | Create World3D .tres. |
+| `read_texture_info` | Read texture asset info. |
 
 </details>
 
