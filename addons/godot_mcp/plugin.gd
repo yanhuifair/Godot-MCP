@@ -2,7 +2,7 @@
 extends EditorPlugin
 
 # ============================================================
-# Godot MCP Editor Plugin v1.2.0
+# Godot MCP Editor Plugin v1.3.0
 # ============================================================
 # Dual-mode communication with the MCP server:
 # - stdio mode: when spawned by MCP (MCP_STDIO=true), reads

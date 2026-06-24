@@ -6,7 +6,7 @@
 
 [中文文档](README-zh.md)
 
-> **Model Context Protocol server for Godot Engine** — 281 tools, 26 categories, Godot 4.6/4.7 coverage. File-based CRUD + live editor plugin. AI assistants read, inspect, and modify Godot projects through stdio transport.
+> **Model Context Protocol server for Godot Engine** — 281 tools, 26 categories, Godot 4.6/4.7 coverage. File-based CRUD + live editor plugin. AI assistants read, inspect, and modify Godot projects through **Stdio**, **SSE**, or **Streamable HTTP** transport.
 
 ---
 
@@ -137,9 +137,9 @@ Godot auto-detection: `GODOT_PATH` → `/Applications/Godot.app` → `PATH` → 
 
 ```bash
 npm run vsix
-# → godot-mcp-1.2.0.vsix
+# → godot-mcp-1.3.0.vsix
 
-code --install-extension godot-mcp-1.2.0.vsix
+code --install-extension godot-mcp-1.3.0.vsix
 ```
 
 After installation, the MCP server auto-registers. Copilot / Cline / Roo Code discover it automatically — **no manual config required**. Skip to [Verify Setup](#verify-setup).
@@ -176,6 +176,55 @@ Create `.vscode/mcp.json` in your Godot project root:
 
 > 💡 **Tip**: Commit `.vscode/mcp.json` to your repo so every team member gets the MCP server automatically.
 
+#### SSE (Server-Sent Events) — HTTP transport
+
+For remote or web-based MCP clients that use SSE:
+
+1. Start the server in SSE mode:
+   ```bash
+   npx @yanhuifair/godot-mcp -t sse --port 3000 -p .
+   ```
+
+2. Configure your MCP client:
+   ```json
+   {
+     "mcpServers": {
+       "godot-mcp": {
+         "url": "http://127.0.0.1:3000/sse"
+       }
+     }
+   }
+   ```
+
+#### Streamable HTTP — MCP 2025 transport
+
+For modern MCP clients supporting the Streamable HTTP spec:
+
+1. Start the server in Streamable HTTP mode:
+   ```bash
+   npx @yanhuifair/godot-mcp -t streamable-http --port 3000 -p .
+   ```
+
+2. Configure your MCP client:
+   ```json
+   {
+     "mcpServers": {
+       "godot-mcp": {
+         "url": "http://127.0.0.1:3000/mcp",
+         "transportType": "streamable-http"
+       }
+     }
+   }
+   ```
+
+#### All transports simultaneously
+
+Run all three transports at once (stdio + SSE + Streamable HTTP):
+
+```bash
+npx @yanhuifair/godot-mcp -t all --port 3000 -p .
+```
+
 #### Verify Setup
 
 1. Open your Godot project folder in VS Code
@@ -198,7 +247,7 @@ npx @yanhuifair/godot-mcp --install-addons -p .
 Then enable in Godot Editor: **Project → Project Settings → Plugins → Godot MCP → Enable**. Confirm in the **Output** panel:
 
 ```
-[Godot MCP] Plugin v1.2.0 loaded — ready on stdin/stdout
+[Godot MCP] Plugin v1.3.0 loaded — ready on stdin/stdout
 ```
 
 > 💡 After enabling once, close Godot. MCP spawns it automatically when you use editor commands.
@@ -440,7 +489,7 @@ If not visible, click **Restart** or reopen the project.
 Confirm in the **Output** panel:
 
 ```
-[Godot MCP] Plugin v1.2.0 loaded — ready on stdin/stdout
+[Godot MCP] Plugin v1.3.0 loaded — ready on stdin/stdout
 ```
 
 > 💡 After enabling the plugin once, you can close Godot. MCP will launch it automatically when needed.
@@ -636,7 +685,7 @@ npm run test:watch       # Watch mode
 
 ```bash
 npm run vsix
-# → godot-mcp-1.2.0.vsix
+# → godot-mcp-1.3.0.vsix
 ```
 
 See [VS Code Setup](#vs-code--github-copilot) for installation and usage.

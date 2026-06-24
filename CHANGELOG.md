@@ -1,5 +1,36 @@
 # Changelog
 
+## v1.3.0 (2026-06-24)
+
+### Multi-Transport Support
+- **New**: Stdio transport (`-t stdio`, default) — stdin/stdout for Claude Desktop / VS Code
+- **New**: SSE transport (`-t sse --port 3000`) — HTTP Server-Sent Events for legacy MCP clients
+- **New**: Streamable HTTP transport (`-t streamable-http --port 3000`) — MCP 2025 spec, supports session resumption
+- **New**: `-t all` mode — run Stdio + SSE + Streamable HTTP simultaneously
+- **New**: `--port` / `--host` / `--no-sse` / `--no-streamable-http` CLI flags
+- **New**: `/health` endpoint — health check with version + active endpoints
+- **Refactored**: `server.ts` → factory pattern (`createMcpServer`, `initSharedResources`)
+- **Refactored**: Transport layer extracted to `src/transports/` (stdio.ts, http-server.ts)
+- **Deps**: Added `express` dependency for HTTP server
+
+## v1.2.0 (2026-06-23)
+
+### Dual-Mode Editor Bridge
+- **New**: stdio mode — editor plugin reads commands from stdin when spawned by MCP
+- **New**: TCP mode — editor plugin listens on port 9876 for direct Godot launches
+- **New**: `--install-addons` CLI flag to install editor plugin to project
+
+## v1.1.2 (2026-06-22)
+
+### Fixes
+- Fixed plugin loading guard for stdio mode
+
+## v1.0.2 (2026-06-21)
+
+### Features
+- `--install-addons` CLI flag for editor plugin installation
+- Shader tools and screenshot usage docs
+
 ## v1.0.0 (2026-06-16)
 
 ### Structural

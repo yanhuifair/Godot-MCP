@@ -198,8 +198,9 @@ describe('Godot Tools (integration)', () => {
 
 describe('Server initialization', () => {
   it('server can be created', async () => {
-    const { GodotMcpServer } = await import('../src/server.js');
-    const server = new GodotMcpServer(testDir);
+    const { createMcpServer, initSharedResources } = await import('../src/server.js');
+    initSharedResources(testDir);
+    const server = createMcpServer();
     expect(server).toBeDefined();
   });
 });
