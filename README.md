@@ -311,17 +311,23 @@ The optional editor plugin provides **real-time editor control** via TCP on port
 
 ### Install the Plugin
 
-1. Copy the plugin to your project:
+**Option 1: CLI one-liner (recommended)**
+
+```bash
+godot-mcp --install-addons -p /path/to/your/godot/project
+```
+
+**Option 2: Manual copy**
 
 ```bash
 cp -r addons/godot_mcp /path/to/your/godot/project/addons/
 ```
 
-2. Enable in Godot: **Project → Project Settings → Plugins → Godot MCP → Enable**
+Then enable in Godot: **Project → Project Settings → Plugins → Godot MCP → Enable**
 
-3. If not visible, click **Restart** or reopen the project
+If not visible, click **Restart** or reopen the project.
 
-4. Confirm in the **Output** panel:
+Confirm in the **Output** panel:
 
 ```
 [Godot MCP] TCP server listening on port 9876
@@ -385,8 +391,8 @@ cp -r addons/godot_mcp /path/to/your/godot/project/addons/
 └────────┬────────────┘
          │ MCP (stdio)
 ┌────────▼──────────────┐        TCP :9876      ┌──────────────────┐
-│   Godot MCP Server     │ ◄───────────────────► │  Godot Editor     │
-│   (TypeScript, 279 tools)│   (editor plugin)   │  (GDScript addon) │
+│   Godot MCP Server      │ ◄───────────────────► │  Godot Editor     │
+│   (TypeScript, 281 tools)│   (editor plugin)   │  (GDScript addon) │
 │                        │                       │                  │
 │  ┌──────────────────┐  │                       │  78 editor cmds   │
 │  │  Tool Handlers    │  │                       │  JSON-RPC/TCP    │
@@ -408,7 +414,7 @@ godot-mcp/
 │   ├── index.ts              # CLI entry point
 │   ├── server.ts             # MCP server core
 │   ├── tools/                # 33 handler files
-│   │   ├── register.ts       # Centralized registration (279 tools)
+│   │   ├── register.ts       # Centralized registration (281 tools)
 │   │   ├── project.ts        # Project tools
 │   │   ├── scene.ts          # Scene tools
 │   │   ├── script.ts         # Script + shader tools
@@ -500,6 +506,7 @@ npm run test:watch       # Watch mode
 |---|---|
 | `-p, --project-path` | Path to Godot project root |
 | `-g, --godot-path` | Path to Godot binary (optional) |
+| `--install-addons` | Copy addons/godot_mcp to target Godot project |
 | `-h, --help` | Show help |
 
 ### Tech Stack
@@ -517,13 +524,13 @@ npm run test:watch       # Watch mode
 
 ```bash
 npm run vsix
-# → godot-mcp-1.0.0.vsix
+# → godot-mcp-1.0.2.vsix
 ```
 
 Install in VS Code:
 
 ```bash
-code --install-extension godot-mcp-1.0.0.vsix
+code --install-extension godot-mcp-1.0.2.vsix
 ```
 
 After installation, the MCP server auto-registers. Copilot / Cline / Roo Code discover it automatically — no manual `mcp.json` config required.

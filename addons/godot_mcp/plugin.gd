@@ -2,7 +2,7 @@
 extends EditorPlugin
 
 # ============================================================
-# Godot MCP Editor Plugin v1.0
+# Godot MCP Editor Plugin v1.0.2
 # ============================================================
 # TCP server inside the Godot editor enabling real-time AI
 # control: node CRUD, property editing, GDScript execution,
@@ -24,7 +24,7 @@ func _enter_tree() -> void:
 	_start_server()
 	_setup_output_capture()
 	set_process(true)
-	print("[Godot MCP] Plugin v1.0 loaded — TCP on port ", _get_port())
+	print("[Godot MCP] Plugin v1.0.2 loaded — TCP on port ", _get_port())
 
 
 func _exit_tree() -> void:
@@ -144,159 +144,159 @@ func _handle_message(raw: String) -> void:
 func _execute_command(method: String, params: Dictionary) -> Dictionary:
 	match method:
 		# ---- Health Check ----
-		"health_check":              return {"ok": true, "version": "3.0", "commands": 97}
+		"health_check": return {"ok": true, "version": "3.0", "commands": 97}
 
 		# ---- Editor State ----
-		"get_open_scene":            return _cmd_get_open_scene()
-		"get_open_scenes":           return _cmd_get_open_scenes()
-		"get_current_scene_tree":    return _cmd_get_current_scene_tree()
-		"get_selection":             return _cmd_get_selection()
-		"set_selection":             return _cmd_set_selection(params)
+		"get_open_scene": return _cmd_get_open_scene()
+		"get_open_scenes": return _cmd_get_open_scenes()
+		"get_current_scene_tree": return _cmd_get_current_scene_tree()
+		"get_selection": return _cmd_get_selection()
+		"set_selection": return _cmd_set_selection(params)
 
 		# ---- Scene Operations ----
-		"save_scene":                return _cmd_save_scene()
-		"save_all_scenes":           return _cmd_save_all_scenes()
-		"close_scene":               return _cmd_close_scene()
-		"reload_scene":              return _cmd_reload_scene()
+		"save_scene": return _cmd_save_scene()
+		"save_all_scenes": return _cmd_save_all_scenes()
+		"close_scene": return _cmd_close_scene()
+		"reload_scene": return _cmd_reload_scene()
 
 		# ---- Playback ----
-		"play_project":              return _cmd_play_project()
-		"stop_project":              return _cmd_stop_project()
-		"pause_project":             return _cmd_pause_project()
-		"unpause_project":           return _cmd_unpause_project()
-		"is_playing":                return _cmd_is_playing()
-		"run_specific_scene":        return _cmd_run_specific_scene(params)
+		"play_project": return _cmd_play_project()
+		"stop_project": return _cmd_stop_project()
+		"pause_project": return _cmd_pause_project()
+		"unpause_project": return _cmd_unpause_project()
+		"is_playing": return _cmd_is_playing()
+		"run_specific_scene": return _cmd_run_specific_scene(params)
 
 		# ---- Edit Operations ----
-		"undo":                      return _cmd_undo()
-		"redo":                      return _cmd_redo()
-		"cut_selected":              return _cmd_cut_selected()
-		"copy_selected":             return _cmd_copy_selected()
-		"paste":                     return _cmd_paste()
+		"undo": return _cmd_undo()
+		"redo": return _cmd_redo()
+		"cut_selected": return _cmd_cut_selected()
+		"copy_selected": return _cmd_copy_selected()
+		"paste": return _cmd_paste()
 
 		# ---- Node Operations (live) ----
-		"select_node":               return _cmd_select_node(params)
-		"move_node":                 return _cmd_move_node(params)
-		"move_node_3d":              return _cmd_move_node_3d(params)
-		"delete_selected":           return _cmd_delete_selected()
-		"add_node":                  return _cmd_add_node(params)
-		"remove_node":               return _cmd_remove_node(params)
-		"get_node_properties":       return _cmd_get_node_properties(params)
-		"set_node_properties":       return _cmd_set_node_properties(params)
-		"rename_node":               return _cmd_rename_node(params)
-		"duplicate_node":            return _cmd_duplicate_node(params)
-		"reparent_node":             return _cmd_reparent_node(params)
+		"select_node": return _cmd_select_node(params)
+		"move_node": return _cmd_move_node(params)
+		"move_node_3d": return _cmd_move_node_3d(params)
+		"delete_selected": return _cmd_delete_selected()
+		"add_node": return _cmd_add_node(params)
+		"remove_node": return _cmd_remove_node(params)
+		"get_node_properties": return _cmd_get_node_properties(params)
+		"set_node_properties": return _cmd_set_node_properties(params)
+		"rename_node": return _cmd_rename_node(params)
+		"duplicate_node": return _cmd_duplicate_node(params)
+		"reparent_node": return _cmd_reparent_node(params)
 
 		# ---- Script Operations ----
-		"create_script":             return _cmd_create_script(params)
-		"attach_script":             return _cmd_attach_script(params)
-		"run_gdscript":              return _cmd_run_gdscript(params)
+		"create_script": return _cmd_create_script(params)
+		"attach_script": return _cmd_attach_script(params)
+		"run_gdscript": return _cmd_run_gdscript(params)
 
 		# ---- Debug ----
-		"get_editor_output":         return _cmd_get_editor_output()
-		"get_editor_version":        return _cmd_get_editor_version()
-		"get_editor_info":           return _cmd_get_editor_info()
-		"read_current_scene":        return _cmd_get_current_scene_tree()
-		"get_breakpoints":           return _cmd_get_breakpoints()
-		"set_breakpoint":            return _cmd_set_breakpoint(params)
-		"remove_breakpoint":         return _cmd_remove_breakpoint(params)
+		"get_editor_output": return _cmd_get_editor_output()
+		"get_editor_version": return _cmd_get_editor_version()
+		"get_editor_info": return _cmd_get_editor_info()
+		"read_current_scene": return _cmd_get_current_scene_tree()
+		"get_breakpoints": return _cmd_get_breakpoints()
+		"set_breakpoint": return _cmd_set_breakpoint(params)
+		"remove_breakpoint": return _cmd_remove_breakpoint(params)
 
 		# ---- File System ----
-		"open_asset":                return _cmd_open_asset(params)
-		"show_in_filesystem":        return _cmd_show_in_filesystem(params)
-		"list_filesystem":           return _cmd_list_filesystem(params)
+		"open_asset": return _cmd_open_asset(params)
+		"show_in_filesystem": return _cmd_show_in_filesystem(params)
+		"list_filesystem": return _cmd_list_filesystem(params)
 
 		# ---- UI / Window ----
-		"get_editor_rect":           return _cmd_get_editor_rect()
-		"focus_editor":              return _cmd_focus_editor()
-		"open_dock":                 return _cmd_open_dock(params)
-		"take_screenshot":           return _cmd_take_screenshot(params)
+		"get_editor_rect": return _cmd_get_editor_rect()
+		"focus_editor": return _cmd_focus_editor()
+		"open_dock": return _cmd_open_dock(params)
+		"take_screenshot": return _cmd_take_screenshot(params)
 
 		# ---- Scene Creation ----
-		"create_scene":              return _cmd_create_editor_scene(params)
-		"instantiate_scene":         return _cmd_instantiate_scene(params)
-		"set_main_scene":            return _cmd_set_main_scene(params)
+		"create_scene": return _cmd_create_editor_scene(params)
+		"instantiate_scene": return _cmd_instantiate_scene(params)
+		"set_main_scene": return _cmd_set_main_scene(params)
 
 		# ---- Debugger Control ----
-		"debug_continue":            return _cmd_debug_continue()
-		"debug_step":                return _cmd_debug_step()
-		"debug_step_over":           return _cmd_debug_step_over()
-		"debug_break":               return _cmd_debug_break()
-		"get_stack_trace":           return _cmd_get_stack_trace()
-		"get_debug_variables":       return _cmd_get_debug_variables()
-		"evaluate_expression":       return _cmd_evaluate_expression(params)
+		"debug_continue": return _cmd_debug_continue()
+		"debug_step": return _cmd_debug_step()
+		"debug_step_over": return _cmd_debug_step_over()
+		"debug_break": return _cmd_debug_break()
+		"get_stack_trace": return _cmd_get_stack_trace()
+		"get_debug_variables": return _cmd_get_debug_variables()
+		"evaluate_expression": return _cmd_evaluate_expression(params)
 
 		# ---- Settings ----
-		"get_editor_setting":        return _cmd_get_editor_setting(params)
-		"set_editor_setting":        return _cmd_set_editor_setting(params)
-		"get_project_setting":       return _cmd_get_project_setting(params)
-		"set_project_setting":       return _cmd_set_project_setting(params)
+		"get_editor_setting": return _cmd_get_editor_setting(params)
+		"set_editor_setting": return _cmd_set_editor_setting(params)
+		"get_project_setting": return _cmd_get_project_setting(params)
+		"set_project_setting": return _cmd_set_project_setting(params)
 
 		# ---- Signals ----
-		"connect_editor_signal":     return _cmd_connect_signal(params)
-		"disconnect_editor_signal":  return _cmd_disconnect_signal(params)
-		"list_node_signals":         return _cmd_list_node_signals(params)
+		"connect_editor_signal": return _cmd_connect_signal(params)
+		"disconnect_editor_signal": return _cmd_disconnect_signal(params)
+		"list_node_signals": return _cmd_list_node_signals(params)
 
 		# ---- Export ----
-		"export_project":            return _cmd_editor_export(params)
+		"export_project": return _cmd_editor_export(params)
 
 		# ---- Project State ----
-		"get_scene_changes":         return _cmd_get_scene_changes()
-		"get_recent_scenes":         return _cmd_get_recent_scenes()
-		"get_project_directory":     return _cmd_get_project_directory()
+		"get_scene_changes": return _cmd_get_scene_changes()
+		"get_recent_scenes": return _cmd_get_recent_scenes()
+		"get_project_directory": return _cmd_get_project_directory()
 
 		# ---- Input Simulation ----
-		"simulate_key_press":        return _cmd_simulate_key_press(params)
+		"simulate_key_press": return _cmd_simulate_key_press(params)
 
 		# ---- Plugin Management ----
-		"get_plugin_list":           return _cmd_get_plugin_list()
-		"enable_plugin":             return _cmd_enable_plugin(params)
-		"disable_plugin":            return _cmd_disable_plugin(params)
+		"get_plugin_list": return _cmd_get_plugin_list()
+		"enable_plugin": return _cmd_enable_plugin(params)
+		"disable_plugin": return _cmd_disable_plugin(params)
 
 		# ---- Class Introspection ----
-		"get_class_list":            return _cmd_get_class_list(params)
-		"get_method_list":           return _cmd_get_method_list(params)
-		"get_property_list":         return _cmd_get_property_list(params)
-		"get_signal_list":           return _cmd_get_signal_list(params)
-		"get_class_doc":             return _cmd_get_class_doc(params)
-		"search_help":               return _cmd_search_help(params)
+		"get_class_list": return _cmd_get_class_list(params)
+		"get_method_list": return _cmd_get_method_list(params)
+		"get_property_list": return _cmd_get_property_list(params)
+		"get_signal_list": return _cmd_get_signal_list(params)
+		"get_class_doc": return _cmd_get_class_doc(params)
+		"search_help": return _cmd_search_help(params)
 
 		# ---- Filesystem CRUD ----
-		"create_folder":             return _cmd_create_folder(params)
-		"delete_asset":              return _cmd_delete_asset(params)
-		"rename_asset":              return _cmd_rename_asset(params)
-		"move_asset":                return _cmd_move_asset(params)
-		"duplicate_asset":           return _cmd_duplicate_asset(params)
+		"create_folder": return _cmd_create_folder(params)
+		"delete_asset": return _cmd_delete_asset(params)
+		"rename_asset": return _cmd_rename_asset(params)
+		"move_asset": return _cmd_move_asset(params)
+		"duplicate_asset": return _cmd_duplicate_asset(params)
 
 		# ---- Editor Viewport ----
-		"get_editor_camera":         return _cmd_get_editor_camera()
-		"set_editor_camera":         return _cmd_set_editor_camera(params)
-		"toggle_grid":               return _cmd_toggle_grid()
-		"toggle_snap":               return _cmd_toggle_snap()
+		"get_editor_camera": return _cmd_get_editor_camera()
+		"set_editor_camera": return _cmd_set_editor_camera(params)
+		"toggle_grid": return _cmd_toggle_grid()
+		"toggle_snap": return _cmd_toggle_snap()
 
 		# ---- Autoload via Editor ----
-		"get_autoload_list":         return _cmd_get_autoload_list()
-		"add_autoload":              return _cmd_add_autoload(params)
-		"remove_autoload":           return _cmd_remove_autoload(params)
+		"get_autoload_list": return _cmd_get_autoload_list()
+		"add_autoload": return _cmd_add_autoload(params)
+		"remove_autoload": return _cmd_remove_autoload(params)
 
 		# ---- Input Map via Editor ----
-		"get_input_map":             return _cmd_get_input_map()
-		"add_input_action":          return _cmd_add_input_action(params)
-		"remove_input_action":       return _cmd_remove_input_action(params)
+		"get_input_map": return _cmd_get_input_map()
+		"add_input_action": return _cmd_add_input_action(params)
+		"remove_input_action": return _cmd_remove_input_action(params)
 
 		# ---- Errors / Diagnostics ----
-		"get_error_list":            return _cmd_get_error_list()
-		"clear_errors":              return _cmd_clear_errors()
+		"get_error_list": return _cmd_get_error_list()
+		"clear_errors": return _cmd_clear_errors()
 
 		# ---- Build / Bake ----
-		"reimport_asset":            return _cmd_reimport_asset(params)
-		"bake_lightmaps":            return _cmd_bake_lightmaps()
-		"bake_navigation":           return _cmd_bake_navigation()
+		"reimport_asset": return _cmd_reimport_asset(params)
+		"bake_lightmaps": return _cmd_bake_lightmaps()
+		"bake_navigation": return _cmd_bake_navigation()
 
 		# ---- Runtime Inspection (game running) ----
-		"get_running_scene_tree":    return _cmd_get_running_scene_tree()
-		"get_performance_monitors":  return _cmd_get_performance_monitors()
-		"get_dependency_list":       return _cmd_get_dependency_list(params)
+		"get_running_scene_tree": return _cmd_get_running_scene_tree()
+		"get_performance_monitors": return _cmd_get_performance_monitors()
+		"get_dependency_list": return _cmd_get_dependency_list(params)
 
 		_:
 			return {"error": "Unknown method: " + method}
@@ -371,16 +371,16 @@ func _node_set_property(node: Node, key: String, raw_value: String) -> void:
 func _value_to_json_string(val) -> String:
 	"""Convert a Godot value to a string suitable for JSON serialization."""
 	match typeof(val):
-		TYPE_VECTOR2, TYPE_VECTOR2I:   return str(val)
-		TYPE_VECTOR3, TYPE_VECTOR3I:   return str(val)
-		TYPE_VECTOR4, TYPE_VECTOR4I:   return str(val)
-		TYPE_COLOR:                    return str(val)
-		TYPE_RECT2:                    return str(val)
-		TYPE_BOOL:                     return "true" if val else "false"
-		TYPE_INT, TYPE_FLOAT:          return str(val)
+		TYPE_VECTOR2, TYPE_VECTOR2I: return str(val)
+		TYPE_VECTOR3, TYPE_VECTOR3I: return str(val)
+		TYPE_VECTOR4, TYPE_VECTOR4I: return str(val)
+		TYPE_COLOR: return str(val)
+		TYPE_RECT2: return str(val)
+		TYPE_BOOL: return "true" if val else "false"
+		TYPE_INT, TYPE_FLOAT: return str(val)
 		TYPE_STRING, TYPE_STRING_NAME: return '"' + str(val).replace('"', '\\"') + '"'
-		TYPE_NODE_PATH:                return '"' + str(val) + '"'
-		_:                             return '"' + str(val) + '"'
+		TYPE_NODE_PATH: return '"' + str(val) + '"'
+		_: return '"' + str(val) + '"'
 
 
 # ============================================================
@@ -420,11 +420,11 @@ func _cmd_get_current_scene_tree() -> Dictionary:
 
 func _build_tree(node: Node, out: Array, depth: int) -> void:
 	var info = {"name": node.name, "type": node.get_class(), "depth": depth}
-	if node is Node2D:   info["position"] = str(node.position)
-	if node is Node3D:   info["position"] = str(node.position)
-	if node is Control:  info["position"] = str(node.position)
+	if node is Node2D: info["position"] = str(node.position)
+	if node is Node3D: info["position"] = str(node.position)
+	if node is Control: info["position"] = str(node.position)
 	var txt = node.get("text")
-	if txt != null:      info["text"] = str(txt).substr(0, 50)
+	if txt != null: info["text"] = str(txt).substr(0, 50)
 	out.append(info)
 	for c in node.get_children():
 		_build_tree(c, out, depth + 1)
@@ -1025,7 +1025,7 @@ func _list_dir(dir: DirAccess, base: String, out: Array, recursive: bool, patter
 				if sub:
 					_list_dir(sub, full, out, recursive, pattern, depth + 1, max_depth)
 		else:
-			if pattern and not fn.match(pattern): 
+			if pattern and not fn.match(pattern):
 				fn = dir.get_next()
 				continue
 			out.append({"name": fn, "path": full, "type": "file"})
@@ -1153,7 +1153,7 @@ func _cmd_get_stack_trace() -> Dictionary:
 	var st: Array = []
 	for i in dbg.get_stack_count():
 		var f = dbg.get_stack_frame(i)
-		if f: st.append({"source": f.get("source",""), "function": f.get("function",""), "line": f.get("line",0)})
+		if f: st.append({"source": f.get("source", ""), "function": f.get("function", ""), "line": f.get("line", 0)})
 	return {"stack": st, "count": st.size()}
 
 func _cmd_get_debug_variables() -> Dictionary:
@@ -1164,7 +1164,7 @@ func _cmd_get_debug_variables() -> Dictionary:
 	var vars: Dictionary = {}
 	for i in dbg.get_dump_stack_members_count():
 		var m = dbg.get_dump_stack_member(i)
-		if m: vars[m.get("name","")] = str(m.get("value",""))
+		if m: vars[m.get("name", "")] = str(m.get("value", ""))
 	return {"variables": vars}
 
 func _cmd_evaluate_expression(params: Dictionary) -> Dictionary:
@@ -1255,7 +1255,7 @@ func _cmd_list_node_signals(params: Dictionary) -> Dictionary:
 	for s in node.get_signal_list():
 		var nm = s["name"]; var conns = node.get_signal_connection_list(nm)
 		var targets: Array = []
-		for c in conns: targets.append({"method": c.get("method",""), "target": str(c.get("target",""))})
+		for c in conns: targets.append({"method": c.get("method", ""), "target": str(c.get("target", ""))})
 		sigs.append({"name": nm, "connections": conns.size(), "targets": targets})
 	return {"node": node.name, "signals": sigs}
 
@@ -1399,7 +1399,7 @@ func _cmd_get_plugin_list() -> Dictionary:
 			if FileAccess.file_exists(cp):
 				var cfg = ConfigFile.new()
 				if cfg.load(cp) == OK:
-					plugins.append({"id": fn, "name": cfg.get_value("plugin","name",fn), "version": cfg.get_value("plugin","version","?"), "enabled": get_editor_interface().is_plugin_enabled(fn)})
+					plugins.append({"id": fn, "name": cfg.get_value("plugin", "name", fn), "version": cfg.get_value("plugin", "version", "?"), "enabled": get_editor_interface().is_plugin_enabled(fn)})
 		fn = dir.get_next()
 	return {"plugins": plugins, "count": plugins.size()}
 
@@ -1431,7 +1431,7 @@ func _cmd_get_class_list(params: Dictionary) -> Dictionary:
 	var classes: Array = []
 	for cls in ClassDB.get_class_list():
 		if not filter or filter in cls.to_lower():
-			var is_parent = ClassDB.is_parent_class(cls, params.get("extends", "")) if params.get("extends","") else true
+			var is_parent = ClassDB.is_parent_class(cls, params.get("extends", "")) if params.get("extends", "") else true
 			if is_parent: classes.append(cls)
 	classes.sort()
 	return {"classes": classes.slice(0, 200), "count": classes.size()}
@@ -1469,7 +1469,7 @@ func _cmd_get_signal_list(params: Dictionary) -> Dictionary:
 func _cmd_get_class_doc(params: Dictionary) -> Dictionary:
 	var cls = params.get("class", ""); if not cls: return {"error": "Missing class name"}
 	# Open the help for this class in the editor
-	OS.shell_open("https://docs.godotengine.org/en/stable/classes/class_" + cls.to_lower().replace("_","-") + ".html")
+	OS.shell_open("https://docs.godotengine.org/en/stable/classes/class_" + cls.to_lower().replace("_", "-") + ".html")
 	return {"ok": true, "class": cls, "url": "https://docs.godotengine.org/en/stable/classes/class_" + cls.to_lower() + ".html"}
 
 func _cmd_search_help(params: Dictionary) -> Dictionary:
@@ -1546,7 +1546,7 @@ func _cmd_get_editor_camera() -> Dictionary:
 func _cmd_set_editor_camera(params: Dictionary) -> Dictionary:
 	var pos_str = params.get("position", "")
 	if not pos_str: return {"error": "Missing position"}
-	var p = pos_str.replace("Vector3(","").replace(")","").split(",")
+	var p = pos_str.replace("Vector3(", "").replace(")", "").split(",")
 	if p.size() < 3: return {"error": "Invalid position format. Use Vector3(x,y,z) string"}
 	var vp = get_editor_interface().get_editor_main_screen().get_viewport()
 	if not vp: return {"error": "No viewport"}
@@ -1706,7 +1706,7 @@ func _cmd_get_performance_monitors() -> Dictionary:
 	var monitors: Dictionary = {}
 	var names = ["time/process", "physics/objects", "objects/node_count", "render/objects/visible", "render/draw_calls", "memory/static", "video_mem/used"]
 	for n in names:
-		monitors[n] = Performance.get_monitor(Performance[n.replace("/","_").to_upper()]) if Performance.has_method("get_monitor") else "N/A"
+		monitors[n] = Performance.get_monitor(Performance[n.replace("/", "_").to_upper()]) if Performance.has_method("get_monitor") else "N/A"
 	return {"monitors": monitors, "fps": Engine.get_frames_per_second() if EditorInterface.is_playing_scene() else "not running"}
 
 func _cmd_get_dependency_list(params: Dictionary) -> Dictionary:

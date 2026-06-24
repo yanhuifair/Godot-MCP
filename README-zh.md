@@ -517,13 +517,13 @@ npm run test:watch       # 监视模式
 
 ```bash
 npm run vsix
-# → godot-mcp-1.0.0.vsix
+# → godot-mcp-1.0.2.vsix
 ```
 
 安装到 VS Code：
 
 ```bash
-code --install-extension godot-mcp-1.0.0.vsix
+code --install-extension godot-mcp-1.0.2.vsix
 ```
 
 安装后，MCP 服务器自动注册，Copilot / Cline / Roo Code 自动发现。无需手动配置 `mcp.json`。
