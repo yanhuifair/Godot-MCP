@@ -21,22 +21,39 @@
 - [Architecture](#architecture)
 - [Supported Formats](#supported-formats)
 - [Development](#development)
-- [VSIX Packaging](#vsix-packaging)
+- [Build VSIX](#build-vsix)
 
 ---
 
 ## Quick Start
 
-```bash
-# Option 1: npx (no install, available after npm publish)
-npx -y @yanhuifair/godot-mcp -p /path/to/your/godot/project
+### 1. Install the plugin (one-time)
 
-# Option 2: global install
-npm install -g @yanhuifair/godot-mcp
-godot-mcp -p /path/to/your/godot/project
+```bash
+npx @yanhuifair/godot-mcp --install-addons -p /path/to/your/godot/project
 ```
 
-The AI client launches the MCP server automatically — no manual run needed. Just configure and start chatting:
+Then enable in Godot: **Project → Project Settings → Plugins → Godot MCP → Enable**.
+
+### 2. Configure your AI client
+
+Create `.vscode/mcp.json` in your project root (or see [AI Client Configuration](#ai-client-configuration) for other clients):
+
+```json
+{
+  "mcpServers": {
+    "godot-mcp": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@yanhuifair/godot-mcp", "-p", "."]
+    }
+  }
+}
+```
+
+### 3. Start chatting
+
+The AI client auto-launches the MCP server. **File-based tools** (.tscn, .tres, .gd) work immediately. **Editor tools** (play, select nodes, etc.) cause MCP to spawn Godot automatically — no need to manually open the editor.
 
 > "List all scenes in the project"
 > "Find all CharacterBody2D nodes"
@@ -114,6 +131,93 @@ Godot auto-detection: `GODOT_PATH` → `/Applications/Godot.app` → `PATH` → 
 
 ## AI Client Configuration
 
+### VS Code / GitHub Copilot
+
+#### Method 1: VSIX Extension (recommended)
+
+```bash
+npm run vsix
+# → godot-mcp-1.1.2.vsix
+
+code --install-extension godot-mcp-1.1.2.vsix
+```
+
+After installation, the MCP server auto-registers. Copilot / Cline / Roo Code discover it automatically — **no manual config required**. Skip to [Verify Setup](#verify-setup).
+
+#### Method 2: Project-level config
+
+Create `.vscode/mcp.json` in your Godot project root:
+
+```json
+{
+  "mcpServers": {
+    "godot-mcp": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@yanhuifair/godot-mcp", "-p", "."]
+    }
+  }
+}
+```
+
+> If you installed globally (`npm install -g`), use `"command": "godot-mcp"` and omit `-y @yanhuifair/godot-mcp` from args:
+>
+> ```json
+> {
+>   "mcpServers": {
+>     "godot-mcp": {
+>       "type": "stdio",
+>       "command": "godot-mcp",
+>       "args": ["-p", "."]
+>     }
+>   }
+> }
+> ```
+
+> 💡 **Tip**: Commit `.vscode/mcp.json` to your repo so every team member gets the MCP server automatically.
+
+#### Verify Setup
+
+1. Open your Godot project folder in VS Code
+2. Open Copilot Chat (`⇧⌘I` / `Ctrl+Shift+I`)
+3. Look for the 🔌 MCP tools indicator in the chat input
+4. Send a test message:
+
+> "List all scenes in the project"
+
+If the server responds with your project's scenes, it's working.
+
+#### Enable Editor Plugin (live control)
+
+For real-time editor control — select nodes, play/stop, undo/redo, set breakpoints — install the plugin (one-time setup):
+
+```bash
+npx @yanhuifair/godot-mcp --install-addons -p .
+```
+
+Then enable in Godot Editor: **Project → Project Settings → Plugins → Godot MCP → Enable**. Confirm in the **Output** panel:
+
+```
+[Godot MCP] Plugin v1.1.2 loaded — ready on stdin/stdout
+```
+
+> 💡 After enabling once, close Godot. MCP spawns it automatically when you use editor commands.
+
+Now try:
+
+> "Run the game at 1280x720"
+> "Select the Player node and show its properties"
+
+#### Troubleshooting
+
+| Problem | Solution |
+|---|---|
+| Server not starting | Ensure Node.js ≥18: `node -v` |
+| "Command not found" | Use `npx` method or `npm install -g @yanhuifair/godot-mcp` |
+| Plugin not showing in Godot | Click **Restart** in the Plugins tab, or reopen the project |
+| Editor process won't start | Ensure Godot is installed and in PATH, or set `GODOT_PATH` |
+| Tools not appearing in chat | Reload VS Code: `Cmd+Shift+P` → `Developer: Reload Window` |
+
 ### Cursor
 
 `~/.cursor/mcp.json`:
@@ -122,6 +226,7 @@ Godot auto-detection: `GODOT_PATH` → `/Applications/Godot.app` → `PATH` → 
 {
   "mcpServers": {
     "godot-mcp": {
+      "type": "stdio",
       "command": "npx",
       "args": ["-y", "@yanhuifair/godot-mcp", "-p", "/path/to/your/godot/project"]
     }
@@ -135,6 +240,7 @@ Or with a global install:
 {
   "mcpServers": {
     "godot-mcp": {
+      "type": "stdio",
       "command": "godot-mcp",
       "args": ["-p", "/path/to/your/godot/project"]
     }
@@ -150,6 +256,7 @@ Or with a global install:
 {
   "mcpServers": {
     "godot-mcp": {
+      "type": "stdio",
       "command": "npx",
       "args": ["-y", "@yanhuifair/godot-mcp", "-p", "/path/to/your/godot/project"]
     }
@@ -165,6 +272,7 @@ Or with a global install:
 {
   "mcpServers": {
     "godot-mcp": {
+      "type": "stdio",
       "command": "npx",
       "args": ["-y", "@yanhuifair/godot-mcp", "-p", "/path/to/your/godot/project"]
     }
@@ -307,7 +415,9 @@ Or with a global install:
 
 ## Editor Plugin
 
-The optional editor plugin provides **real-time editor control** via TCP on port `9876` — select nodes, play/stop, undo/redo, save, breakpoints, debugging, and more.
+The editor plugin enables **real-time editor control** — select nodes, play/stop, undo/redo, save, breakpoints, debugging, and more. MCP spawns Godot as a child process when editor tools are invoked, communicating via stdin/stdout.
+
+> **How it works**: When you say "Run the game", the MCP server spawns `godot --editor --path <project>`, the plugin reads commands from stdin, executes them, and writes results to stdout. The Godot window opens automatically — no manual steps.
 
 ### Install the Plugin
 
@@ -330,8 +440,10 @@ If not visible, click **Restart** or reopen the project.
 Confirm in the **Output** panel:
 
 ```
-[Godot MCP] TCP server listening on port 9876
+[Godot MCP] Plugin v1.1.2 loaded — ready on stdin/stdout
 ```
+
+> 💡 After enabling the plugin once, you can close Godot. MCP will launch it automatically when needed.
 
 ### Editor Tools (78 tools)
 
@@ -390,12 +502,12 @@ Confirm in the **Output** panel:
 │ (Cursor/Claude/Copilot)│
 └────────┬────────────┘
          │ MCP (stdio)
-┌────────▼──────────────┐        TCP :9876      ┌──────────────────┐
+┌────────▼──────────────┐      stdin/stdout     ┌──────────────────┐
 │   Godot MCP Server      │ ◄───────────────────► │  Godot Editor     │
-│   (TypeScript, 281 tools)│   (editor plugin)   │  (GDScript addon) │
+│   (TypeScript, 281 tools)│  (spawns as child)  │  (GDScript addon) │
 │                        │                       │                  │
 │  ┌──────────────────┐  │                       │  78 editor cmds   │
-│  │  Tool Handlers    │  │                       │  JSON-RPC/TCP    │
+│  │  Tool Handlers    │  │                       │  JSON-RPC/stdio  │
 │  └──────────────────┘  │                       └──────────────────┘
 │  ┌──────────────────┐  │
 │  │  File Parsers     │  │  .tscn / .tres / .gd / .gdshader / .import / .csv
@@ -457,7 +569,7 @@ godot-mcp/
 ├── addons/
 │   └── godot_mcp/            # Godot editor plugin
 │       ├── plugin.cfg         # Plugin metadata
-│       └── plugin.gd          # TCP server + command handlers
+│       └── plugin.gd          # stdin reader + command handlers
 ├── dist/                     # Compiled output
 ├── test/                     # Test suite
 ├── package.json
@@ -520,20 +632,14 @@ npm run test:watch       # Watch mode
 
 ---
 
-## VSIX Packaging
+## Build VSIX
 
 ```bash
 npm run vsix
-# → godot-mcp-1.0.2.vsix
+# → godot-mcp-1.1.2.vsix
 ```
 
-Install in VS Code:
-
-```bash
-code --install-extension godot-mcp-1.0.2.vsix
-```
-
-After installation, the MCP server auto-registers. Copilot / Cline / Roo Code discover it automatically — no manual `mcp.json` config required.
+See [VS Code Setup](#vs-code--github-copilot) for installation and usage.
 
 ---
 

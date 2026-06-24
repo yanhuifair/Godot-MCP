@@ -1,67 +1,135 @@
 // ============================================================
-// Godot MCP Server — Live Editor Bridge v1.0
+// Godot MCP Server — Live Editor Bridge v1.1.0 (stdio)
+// ============================================================
+// Communicates with the Godot Editor via stdin/stdout.
+// The MCP server spawns Godot as a child process. Commands are
+// sent as JSON-RPC lines to Godot's stdin. Responses are read
+// from Godot's stdout, filtered by a marker prefix.
 // ============================================================
 
 import { z } from 'zod';
-import net from 'node:net';
+import { spawn, ChildProcess } from 'node:child_process';
 import { ToolResult } from '../utils/types.js';
 import { ErrorCode, toolError, wrapError } from '../utils/errors.js';
+import { findGodotBinary } from '../utils/godot_cli.js';
 
-const DEFAULT_EDITOR_PORT = 9876;
-const CONNECTION_TIMEOUT = 5000;
+const CONNECTION_TIMEOUT = 15000; // longer timeout for process startup
+const RESPONSE_MARKER = '__MCP__:';
 
+let _editorProcess: ChildProcess | null = null;
+let _pendingRequests: Map<number, { resolve: (value: any) => void; reject: (err: Error) => void }> = new Map();
+let _stdoutBuffer = '';
+let _projectRoot: string | null = null;
 let _lastHealthCheck = 0;
 let _lastHealthStatus = false;
 
-// ---- Connection ----
+// ---- Editor Process Lifecycle ----
 
+function ensureEditorProcess(): ChildProcess {
+  if (_editorProcess && !_editorProcess.killed && _editorProcess.exitCode === null) {
+    return _editorProcess;
+  }
+
+  if (!_projectRoot) {
+    throw new Error('Editor bridge not initialized. Call initEditorBridge(projectRoot) first.');
+  }
+
+  const godotPath = findGodotBinary();
+  if (!godotPath) {
+    throw new Error('Godot binary not found. Set GODOT_PATH environment variable.');
+  }
+
+  // Spawn Godot editor as child process with piped stdio
+  _editorProcess = spawn(godotPath, ['--editor', '--path', _projectRoot], {
+    stdio: ['pipe', 'pipe', 'pipe'],
+    env: { ...process.env, MCP_STDIO: 'true' },
+  });
+
+  _stdoutBuffer = '';
+
+  // Parse stdout for MCP responses (marked lines)
+  _editorProcess.stdout!.on('data', (data: Buffer) => {
+    _stdoutBuffer += data.toString();
+    const lines = _stdoutBuffer.split('\n');
+    _stdoutBuffer = lines.pop() || ''; // keep incomplete line
+
+    for (const line of lines) {
+      if (line.startsWith(RESPONSE_MARKER)) {
+        try {
+          const json = JSON.parse(line.substring(RESPONSE_MARKER.length));
+          const resolver = _pendingRequests.get(json.id);
+          if (resolver) {
+            _pendingRequests.delete(json.id);
+            if (json.error) {
+              resolver.reject(new Error(json.error.message || 'Editor error'));
+            } else {
+              resolver.resolve(json.result);
+              _lastHealthCheck = Date.now();
+              _lastHealthStatus = true;
+            }
+          }
+        } catch {
+          // skip malformed lines
+        }
+      }
+    }
+  });
+
+  // Log stderr for debugging
+  _editorProcess.stderr!.on('data', (data: Buffer) => {
+    const text = data.toString().trim();
+    if (text) {
+      console.error(`[godot-editor] ${text}`);
+    }
+  });
+
+  _editorProcess.on('exit', (code) => {
+    console.error(`[Godot MCP] Editor process exited (code=${code})`);
+    _lastHealthStatus = false;
+    // Reject all pending requests
+    for (const [, resolver] of _pendingRequests) {
+      resolver.reject(new Error(`Editor process exited unexpectedly (code=${code})`));
+    }
+    _pendingRequests.clear();
+    _editorProcess = null;
+  });
+
+  _editorProcess.on('error', (err) => {
+    console.error(`[Godot MCP] Failed to spawn editor: ${err.message}`);
+    _lastHealthStatus = false;
+    _editorProcess = null;
+  });
+
+  return _editorProcess;
+}
+
+/** Initialize the editor bridge with the project root. Call once on startup. */
+export function initEditorBridge(projectRoot: string): void {
+  _projectRoot = projectRoot;
+}
+
+/** Send a JSON-RPC command to the editor and wait for response. */
 export function sendEditorCommand(method: string, params: Record<string, any> = {}): Promise<any> {
   return new Promise((resolve, reject) => {
-    const client = new net.Socket();
-    const request = JSON.stringify({ jsonrpc: '2.0', id: Date.now(), method, params });
+    try {
+      const proc = ensureEditorProcess();
+      const id = Date.now() + Math.random();
+      const request = JSON.stringify({ jsonrpc: '2.0', id, method, params }) + '\n';
 
-    let data = '';
-    let settled = false;
-    let timeout: NodeJS.Timeout;
+      _pendingRequests.set(id, { resolve, reject });
+      proc.stdin!.write(request);
 
-    const finish = (err: Error | null, result?: any) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timeout);
-      client.destroy();
-      if (err) reject(err);
-      else resolve(result);
-    };
-
-    client.connect(DEFAULT_EDITOR_PORT, '127.0.0.1', () => {
-      client.write(request);
-    });
-
-    client.on('data', (chunk: Buffer) => {
-      data += chunk.toString();
-      _lastHealthCheck = Date.now();
-      _lastHealthStatus = true;
-      try {
-        const response = JSON.parse(data);
-        if (response.error) {
-          finish(new Error(response.error.message || 'Editor error'));
-        } else {
-          finish(null, response.result);
+      // Timeout guard
+      setTimeout(() => {
+        if (_pendingRequests.has(id)) {
+          _pendingRequests.delete(id);
+          reject(new Error(`Editor command timed out: ${method}`));
         }
-      } catch {
-        finish(new Error('Invalid response from editor'));
-      }
-    });
-
-    client.on('error', (err: Error) => {
+      }, CONNECTION_TIMEOUT);
+    } catch (err: any) {
       _lastHealthStatus = false;
-      finish(new Error(`Editor not reachable on port ${DEFAULT_EDITOR_PORT}. Ensure Godot is open with the Godot MCP plugin enabled (Project Settings → Plugins).`));
-    });
-
-    timeout = setTimeout(() => {
-      _lastHealthStatus = false;
-      finish(new Error('Editor connection timed out'));
-    }, CONNECTION_TIMEOUT);
+      reject(new Error(`Editor not available: ${err.message}. Ensure Godot is installed and the project path is correct.`));
+    }
   });
 }
 
@@ -69,6 +137,15 @@ export function sendEditorCommand(method: string, params: Record<string, any> = 
 export function isEditorHealthy(): boolean {
   if (Date.now() - _lastHealthCheck < 30000) return _lastHealthStatus;
   return false;
+}
+
+/** Shut down the editor process gracefully */
+export function shutdownEditorBridge(): void {
+  if (_editorProcess && !_editorProcess.killed) {
+    _editorProcess.kill();
+  }
+  _editorProcess = null;
+  _pendingRequests.clear();
 }
 
 // ---- Tool Schemas ----

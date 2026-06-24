@@ -1,5 +1,5 @@
 // ============================================================
-// Godot MCP Server - Main Server Class (v1.0.0)
+// Godot MCP Server - Main Server Class (v1.1.0)
 // ============================================================
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
@@ -16,6 +16,7 @@ import { cleanupProcesses } from './utils/godot_cli.js';
 import { ToolRegistry } from './utils/registry.js';
 import { ErrorCode, toolError } from './utils/errors.js';
 import { registerAllTools } from './tools/register.js';
+import { initEditorBridge, shutdownEditorBridge } from './tools/editor.js';
 
 // ---- MCP Server ----
 
@@ -27,11 +28,11 @@ export class GodotMcpServer {
   constructor(projectRoot?: string) {
     this.registry = new ToolRegistry();
 
-    // Register all 179 tools
+    // Register all 281 tools
     registerAllTools(this.registry);
 
     this.server = new Server(
-      { name: 'godot-mcp', version: '1.0.0' },
+      { name: 'godot-mcp', version: '1.1.0' },
       { capabilities: { tools: {} } }
     );
 
@@ -41,6 +42,8 @@ export class GodotMcpServer {
       console.error('[Godot MCP] No Godot project found. Use -p <path> or run from a project directory.');
     } else {
       console.error(`[Godot MCP] Project root: ${this.projectRoot}  |  ${this.registry.count} tools loaded`);
+      // Initialize editor bridge — spawns Godot on first editor command
+      initEditorBridge(this.projectRoot);
     }
 
     this.registerHandlers();
@@ -96,6 +99,7 @@ export class GodotMcpServer {
     await this.server.connect(transport);
 
     const shutdown = async () => {
+      shutdownEditorBridge();
       cleanupProcesses();
       await this.server.close();
       process.exit(0);

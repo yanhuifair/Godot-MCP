@@ -1,7 +1,7 @@
 {
   "name": "@yanhuifair/godot-mcp",
-  "version": "1.0.2",
-  "description": "Godot MCP — Model Context Protocol server for Godot Engine. 279 tools, 26 categories, 100% Godot 4.6/4.7 coverage. File-based + optional editor plugin.",
+  "version": "1.1.2",
+  "description": "Godot MCP — Model Context Protocol server for Godot Engine. 281 tools, 26 categories, Godot 4.6/4.7 coverage. Stdin/stdout communication with Godot editor.",
   "type": "module",
   "main": "dist/index.js",
   "bin": {

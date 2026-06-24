@@ -21,22 +21,39 @@
 - [架构](#架构)
 - [支持格式](#支持格式)
 - [开发](#开发)
-- [VSIX 打包](#打包为-vsix-扩展)
+- [构建 VSIX](#构建-vsix)
 
 ---
 
 ## 快速开始
 
-```bash
-# 方式一：npx（无需安装）
-npx -y @yanhuifair/godot-mcp -p /path/to/your/godot/project
+### 1. 安装插件（一次性）
 
-# 方式二：全局安装
-npm install -g @yanhuifair/godot-mcp
-godot-mcp -p /path/to/your/godot/project
+```bash
+npx @yanhuifair/godot-mcp --install-addons -p /path/to/your/godot/project
 ```
 
-AI 客户端会自动启动 MCP 服务器，无需手动运行。配置完成后直接对话即可：
+然后在 Godot 中启用：**项目 → 项目设置 → 插件 → Godot MCP → 启用**。
+
+### 2. 配置 AI 客户端
+
+在项目根目录创建 `.vscode/mcp.json`（其他客户端见[配置 AI 客户端](#配置-ai-客户端)）：
+
+```json
+{
+  "mcpServers": {
+    "godot-mcp": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@yanhuifair/godot-mcp", "-p", "."]
+    }
+  }
+}
+```
+
+### 3. 开始对话
+
+AI 客户端自动启动 MCP 服务器。**文件级工具**（.tscn、.tres、.gd）立即可用。**编辑器工具**（运行游戏、选中节点等）会触发 MCP 自动启动 Godot——无需手动打开编辑器。
 
 > "列出项目中的所有场景"
 > "找到所有 CharacterBody2D 节点"
@@ -114,6 +131,93 @@ Godot 自动检测顺序：`GODOT_PATH` → `/Applications/Godot.app` → `PATH`
 
 ## 配置 AI 客户端
 
+### VS Code / GitHub Copilot
+
+#### 方式一：安装 VSIX 扩展（推荐）
+
+```bash
+npm run vsix
+# → godot-mcp-1.1.2.vsix
+
+code --install-extension godot-mcp-1.1.2.vsix
+```
+
+安装后 MCP 服务器自动注册，Copilot / Cline / Roo Code 自动发现——**无需手动配置**。跳到[验证安装](#验证安装)。
+
+#### 方式二：项目级配置
+
+在 Godot 项目根目录创建 `.vscode/mcp.json`：
+
+```json
+{
+  "mcpServers": {
+    "godot-mcp": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@yanhuifair/godot-mcp", "-p", "."]
+    }
+  }
+}
+```
+
+> 如果已全局安装（`npm install -g`），把 `command` 改为 `"godot-mcp"`，args 中去掉 `-y @yanhuifair/godot-mcp`：
+>
+> ```json
+> {
+>   "mcpServers": {
+>     "godot-mcp": {
+>       "type": "stdio",
+>       "command": "godot-mcp",
+>       "args": ["-p", "."]
+>     }
+>   }
+> }
+> ```
+
+> 💡 **提示**：将 `.vscode/mcp.json` 提交到仓库，团队成员打开项目即可自动获得 MCP 服务。
+
+#### 验证安装
+
+1. 在 VS Code 中打开 Godot 项目文件夹
+2. 打开 Copilot Chat（`⇧⌘I` / `Ctrl+Shift+I`）
+3. 查看聊天输入框是否出现 🔌 MCP 工具指示器
+4. 发送一条测试消息：
+
+> "列出项目中的所有场景"
+
+如果返回了项目中的场景列表，说明安装成功。
+
+#### 启用编辑器插件（实时控制）
+
+如需实时编辑器控制——选中节点、运行/停止、撤销/恢复、断点调试——安装插件（一次性设置）：
+
+```bash
+npx @yanhuifair/godot-mcp --install-addons -p .
+```
+
+然后在 Godot 编辑器中启用：**项目 → 项目设置 → 插件 → Godot MCP → 启用**。在**输出**面板确认：
+
+```
+[Godot MCP] Plugin v1.1.2 loaded — ready on stdin/stdout
+```
+
+> 💡 启用一次后即可关闭 Godot，MCP 会在你使用编辑器命令时自动启动。
+
+现在试试：
+
+> "以 1280x720 运行游戏"
+> "选中 Player 节点并显示属性"
+
+#### 常见问题
+
+| 问题 | 解决方法 |
+|---|---|
+| 服务器未启动 | 确保 Node.js ≥18：`node -v` |
+| "Command not found" | 使用 `npx` 方式或 `npm install -g @yanhuifair/godot-mcp` |
+| Godot 中看不到插件 | 在插件标签页点击**重启**，或重新打开项目 |
+| 编辑器进程无法启动 | 确保 Godot 已安装且在 PATH 中，或设置 `GODOT_PATH` 环境变量 |
+| 聊天中未出现工具 | 重新加载 VS Code：`Cmd+Shift+P` → `Developer: Reload Window` |
+
 ### Cursor
 
 `~/.cursor/mcp.json`:
@@ -122,6 +226,7 @@ Godot 自动检测顺序：`GODOT_PATH` → `/Applications/Godot.app` → `PATH`
 {
   "mcpServers": {
     "godot-mcp": {
+      "type": "stdio",
       "command": "npx",
       "args": ["-y", "@yanhuifair/godot-mcp", "-p", "/path/to/your/godot/project"]
     }
@@ -135,6 +240,7 @@ Godot 自动检测顺序：`GODOT_PATH` → `/Applications/Godot.app` → `PATH`
 {
   "mcpServers": {
     "godot-mcp": {
+      "type": "stdio",
       "command": "godot-mcp",
       "args": ["-p", "/path/to/your/godot/project"]
     }
@@ -150,6 +256,7 @@ Godot 自动检测顺序：`GODOT_PATH` → `/Applications/Godot.app` → `PATH`
 {
   "mcpServers": {
     "godot-mcp": {
+      "type": "stdio",
       "command": "npx",
       "args": ["-y", "@yanhuifair/godot-mcp", "-p", "/path/to/your/godot/project"]
     }
@@ -165,6 +272,7 @@ Godot 自动检测顺序：`GODOT_PATH` → `/Applications/Godot.app` → `PATH`
 {
   "mcpServers": {
     "godot-mcp": {
+      "type": "stdio",
       "command": "npx",
       "args": ["-y", "@yanhuifair/godot-mcp", "-p", "/path/to/your/godot/project"]
     }
@@ -307,25 +415,35 @@ Godot 自动检测顺序：`GODOT_PATH` → `/Applications/Godot.app` → `PATH`
 
 ## 编辑器插件
 
-可选编辑器插件通过 TCP（端口 `9876`）提供**实时编辑器控制**——选中节点、播放/停止、撤销/恢复、保存、断点调试等。
+编辑器插件提供**实时编辑器控制**——选中节点、运行/停止、撤销/恢复、保存、断点调试等。MCP 在调用编辑器工具时将 Godot 作为子进程启动，通过 stdin/stdout 通信。
+
+> **工作原理**：当你说"运行游戏"时，MCP 服务器自动执行 `godot --editor --path <项目>`，插件从 stdin 读取命令、执行后将结果写入 stdout。Godot 窗口会自动打开——无需手动操作。
 
 ### 安装插件
 
-1. 复制插件到项目：
+**方式一：CLI 一键安装（推荐）**
+
+```bash
+godot-mcp --install-addons -p /path/to/your/godot/project
+```
+
+**方式二：手动复制**
 
 ```bash
 cp -r addons/godot_mcp /path/to/your/godot/project/addons/
 ```
 
-2. 在 Godot 中启用：**项目 → 项目设置 → 插件 → Godot MCP → 启用**
+然后在 Godot 中启用：**项目 → 项目设置 → 插件 → Godot MCP → 启用**
 
-3. 若插件未显示，点击**重启**或重新打开项目
+若插件未显示，点击**重启**或重新打开项目。
 
-4. 在 **输出** 面板确认：
+在 **输出** 面板确认：
 
 ```
-[Godot MCP] TCP server listening on port 9876
+[Godot MCP] Plugin v1.1.2 loaded — ready on stdin/stdout
 ```
+
+> 💡 插件启用一次后即可关闭 Godot，MCP 会在需要时自动启动。
 
 ### 编辑器工具列表（78 个）
 
@@ -384,12 +502,12 @@ cp -r addons/godot_mcp /path/to/your/godot/project/addons/
 │ (Cursor/Claude/Copilot)│
 └────────┬────────────┘
          │ MCP (stdio)
-┌────────▼──────────────┐        TCP :9876      ┌──────────────────┐
+┌────────▼──────────────┐      stdin/stdout     ┌──────────────────┐
 │   Godot MCP Server     │ ◄───────────────────► │  Godot Editor     │
-│   (TypeScript, 279 工具)│     (编辑器插件)      │  (GDScript addon) │
+│   (TypeScript, 281 工具)│   (作为子进程启动)    │  (GDScript addon) │
 │                        │                       │                  │
 │  ┌──────────────────┐  │                       │  78 个编辑器命令  │
-│  │  Tool Handlers    │  │                       │  JSON-RPC/TCP    │
+│  │  Tool Handlers    │  │                       │  JSON-RPC/stdio  │
 │  └──────────────────┘  │                       └──────────────────┘
 │  ┌──────────────────┐  │
 │  │  File Parsers     │  │  .tscn / .tres / .gd / .gdshader / .import / .csv
@@ -408,7 +526,7 @@ godot-mcp/
 │   ├── index.ts              # CLI 入口
 │   ├── server.ts             # MCP 服务器核心
 │   ├── tools/                # 33 个处理器文件
-│   │   ├── register.ts       # 集中注册（279 工具）
+│   │   ├── register.ts       # 集中注册（281 工具）
 │   │   ├── project.ts        # 项目工具
 │   │   ├── scene.ts          # 场景工具
 │   │   ├── script.ts         # 脚本 + 着色器工具
@@ -451,7 +569,7 @@ godot-mcp/
 ├── addons/
 │   └── godot_mcp/            # Godot 编辑器插件
 │       ├── plugin.cfg         # 插件元数据
-│       └── plugin.gd          # TCP 服务器 + 命令处理器
+│       └── plugin.gd          # stdin 读取器 + 命令处理器
 ├── dist/                     # 编译输出
 ├── test/                     # 测试套件
 ├── package.json
@@ -513,20 +631,14 @@ npm run test:watch       # 监视模式
 
 ---
 
-## 打包为 VSIX 扩展
+## 构建 VSIX
 
 ```bash
 npm run vsix
-# → godot-mcp-1.0.2.vsix
+# → godot-mcp-1.1.2.vsix
 ```
 
-安装到 VS Code：
-
-```bash
-code --install-extension godot-mcp-1.0.2.vsix
-```
-
-安装后，MCP 服务器自动注册，Copilot / Cline / Roo Code 自动发现。无需手动配置 `mcp.json`。
+详细安装和使用见 [VS Code 配置](#vs-code--github-copilot)。
 
 ---
 

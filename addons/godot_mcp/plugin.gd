@@ -2,95 +2,103 @@
 extends EditorPlugin
 
 # ============================================================
-# Godot MCP Editor Plugin v1.0.2
+# Godot MCP Editor Plugin v1.1.2
 # ============================================================
-# TCP server inside the Godot editor enabling real-time AI
-# control: node CRUD, property editing, GDScript execution,
-# breakpoints, output capture, scene management, and more.
+# Runs inside Godot Editor, communicating with the MCP server
+# via stdin/stdout instead of TCP. The parent process (Node.js
+# MCP server) spawns Godot and pipes JSON-RPC commands through
+# stdin. This plugin reads them in a background thread, executes
+# them on the main thread, and writes responses back to stdout.
 # ============================================================
 
-const DEFAULT_PORT = 9876
 const MAX_OUTPUT_LINES = 500
-const BUFFER_SIZE = 65536
+# Marker prefix to distinguish MCP responses from Godot engine output
+const RESPONSE_MARKER = "__MCP__:"
 
-var _tcp_server: TCPServer = null
-var _peer: StreamPeerTCP = null
 var _output_buffer: PackedStringArray = []
 var _output_signal_connected: bool = false
+
+# ---- stdin/stdout communication ----
+# Only active when Godot is spawned by MCP (MCP_STDIO=true env var).
+# When opened normally, plugin loads but skips stdin to avoid blocking.
+var _stdin_thread: Thread = null
+var _command_mutex: Mutex = null
+var _command_queue: Array = []
+var _running: bool = true
+var _stdio_mode: bool = false
+
 
 # ---- Lifecycle ----
 
 func _enter_tree() -> void:
-	_start_server()
+	# Check if launched by MCP server (stdio mode) or opened normally
+	_stdio_mode = OS.get_environment("MCP_STDIO") == "true"
+	_command_mutex = Mutex.new()
+	_running = true
+
+	if _stdio_mode:
+		_start_stdin_reader()
+		_send_stdout({"jsonrpc": "2.0", "id": 0, "result": {"ready": true, "version": "1.1.2"}})
+
 	_setup_output_capture()
 	set_process(true)
-	print("[Godot MCP] Plugin v1.0.2 loaded — TCP on port ", _get_port())
+
+	if _stdio_mode:
+		print("[Godot MCP] Plugin v1.1.2 loaded — stdio mode, waiting for commands")
+	else:
+		print("[Godot MCP] Plugin v1.1.2 loaded — direct mode (MCP will spawn editor on demand)")
 
 
 func _exit_tree() -> void:
+	_running = false
 	set_process(false)
 	_teardown_output_capture()
-	if _tcp_server:
-		_tcp_server.stop()
-		_tcp_server = null
-	_peer = null
-	print("[Godot MCP] Plugin unloaded")
+	# Wait for stdin thread to finish (only if in stdio mode)
+	if _stdio_mode and _stdin_thread:
+		_stdin_thread.wait_to_finish()
+		_stdin_thread = null
+	if _stdio_mode:
+		_send_stdout({"jsonrpc": "2.0", "id": 0, "result": {"shutdown": true}})
+	else:
+		print("[Godot MCP] Plugin unloaded")
 
 
-func _get_port() -> int:
-	if ProjectSettings.has_setting("godot_mcp/editor_port"):
-		return ProjectSettings.get_setting("godot_mcp/editor_port")
-	return DEFAULT_PORT
+# ---- stdin Reader (background thread) ----
+
+func _start_stdin_reader() -> void:
+	_stdin_thread = Thread.new()
+	_stdin_thread.start(_stdin_reader_loop)
 
 
-func _start_server() -> void:
-	_tcp_server = TCPServer.new()
-	var port = _get_port()
-	var err = _tcp_server.listen(port)
-	if err != OK:
-		printerr("[Godot MCP] Failed to start TCP server on port ", port, " (err=", err, ")")
-		return
-	print("[Godot MCP] TCP server listening on port ", port)
+func _stdin_reader_loop() -> void:
+	# Blocking read loop — runs in a separate OS thread.
+	# OS.read_string_from_stdin() blocks until a full line arrives.
+	# When stdin closes (parent process exits), returns empty string.
+	while _running:
+		var line: String = OS.read_string_from_stdin()
+		if line == "":
+			break # EOF — parent process closed stdin
+		line = line.strip_edges()
+		if line != "":
+			_command_mutex.lock()
+			_command_queue.append(line)
+			_command_mutex.unlock()
 
 
-func _setup_output_capture() -> void:
-	# Hook into Godot's output logging — only connect once
-	if _output_signal_connected:
-		return
-	var log = Engine.get_singleton("EditorInterface").get_editor_toaster()
-	# Use EditorLog's message signal
-	# Fallback: intercept via editor's output panel polling
-	_output_signal_connected = true
-
-
-func _teardown_output_capture() -> void:
-	_output_signal_connected = false
-
-
-# ---- Process / Network Loop ----
+# ---- Process (main thread) ----
 
 func _process(_delta: float) -> void:
-	if not _tcp_server:
+	if not _stdio_mode:
 		return
 
-	# Accept new connections
-	if not _peer:
-		if _tcp_server.is_connection_available():
-			_peer = _tcp_server.take_connection()
+	# Dequeue and process commands from the background thread
+	_command_mutex.lock()
+	var commands = _command_queue.duplicate()
+	_command_queue.clear()
+	_command_mutex.unlock()
 
-	# Read and handle messages
-	if _peer:
-		var status = _peer.get_status()
-		if status == StreamPeerTCP.STATUS_CONNECTED:
-			var available = _peer.get_available_bytes()
-			if available > 0:
-				var data = _peer.get_string(min(available, BUFFER_SIZE))
-				if data:
-					_handle_message(data)
-			elif available < 0:
-				_peer = null
-		else:
-			_peer = null
+	for cmd in commands:
+		_handle_message(cmd)
 
 	# Capture editor output via polling
 	_capture_editor_output()
@@ -101,11 +109,10 @@ func _process(_delta: float) -> void:
 var _last_output_line_count: int = 0
 
 func _capture_editor_output() -> void:
-	# Poll the editor log for new lines
-	var editor_base = get_editor_interface().get_base_control()
-	if not editor_base:
+	# Navigate to output panel via editor main screen
+	var editor_main = get_editor_interface().get_editor_main_screen()
+	if not editor_main:
 		return
-	# Navigate to output panel — this is fragile, use a safer approach
 	# For now, rely on print() forwarding which already works
 	pass
 
@@ -114,6 +121,26 @@ func capture_output_line(line: String) -> void:
 	_output_buffer.append(line)
 	while _output_buffer.size() > MAX_OUTPUT_LINES:
 		_output_buffer.remove_at(0)
+
+
+func _setup_output_capture() -> void:
+	if _output_signal_connected:
+		return
+	# Output capture relies on _capture_editor_output() polling
+	_output_signal_connected = true
+
+
+func _teardown_output_capture() -> void:
+	_output_signal_connected = false
+
+
+# ---- stdout Response ----
+
+func _send_stdout(data: Dictionary) -> void:
+	# Write a JSON-RPC response to stdout with marker prefix.
+	# The parent MCP server filters for lines starting with RESPONSE_MARKER.
+	var json_str = JSON.stringify(data, "", false)
+	printraw(RESPONSE_MARKER + json_str + "\n")
 
 
 # ---- Message Handling ----
@@ -369,7 +396,7 @@ func _node_set_property(node: Node, key: String, raw_value: String) -> void:
 
 
 func _value_to_json_string(val) -> String:
-	"""Convert a Godot value to a string suitable for JSON serialization."""
+	# Convert a Godot value to a string suitable for JSON serialization.
 	match typeof(val):
 		TYPE_VECTOR2, TYPE_VECTOR2I: return str(val)
 		TYPE_VECTOR3, TYPE_VECTOR3I: return str(val)
@@ -1058,8 +1085,8 @@ func _cmd_open_dock(params: Dictionary) -> Dictionary:
 		"node", "scene":
 			get_editor_interface().set_main_screen_editor("Node")
 		"output", "console":
-			# Show the bottom panel
-			var editor_node = get_editor_interface().get_base_control()
+			# Show the bottom panel via editor main screen
+			var editor_node = get_editor_interface().get_editor_main_screen()
 			# Try to find and activate the output panel
 			get_editor_interface().set_main_screen_editor("Script")
 		_:
@@ -1741,20 +1768,8 @@ func _generate_node_name(type_name: String, parent: Node) -> String:
 
 
 func _send_response(id: int, result: Dictionary) -> void:
-	if not _peer:
-		return
-	var response = {"jsonrpc": "2.0", "id": id, "result": result}
-	var json = JSON.stringify(response, "", false)
-	_peer.put_data(json.to_utf8_buffer())
-	_peer.disconnect_from_host()
-	_peer = null
+	_send_stdout({"jsonrpc": "2.0", "id": id, "result": result})
 
 
 func _send_error(message: String) -> void:
-	if not _peer:
-		return
-	var response = {"jsonrpc": "2.0", "id": 0, "error": {"message": message}}
-	var json = JSON.stringify(response, "", false)
-	_peer.put_data(json.to_utf8_buffer())
-	_peer.disconnect_from_host()
-	_peer = null
+	_send_stdout({"jsonrpc": "2.0", "id": 0, "error": {"message": message}})
