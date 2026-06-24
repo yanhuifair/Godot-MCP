@@ -99,7 +99,7 @@ The AI client auto-launches the MCP server. **File-based tools** (.tscn, .tres, 
 
 ## All Tools
 
-> 🔍 Click each category to expand and see all tool names. For detailed usage examples, see [Usage Examples](#usage-examples). Editor tools are also listed with descriptions in [Editor Tools](#editor-tools-78-tools).
+> 🔍 Click each category to expand and see all tools with descriptions. For detailed usage examples, see [Usage Examples](#usage-examples). Editor tools are also listed with descriptions in [Editor Plugin](#editor-plugin).
 
 <details>
 <summary><b>🎬 Editor</b> (89 tools) — Live editor control</summary>
@@ -997,7 +997,7 @@ Confirm in the **Output** panel:
 `editor_get_selection` `editor_set_selection` `editor_get_open_scene` `editor_read_current_scene` `editor_get_info` `editor_get_rect` `editor_focus` `editor_show_in_filesystem` `editor_open_dock`
 
 **Playback Control:**
-`editor_play` `editor_stop` `editor_run_specific_scene` `editor_get_running_scene_tree` `editor_get_performance`
+`editor_play` `editor_stop` `editor_run_specific_scene` `editor_get_running_scene_tree` `editor_get_performance_monitors`
 
 **Edit Operations:**
 `editor_undo` `editor_redo` `editor_save` `editor_save_all` `editor_reload_scene` `editor_delete_selected`
@@ -1018,25 +1018,25 @@ Confirm in the **Output** panel:
 `editor_connect_signal` `editor_disconnect_signal` `editor_list_node_signals`
 
 **File System:**
-`editor_open_asset` `editor_list_filesystem` `editor_create_folder` `editor_delete_asset` `editor_rename_asset` `editor_move_asset` `editor_duplicate_asset` `editor_reimport_asset` `editor_get_dependencies`
+`editor_open_asset` `editor_list_filesystem` `editor_create_folder` `editor_delete_asset` `editor_rename_asset` `editor_move_asset` `editor_duplicate_asset` `editor_reimport_asset` `editor_get_dependency_list`
 
 **Project Settings:**
 `editor_get_project_setting` `editor_set_project_setting` `editor_get_editor_setting` `editor_set_editor_setting` `editor_get_project_directory`
 
 **Input & Autoloads:**
-`editor_get_input_map` `editor_add_input_action` `editor_remove_input_action` `editor_get_autoloads` `editor_add_autoload` `editor_remove_autoload`
+`editor_get_input_map` `editor_add_input_action` `editor_remove_input_action` `editor_get_autoload_list` `editor_add_autoload` `editor_remove_autoload`
 
 **Assets:**
 `editor_bake_lightmaps` `editor_bake_navigation` `editor_take_screenshot`
 
 **Class Documentation:**
-`editor_get_class_list` `editor_get_method_list` `editor_get_class_properties` `editor_get_class_signals` `editor_get_class_doc` `editor_search_help`
+`editor_get_class_list` `editor_get_method_list` `editor_get_class_property_list` `editor_get_class_signal_list` `editor_get_class_doc` `editor_search_help`
 
 **Camera & Viewport:**
-`editor_get_camera` `editor_set_camera` `editor_toggle_grid` `editor_toggle_snap`
+`editor_get_editor_camera` `editor_set_editor_camera` `editor_toggle_grid` `editor_toggle_snap`
 
 **Other:**
-`editor_get_recent_scenes` `editor_simulate_key` `editor_get_plugin_list` `editor_enable_plugin` `editor_disable_plugin` `editor_get_errors` `editor_clear_errors` `editor_health_check`
+`editor_get_recent_scenes` `editor_simulate_key` `editor_get_plugin_list` `editor_enable_plugin` `editor_disable_plugin` `editor_get_error_list` `editor_clear_errors` `editor_health_check`
 
 ---
 

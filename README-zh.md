@@ -99,7 +99,7 @@ AI 客户端自动启动 MCP 服务器。**文件级工具**（.tscn、.tres、.
 
 ## 全部工具列表
 
-> 🔍 点击各分类展开查看所有工具名称。详细用法见[使用示例](#使用示例)。编辑器工具详见[编辑器工具](#编辑器工具-78-个工具)。
+> 🔍 点击各分类展开查看所有工具及描述。详细用法见[使用示例](#使用示例)。编辑器工具详见[编辑器插件](#编辑器插件)。
 
 <details>
 <summary><b>🎬 Editor</b> (89 个工具) — 实时编辑器控制</summary>
@@ -673,6 +673,55 @@ code --install-extension godot-mcp-1.3.0.vsix
 
 > 💡 **提示**：将 `.vscode/mcp.json` 提交到仓库，团队成员打开项目即可自动获得 MCP 服务。
 
+#### SSE（Server-Sent Events）— HTTP 传输
+
+适用于远程或基于 Web 的 MCP 客户端（使用 SSE）：
+
+1. 以 SSE 模式启动服务器：
+   ```bash
+   npx @yanhuifair/godot-mcp -t sse --port 3000 -p .
+   ```
+
+2. 配置你的 MCP 客户端：
+   ```json
+   {
+     "mcpServers": {
+       "godot-mcp": {
+         "url": "http://127.0.0.1:3000/sse"
+       }
+     }
+   }
+   ```
+
+#### Streamable HTTP — MCP 2025 传输
+
+适用于支持 Streamable HTTP 规范的现代 MCP 客户端：
+
+1. 以 Streamable HTTP 模式启动服务器：
+   ```bash
+   npx @yanhuifair/godot-mcp -t streamable-http --port 3000 -p .
+   ```
+
+2. 配置你的 MCP 客户端：
+   ```json
+   {
+     "mcpServers": {
+       "godot-mcp": {
+         "url": "http://127.0.0.1:3000/mcp",
+         "transportType": "streamable-http"
+       }
+     }
+   }
+   ```
+
+#### 同时启用所有传输
+
+同时运行三种传输（stdio + SSE + Streamable HTTP）：
+
+```bash
+npx @yanhuifair/godot-mcp -t all --port 3000 -p .
+```
+
 #### 验证安装
 
 1. 在 VS Code 中打开 Godot 项目文件夹
@@ -948,7 +997,7 @@ cp -r addons/godot_mcp /path/to/your/godot/project/addons/
 `editor_get_selection` `editor_set_selection` `editor_get_open_scene` `editor_read_current_scene` `editor_get_info` `editor_get_rect` `editor_focus` `editor_show_in_filesystem` `editor_open_dock`
 
 **播放控制：**
-`editor_play` `editor_stop` `editor_run_specific_scene` `editor_get_running_scene_tree` `editor_get_performance`
+`editor_play` `editor_stop` `editor_run_specific_scene` `editor_get_running_scene_tree` `editor_get_performance_monitors`
 
 **编辑操作：**
 `editor_undo` `editor_redo` `editor_save` `editor_save_all` `editor_reload_scene` `editor_delete_selected`
@@ -969,25 +1018,25 @@ cp -r addons/godot_mcp /path/to/your/godot/project/addons/
 `editor_connect_signal` `editor_disconnect_signal` `editor_list_node_signals`
 
 **文件系统：**
-`editor_open_asset` `editor_list_filesystem` `editor_create_folder` `editor_delete_asset` `editor_rename_asset` `editor_move_asset` `editor_duplicate_asset` `editor_reimport_asset` `editor_get_dependencies`
+`editor_open_asset` `editor_list_filesystem` `editor_create_folder` `editor_delete_asset` `editor_rename_asset` `editor_move_asset` `editor_duplicate_asset` `editor_reimport_asset` `editor_get_dependency_list`
 
 **项目设置：**
 `editor_get_project_setting` `editor_set_project_setting` `editor_get_editor_setting` `editor_set_editor_setting` `editor_get_project_directory`
 
 **输入与自动加载：**
-`editor_get_input_map` `editor_add_input_action` `editor_remove_input_action` `editor_get_autoloads` `editor_add_autoload` `editor_remove_autoload`
+`editor_get_input_map` `editor_add_input_action` `editor_remove_input_action` `editor_get_autoload_list` `editor_add_autoload` `editor_remove_autoload`
 
 **资源：**
 `editor_bake_lightmaps` `editor_bake_navigation` `editor_take_screenshot`
 
 **类文档：**
-`editor_get_class_list` `editor_get_method_list` `editor_get_class_properties` `editor_get_class_signals` `editor_get_class_doc` `editor_search_help`
+`editor_get_class_list` `editor_get_method_list` `editor_get_class_property_list` `editor_get_class_signal_list` `editor_get_class_doc` `editor_search_help`
 
 **相机与视图：**
-`editor_get_camera` `editor_set_camera` `editor_toggle_grid` `editor_toggle_snap`
+`editor_get_editor_camera` `editor_set_editor_camera` `editor_toggle_grid` `editor_toggle_snap`
 
 **其他：**
-`editor_get_recent_scenes` `editor_simulate_key` `editor_get_plugin_list` `editor_enable_plugin` `editor_disable_plugin` `editor_get_errors` `editor_clear_errors` `editor_health_check`
+`editor_get_recent_scenes` `editor_simulate_key` `editor_get_plugin_list` `editor_enable_plugin` `editor_disable_plugin` `editor_get_error_list` `editor_clear_errors` `editor_health_check`
 
 ---
 
@@ -1115,6 +1164,7 @@ npm run test:watch       # 监视模式
 |---|---|
 | `-p, --project-path` | Godot 项目根目录路径 |
 | `-g, --godot-path` | Godot 可执行文件路径（可选） |
+| `--install-addons` | 将 addons/godot_mcp 复制到目标 Godot 项目 |
 | `-h, --help` | 显示帮助 |
 
 ### 技术栈
