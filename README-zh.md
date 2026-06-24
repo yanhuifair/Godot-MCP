@@ -6,7 +6,7 @@
 
 [English Documentation](README.md)
 
-> **Godot Engine MCP 服务器** — 281 个工具，26 个分类，覆盖 Godot 4.6/4.7。文件级 CRUD + 可选实时编辑器插件。AI 助手通过 stdio 协议直接操作 Godot 项目。
+> **Godot Engine 的 Model Context Protocol 服务器** — 281 个工具，26 个分类，覆盖 Godot 4.6/4.7。文件级 CRUD + 实时编辑器插件。AI 助手通过 **Stdio**、**SSE** 或 **Streamable HTTP** 传输协议读取、检查、修改 Godot 项目。
 
 ---
 
