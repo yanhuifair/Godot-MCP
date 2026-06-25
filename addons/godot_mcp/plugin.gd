@@ -2,7 +2,7 @@
 extends EditorPlugin
 
 # ============================================================
-# Godot MCP Editor Plugin v1.3.1
+# Godot MCP Editor Plugin v1.3.2
 # ============================================================
 # Dual-mode communication with the MCP server:
 # - stdio mode: when spawned by MCP (MCP_STDIO=true), reads
@@ -42,7 +42,7 @@ func _enter_tree() -> void:
 
 	if _stdio_mode:
 		_start_stdin_reader()
-		_send_stdout({"jsonrpc": "2.0", "id": 0, "result": {"ready": true, "version": "1.3.1"}})
+		_send_stdout({"jsonrpc": "2.0", "id": 0, "result": {"ready": true, "version": "1.3.2"}})
 	else:
 		_start_tcp_server()
 
@@ -50,9 +50,9 @@ func _enter_tree() -> void:
 	set_process(true)
 
 	if _stdio_mode:
-		print("[Godot MCP] Plugin v1.2.0 loaded — stdio mode")
+		print("[Godot MCP] Plugin v1.3.2 loaded — stdio mode")
 	else:
-		print("[Godot MCP] Plugin v1.2.0 loaded — TCP on port ", DEFAULT_PORT)
+		print("[Godot MCP] Plugin v1.3.2 loaded — TCP on port ", DEFAULT_PORT)
 
 
 func _exit_tree() -> void:
