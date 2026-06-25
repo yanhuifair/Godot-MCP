@@ -206,7 +206,7 @@ npx @yanhuifair/godot-mcp -t all --port 3000 -p /path/to/your/godot/project
 ```bash
 # 健康检查
 curl http://127.0.0.1:3000/health
-# → {"status":"ok","version":"1.3.0","projectRoot":"/path/to/project","endpoints":{...}}
+# → {"status":"ok","version":"1.3.1","projectRoot":"/path/to/project","endpoints":{...}}
 ```
 
 ### 禁用特定 HTTP 端点
@@ -795,9 +795,9 @@ Godot auto-detection: `GODOT_PATH` → `/Applications/Godot.app` → `PATH` → 
 
 ```bash
 npm run vsix
-# → godot-mcp-1.3.0.vsix
+# → godot-mcp-1.3.1.vsix
 
-code --install-extension godot-mcp-1.3.0.vsix
+code --install-extension godot-mcp-1.3.1.vsix
 ```
 
 After installation, the MCP server auto-registers. Copilot / Cline / Roo Code discover it automatically — **no manual config required**. Skip to [Verify Setup](#verify-setup).
@@ -905,7 +905,7 @@ npx @yanhuifair/godot-mcp --install-addons -p .
 Then enable in Godot Editor: **Project → Project Settings → Plugins → Godot MCP → Enable**. Confirm in the **Output** panel:
 
 ```
-[Godot MCP] Plugin v1.3.0 loaded — ready on stdin/stdout
+[Godot MCP] Plugin v1.3.1 loaded — ready on stdin/stdout
 ```
 
 > 💡 After enabling once, close Godot. MCP spawns it automatically when you use editor commands.
@@ -1147,7 +1147,7 @@ If not visible, click **Restart** or reopen the project.
 Confirm in the **Output** panel:
 
 ```
-[Godot MCP] Plugin v1.3.0 loaded — ready on stdin/stdout
+[Godot MCP] Plugin v1.3.1 loaded — ready on stdin/stdout
 ```
 
 > 💡 After enabling the plugin once, you can close Godot. MCP will launch it automatically when needed.
@@ -1343,7 +1343,7 @@ npm run test:watch       # Watch mode
 
 ```bash
 npm run vsix
-# → godot-mcp-1.3.0.vsix
+# → godot-mcp-1.3.1.vsix
 ```
 
 See [VS Code Setup](#vs-code--github-copilot) for installation and usage.
