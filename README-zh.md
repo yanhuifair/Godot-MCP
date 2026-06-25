@@ -13,6 +13,7 @@
 ## 目录
 
 - [快速开始](#快速开始)
+- [传输模式](#传输模式)
 - [功能概览](#功能概览)
 - [全部工具列表](#全部工具列表)
 - [安装](#安装)
@@ -59,6 +60,166 @@ AI 客户端自动启动 MCP 服务器。**文件级工具**（.tscn、.tres、.
 > "列出项目中的所有场景"
 > "找到所有 CharacterBody2D 节点"
 > "运行游戏并截图"
+
+---
+
+## 传输模式
+
+Godot MCP 支持三种传输协议，根据客户端和部署需求选择。
+
+| 模式 | 协议 | 适用场景 | 默认 |
+|---|---|---|---|
+| **Stdio** | 标准输入/输出 (stdin/stdout) | 本地 AI 客户端（VS Code、Claude Desktop、Cursor、Windsurf） | ✅ |
+| **SSE** | Server-Sent Events over HTTP | 旧版 MCP 客户端、Web 客户端、远程访问 | |
+| **Streamable HTTP** | MCP 2025 Streamable HTTP | 现代 MCP 客户端、生产部署、远程访问 | |
+
+### Stdio（默认）
+
+通过进程的标准输入/输出进行 JSON-RPC 通信。适合本地开发，无需网络配置。
+
+**启动服务器：**
+
+```bash
+# stdio 是默认模式，无需指定 -t
+npx @yanhuifair/godot-mcp -p /path/to/your/godot/project
+```
+
+**客户端配置：**
+
+```json
+{
+  "mcpServers": {
+    "godot-mcp": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@yanhuifair/godot-mcp", "-p", "/path/to/your/godot/project"]
+    }
+  }
+}
+```
+
+如果使用全局安装：
+
+```json
+{
+  "mcpServers": {
+    "godot-mcp": {
+      "type": "stdio",
+      "command": "godot-mcp",
+      "args": ["-p", "/path/to/your/godot/project"]
+    }
+  }
+}
+```
+
+> **适用客户端**：Claude Desktop、VS Code / GitHub Copilot、Cursor、Windsurf、Cline、Roo Code。这些客户端会自动管理服务器进程的生命周期。
+
+---
+
+### SSE（Server-Sent Events）
+
+基于 HTTP 的传输方式，使用 SSE 实现服务端到客户端的流式推送。兼容不支持 Streamable HTTP 的旧版 MCP 客户端。
+
+**启动服务器：**
+
+```bash
+npx @yanhuifair/godot-mcp -t sse --port 3000 -p /path/to/your/godot/project
+```
+
+| 选项 | 说明 | 默认值 |
+|---|---|---|
+| `-t sse` | 指定 SSE 传输模式 | — |
+| `--port <number>` | HTTP 监听端口 | `3000` |
+| `--host <string>` | 监听地址（远程访问用 `0.0.0.0`） | `127.0.0.1` |
+
+**客户端配置：**
+
+```json
+{
+  "mcpServers": {
+    "godot-mcp": {
+      "url": "http://127.0.0.1:3000/sse"
+    }
+  }
+}
+```
+
+> **注意**：每个 SSE 连接会创建一个独立的 Server + Transport 实例。生产环境远程访问时请确保配置鉴权。
+
+---
+
+### Streamable HTTP（MCP 2025）
+
+基于 MCP 2025 规范的现代 HTTP 传输方式。支持会话管理、断线重连恢复，以及有状态和无状态两种模式。
+
+**启动服务器：**
+
+```bash
+npx @yanhuifair/godot-mcp -t streamable-http --port 3000 -p /path/to/your/godot/project
+```
+
+| 选项 | 说明 | 默认值 |
+|---|---|---|
+| `-t streamable-http` | 指定 Streamable HTTP 模式 | — |
+| `--port <number>` | HTTP 监听端口 | `3000` |
+| `--host <string>` | 监听地址（远程访问用 `0.0.0.0`） | `127.0.0.1` |
+
+**端点说明：**
+
+| 方法 | 路径 | 用途 |
+|---|---|---|
+| `GET` | `/mcp` | 建立 SSE 流（支持 `Last-Event-ID` 断线重连） |
+| `POST` | `/mcp` | 发送 JSON-RPC 请求/通知 |
+| `DELETE` | `/mcp` | 关闭会话 |
+
+**客户端配置：**
+
+```json
+{
+  "mcpServers": {
+    "godot-mcp": {
+      "url": "http://127.0.0.1:3000/mcp",
+      "transportType": "streamable-http"
+    }
+  }
+}
+```
+
+> **适用场景**：生产部署、远程团队协作、需要会话持久化和断线恢复的场景。
+
+---
+
+### 同时启用所有模式
+
+开发调试或多客户端混合环境可使用 `all` 模式：
+
+```bash
+npx @yanhuifair/godot-mcp -t all --port 3000 -p /path/to/your/godot/project
+```
+
+同时启动：
+- **Stdio** — 标准输入/输出
+- **SSE** — `http://127.0.0.1:3000/sse`
+- **Streamable HTTP** — `http://127.0.0.1:3000/mcp`
+- **健康检查** — `http://127.0.0.1:3000/health`
+
+```bash
+# 健康检查
+curl http://127.0.0.1:3000/health
+# → {"status":"ok","version":"1.3.0","projectRoot":"/path/to/project","endpoints":{...}}
+```
+
+### 禁用特定 HTTP 端点
+
+如果只需要其中一种 HTTP 模式：
+
+```bash
+# 仅 Streamable HTTP（禁用 SSE）
+npx @yanhuifair/godot-mcp -t streamable-http --no-sse --port 3000 -p .
+
+# 仅 SSE（禁用 Streamable HTTP）
+npx @yanhuifair/godot-mcp -t sse --no-streamable-http --port 3000 -p .
+```
 
 ---
 
@@ -675,14 +836,14 @@ code --install-extension godot-mcp-1.3.0.vsix
 
 #### SSE（Server-Sent Events）— HTTP 传输
 
-适用于远程或基于 Web 的 MCP 客户端（使用 SSE）：
+适用于远程或基于 Web 的 MCP 客户端（使用 SSE）。详见[传输模式 → SSE](#sse-server-sent-events)。
 
 1. 以 SSE 模式启动服务器：
    ```bash
    npx @yanhuifair/godot-mcp -t sse --port 3000 -p .
    ```
 
-2. 配置你的 MCP 客户端：
+2. 配置 `.vscode/mcp.json`：
    ```json
    {
      "mcpServers": {
@@ -695,14 +856,14 @@ code --install-extension godot-mcp-1.3.0.vsix
 
 #### Streamable HTTP — MCP 2025 传输
 
-适用于支持 Streamable HTTP 规范的现代 MCP 客户端：
+适用于支持 Streamable HTTP 规范的现代 MCP 客户端。详见[传输模式 → Streamable HTTP](#streamable-httpmcp-2025)。
 
 1. 以 Streamable HTTP 模式启动服务器：
    ```bash
    npx @yanhuifair/godot-mcp -t streamable-http --port 3000 -p .
    ```
 
-2. 配置你的 MCP 客户端：
+2. 配置 `.vscode/mcp.json`：
    ```json
    {
      "mcpServers": {
@@ -716,7 +877,7 @@ code --install-extension godot-mcp-1.3.0.vsix
 
 #### 同时启用所有传输
 
-同时运行三种传输（stdio + SSE + Streamable HTTP）：
+同时运行三种传输（stdio + SSE + Streamable HTTP）。详见[传输模式 → 同时启用所有模式](#同时启用所有模式)。
 
 ```bash
 npx @yanhuifair/godot-mcp -t all --port 3000 -p .
