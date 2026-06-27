@@ -217,12 +217,12 @@ godot-mcp/
 ├── src/
 │   ├── index.ts              # CLI 入口点，参数解析，传输调度
 │   ├── server.ts             # MCP 服务器工厂，工具注册，请求路由
-│   ├── tools/                # 28 个工具处理文件（每个分类一个）
+│   ├── tools/                # 29 个工具处理文件（每个分类一个）
 │   │   ├── register.ts       # 集中注册（282 个工具）
 │   │   ├── project.ts        # 项目管理工具
 │   │   ├── scene.ts          # 场景编辑工具
 │   │   ├── script.ts         # 脚本和着色器工具
-│   │   ├── editor.ts         # 实时编辑器桥（TCP + stdio）
+│   │   ├── editor.ts         # 实时编辑器桥（TCP + stdio，持久连接）
 │   │   ├── resource.ts       # 资源/材质/主题工具
 │   │   ├── godot.ts          # Godot 引擎控制
 │   │   ├── animation.ts      # 动画管线
@@ -230,7 +230,7 @@ godot-mcp/
 │   │   ├── scene_inspectors.ts  # 2D 灯光、车辆、弹簧臂等
 │   │   ├── mesh.ts           # 3D 网格图元
 │   │   ├── shader_graph.ts   # VisualShader 图编辑
-│   │   └── ...（另 18 个文件）
+│   │   └── ...（另 16 个：domain、physics、navigation、joints 等）
 │   ├── parsers/
 │   │   ├── scene_parser.ts   # .tscn 文件解析器（段、节点、连接）
 │   │   ├── resource_parser.ts # .tres 文件解析器
@@ -251,7 +251,15 @@ godot-mcp/
 │       ├── plugin.cfg         # 插件元数据
 │       └── plugin.gd          # stdin 读取器、TCP 服务器、97 个命令处理器
 ├── test/                     # 167 个测试，分布在 7 个测试文件中
-│   └── fixtures/             # 测试夹具文件
+│   ├── test_all.mjs          # 167 项全量工具测试套件
+│   ├── test_editor.mjs       # Editor 桥 TCP 测试
+│   ├── test_runner.mjs       # 早期集成测试
+│   ├── tools.test.ts         # Vitest 工具处理测试
+│   ├── parsers.test.ts       # Vitest 解析器测试
+│   ├── structural.test.ts    # Vitest 结构测试
+│   ├── integration_mcp_test.test.ts  # Vitest 集成测试
+│   ├── fixtures/             # 测试夹具文件（.tscn、.tres、.gd）
+│   └── test-project/         # 独立 Godot 测试项目
 ├── scripts/
 │   └── sync-addons.js        # 构建后：同步 addons 到 dist/
 ├── package.json

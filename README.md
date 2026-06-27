@@ -184,12 +184,12 @@ godot-mcp/
 ├── src/
 │   ├── index.ts              # CLI entry point, argument parsing, transport dispatch
 │   ├── server.ts             # MCP server factory, tool registration, request routing
-│   ├── tools/                # 28 tool handler files (one per category)
+│   ├── tools/                # 29 tool handler files (one per category)
 │   │   ├── register.ts       # Centralized registration (282 tools)
 │   │   ├── project.ts        # Project management tools
 │   │   ├── scene.ts          # Scene editing tools
 │   │   ├── script.ts         # Script and shader tools
-│   │   ├── editor.ts         # Live editor bridge (TCP + stdio)
+│   │   ├── editor.ts         # Live editor bridge (TCP + stdio, persistent connection)
 │   │   ├── resource.ts       # Resource/material/theme tools
 │   │   ├── godot.ts          # Godot engine control
 │   │   ├── animation.ts      # Animation pipeline
@@ -197,7 +197,7 @@ godot-mcp/
 │   │   ├── scene_inspectors.ts  # 2D lights, vehicles, spring arm, etc.
 │   │   ├── mesh.ts           # 3D mesh primitives
 │   │   ├── shader_graph.ts   # VisualShader graph editing
-│   │   └── ... (18 more files)
+│   │   └── ... (16 more files: domain, physics, navigation, joints, etc.)
 │   ├── parsers/
 │   │   ├── scene_parser.ts   # .tscn file parser (sections, nodes, connections)
 │   │   ├── resource_parser.ts # .tres file parser
@@ -218,7 +218,15 @@ godot-mcp/
 │       ├── plugin.cfg         # Plugin metadata
 │       └── plugin.gd          # stdin reader, TCP server, 97 command handlers
 ├── test/                     # 167 tests across 7 test files
-│   └── fixtures/             # Test fixture files
+│   ├── test_all.mjs          # Comprehensive 167-tool test suite
+│   ├── test_editor.mjs       # Editor bridge TCP tests
+│   ├── test_runner.mjs       # Early integration test runner
+│   ├── tools.test.ts         # Vitest tool handler tests
+│   ├── parsers.test.ts       # Vitest parser tests
+│   ├── structural.test.ts    # Vitest structural tests
+│   ├── integration_mcp_test.test.ts  # Vitest integration tests
+│   ├── fixtures/             # Test fixture files (.tscn, .tres, .gd)
+│   └── test-project/         # Standalone Godot test project
 ├── scripts/
 │   └── sync-addons.js        # Post-build: syncs addons to dist/
 ├── package.json
