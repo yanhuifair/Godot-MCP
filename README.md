@@ -228,7 +228,7 @@ godot-mcp/
 │   ├── fixtures/             # Test fixture files (.tscn, .tres, .gd)
 │   └── test-project/         # Standalone Godot test project
 ├── scripts/
-│   └── sync-addons.js        # Post-build: syncs addons to dist/
+│   └── sync-addons.js        # Post-build: syncs addons to target Godot project
 ├── package.json
 └── tsconfig.json
 ```

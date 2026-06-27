@@ -261,7 +261,7 @@ godot-mcp/
 │   ├── fixtures/             # 测试夹具文件（.tscn、.tres、.gd）
 │   └── test-project/         # 独立 Godot 测试项目
 ├── scripts/
-│   └── sync-addons.js        # 构建后：同步 addons 到 dist/
+│   └── sync-addons.js        # 构建后：同步 addons 到目标 Godot 工程
 ├── package.json
 └── tsconfig.json
 ```
