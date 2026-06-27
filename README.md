@@ -1,7 +1,7 @@
 # <div align="center">Godot MCP</div>
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-138%20passed-brightgreen)](.)
+[![Tests](https://img.shields.io/badge/tests-167%20passed-brightgreen)](.)
 [![npm](https://img.shields.io/npm/v/@yanhuifair/godot-mcp)](https://www.npmjs.com/package/@yanhuifair/godot-mcp)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-green)](.)
 [![Godot](https://img.shields.io/badge/godot-4.x-blue)](https://godotengine.org)
@@ -217,7 +217,7 @@ godot-mcp/
 │   └── godot_mcp/            # Godot editor plugin
 │       ├── plugin.cfg         # Plugin metadata
 │       └── plugin.gd          # stdin reader, TCP server, 97 command handlers
-├── test/                     # 138 tests across 4 test files
+├── test/                     # 167 tests across 7 test files
 │   └── fixtures/             # Test fixture files
 ├── scripts/
 │   └── sync-addons.js        # Post-build: syncs addons to dist/
@@ -355,7 +355,7 @@ Starts: Stdio + SSE (`/sse`) + Streamable HTTP (`/mcp`) + Health Check (`/health
 
 ```bash
 curl http://127.0.0.1:3000/health
-# {"status":"ok","version":"1.3.4","projectRoot":"/path/to/project","endpoints":{...}}
+# {"status":"ok","version":"1.3.5","projectRoot":"/path/to/project","endpoints":{...}}
 ```
 
 ---
@@ -1228,7 +1228,7 @@ Click each category to expand and see all tools with descriptions.
 npm install          # Install dependencies
 npm run build        # Build TypeScript to dist/
 npm run dev          # Dev mode (tsx hot reload)
-npm test             # Run 138 tests
+npm test             # Run tests (167 via vitest + test_all.mjs)
 npm run test:watch   # Watch mode
 ```
 
@@ -1264,13 +1264,13 @@ npm run test:watch   # Watch mode
 
 ```bash
 npm run vsix
-# Output: godot-mcp-1.3.4.vsix
+# Output: godot-mcp-1.3.5.vsix
 ```
 
 Install in VS Code:
 
 ```bash
-code --install-extension godot-mcp-1.3.4.vsix
+code --install-extension godot-mcp-1.3.5.vsix
 ```
 
 ---
