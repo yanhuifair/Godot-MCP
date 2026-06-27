@@ -33,12 +33,14 @@ import {
   handleLoadSprite, handleAddNode, handleRemoveNode, handleModifyNode,
   handleCloneNode, handleConnectSignal, handleDisconnectSignal,
   handleSetNodePosition, handleSetNodeRotation, handleSetNodeScale,
+  handleTransformNode,
   readSceneSchema, createSceneSchema, editSceneSchema, listScenesSchema,
   sceneDependencyGraphSchema, findNodesInScenesSchema, searchSceneContentSchema,
   listUiNodesSchema, renameNodeSchema, attachScriptSchema, setCollisionShapeSchema,
   loadSpriteSchema, addNodeSchema, removeNodeSchema, modifyNodeSchema,
   cloneNodeSchema, connectSignalSchema, disconnectSignalSchema,
   setNodePositionSchema, setNodeRotationSchema, setNodeScaleSchema,
+  transformNodeSchema,
 } from './scene.js';
 
 // Script + Shader tools
@@ -276,8 +278,13 @@ import {
   connectShaderGraphNodesSchema, disconnectShaderGraphNodesSchema,
   setShaderNodeParamSchema, listShaderNodeTypesSchema, getShaderNodeDefaultsSchema,
 } from './shader_graph.js';
+// Mesh Primitives & Scene Inspectors (was coverage.ts)
 import {
-  handleCreateMeshPrimitive, handleReadLight2d, handleSetLight2dParam,
+  handleCreateMeshPrimitive,
+  createMeshPrimitiveSchema,
+} from './mesh.js';
+import {
+  handleReadLight2d, handleSetLight2dParam,
   handleCreateVehicleBody, handleReadVehicleBody,
   handleCreateSpringArm, handleReadSpringArm,
   handleReadDecal, handleReadOccluder, handleReadMarker,
@@ -285,7 +292,7 @@ import {
   handleCreateSpriteFrames, handleReadSpriteFrames,
   handleReadSoftBody, handleReadGridMap, handleCreateGridMap,
   handleReadAudioListener,
-  createMeshPrimitiveSchema, readLight2dSchema, setLight2dParamSchema,
+  readLight2dSchema, setLight2dParamSchema,
   createVehicleBodySchema, readVehicleBodySchema,
   createSpringArmSchema, readSpringArmSchema,
   readDecalSchema, readOccluderSchema, readMarkerSchema,
@@ -293,7 +300,7 @@ import {
   createSpriteFramesSchema, readSpriteFramesSchema,
   readSoftBodySchema, readGridMapSchema, createGridMapSchema,
   readAudioListenerSchema,
-} from './coverage.js';
+} from './scene_inspectors.js';
 
 // ---- Registration ----
 
@@ -334,6 +341,7 @@ export function registerAllTools(registry: ToolRegistry): void {
   registry.register({ name: 'set_node_position', description: 'Set node position (2D/3D auto-detect).', schema: setNodePositionSchema, handler: handleSetNodePosition });
   registry.register({ name: 'set_node_rotation', description: 'Set node rotation (2D/3D).', schema: setNodeRotationSchema, handler: handleSetNodeRotation });
   registry.register({ name: 'set_node_scale', description: 'Set node scale (2D/3D).', schema: setNodeScaleSchema, handler: handleSetNodeScale });
+  registry.register({ name: 'transform_node', description: 'Apply a combined transform (position, rotation, scale) to a node in a scene.', schema: transformNodeSchema, handler: handleTransformNode });
   registry.register({ name: 'list_scenes', description: 'List all .tscn scene files.', schema: listScenesSchema, handler: handleListScenes });
   registry.register({ name: 'scene_dependency_graph', description: 'Analyze inter-scene dependencies.', schema: sceneDependencyGraphSchema, handler: (root) => handleSceneDependencyGraph(root) });
   registry.register({ name: 'find_nodes_in_scenes', description: 'Search nodes across scenes by type/property.', schema: findNodesInScenesSchema, handler: handleFindNodesInScenes });

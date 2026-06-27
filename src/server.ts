@@ -1,5 +1,5 @@
 // ============================================================
-// Godot MCP Server - Server Factory & Handlers (v1.3.2)
+// Godot MCP Server - Server Factory & Handlers (v1.3.4)
 // ============================================================
 // 将 MCP Server 创建、工具注册、请求处理抽离为独立工厂函数，
 // 供 Stdio、SSE、Streamable HTTP 三种传输层共用。
@@ -63,7 +63,7 @@ export function createMcpServer(options: CreateServerOptions = {}): Server {
   const { registry } = initSharedResources();
 
   const server = new Server(
-    { name: 'godot-mcp', version: '1.3.2' },
+    { name: 'godot-mcp', version: '1.3.4' },
     { capabilities: { tools: {} } }
   );
 
@@ -80,9 +80,14 @@ export function createMcpServer(options: CreateServerOptions = {}): Server {
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
 
+    // ---- Auto-normalize snake_case → camelCase ----
+    // AI clients sometimes send snake_case parameter names; we map them
+    // to the camelCase equivalents that our Zod schemas expect.
+    const normalizedArgs = normalizeParameterNames(args || {});
+
     // set_project_root — 动态更新项目根目录
     if (name === 'set_project_root') {
-      const newPath = (args as any)?.path;
+      const newPath = (normalizedArgs as any)?.path;
       if (!newPath) return toolError(ErrorCode.INVALID_ARGUMENT, 'Missing required parameter: path');
       const root = findProjectRoot(newPath);
       if (!root) return toolError(ErrorCode.FILE_NOT_FOUND, `No Godot project at "${newPath}"`);
@@ -97,7 +102,7 @@ export function createMcpServer(options: CreateServerOptions = {}): Server {
 
     try {
       const schema = z.object(tool.schema);
-      const validatedArgs = schema.parse(args || {});
+      const validatedArgs = schema.parse(normalizedArgs);
       const effectiveRoot = sharedProjectRoot || process.cwd();
       const { content, isError } = await tool.handler(effectiveRoot, validatedArgs);
       return { content, isError } as any;
@@ -129,4 +134,54 @@ function buildJsonSchema(schema: Record<string, z.ZodTypeAny>): Record<string, u
     properties,
     ...(required.length > 0 ? { required } : {}),
   };
+}
+
+// ---- Parameter Normalization ----
+
+/** Known snake_case → camelCase mappings for common Godot MCP parameters */
+const PARAMETER_MAP: Record<string, string> = {
+  'project_path': 'projectPath',
+  'scene_path': 'scenePath',
+  'root_node_type': 'rootNodeType',
+  'parent_node_path': 'parentNodePath',
+  'node_type': 'nodeType',
+  'node_name': 'nodeName',
+  'texture_path': 'texturePath',
+  'node_path': 'nodePath',
+  'output_path': 'outputPath',
+  'mesh_item_names': 'meshItemNames',
+  'new_path': 'newPath',
+  'file_path': 'filePath',
+  'script_path': 'scriptPath',
+  'max_results': 'maxResults',
+  'new_name': 'newName',
+  'shape_type': 'shapeType',
+  'shape_resource_path': 'shapeResourcePath',
+  'from_node': 'fromNode',
+  'to_node': 'toNode',
+  'method_name': 'methodName',
+  'property_key': 'propertyKey',
+  'property_value': 'propertyValue',
+  'clone_source': 'cloneSource',
+  'light_type': 'lightType',
+  'light_name': 'lightName',
+  'mesh_type': 'meshType',
+  'marker_type': 'markerType',
+  'root_name': 'rootName',
+  'line_number': 'lineNumber',
+  'new_parent': 'newParent',
+};
+
+/**
+ * Convert snake_case keys to camelCase in an arguments object.
+ * Leaves unknown keys unchanged (they pass through to Zod validation).
+ */
+function normalizeParameterNames(args: Record<string, unknown>): Record<string, unknown> {
+  if (!args || typeof args !== 'object') return args;
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(args)) {
+    const camelKey = PARAMETER_MAP[key] || key;
+    result[camelKey] = value;
+  }
+  return result;
 }

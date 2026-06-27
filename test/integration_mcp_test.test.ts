@@ -1,13 +1,19 @@
 // ============================================================
-// Comprehensive Integration Test against /Users/Fair/MCP_test
+// Comprehensive Integration Test
 // ============================================================
+// Set GODOT_MCP_TEST_PROJECT env var to point to a real Godot project,
+// or these tests will be skipped automatically.
+// Example: GODOT_MCP_TEST_PROJECT=/path/to/godot/project npm test
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
+import { existsSync } from 'node:fs';
 
-const PROJECT = '/Users/Fair/MCP_test';
+const PROJECT = process.env.GODOT_MCP_TEST_PROJECT || '';
+const SKIP_ALL = !PROJECT || !existsSync(PROJECT + '/project.godot');
 
 // ---- Project Tools ----
 describe('Project Tools', () => {
+  beforeAll(() => { if (SKIP_ALL) throw { __SKIP__: 'Set GODOT_MCP_TEST_PROJECT env var' }; });
   it('list_project_files', async () => {
     const { listFiles } = await import('../src/utils/file_utils.js');
     const files = listFiles(PROJECT);
@@ -400,64 +406,64 @@ describe('Utility Tools', () => {
   });
 });
 
-// ---- Coverage Tools ----
-describe('Coverage Tools', () => {
+// ---- Coverage / Scene Inspectors Tools ----
+describe('Scene Inspectors', () => {
   it('read_decal', async () => {
-    const { handleReadDecal } = await import('../src/tools/coverage.js');
+    const { handleReadDecal } = await import('../src/tools/scene_inspectors.js');
     const r = handleReadDecal(PROJECT, {});
     expect(r.isError).toBeFalsy();
   });
 
   it('read_occluder', async () => {
-    const { handleReadOccluder } = await import('../src/tools/coverage.js');
+    const { handleReadOccluder } = await import('../src/tools/scene_inspectors.js');
     const r = handleReadOccluder(PROJECT, {});
     expect(r.isError).toBeFalsy();
   });
 
   it('read_marker', async () => {
-    const { handleReadMarker } = await import('../src/tools/coverage.js');
+    const { handleReadMarker } = await import('../src/tools/scene_inspectors.js');
     const r = handleReadMarker(PROJECT, {});
     expect(r.isError).toBeFalsy();
   });
 
   it('read_soft_body', async () => {
-    const { handleReadSoftBody } = await import('../src/tools/coverage.js');
+    const { handleReadSoftBody } = await import('../src/tools/scene_inspectors.js');
     const r = handleReadSoftBody(PROJECT, {});
     expect(r.isError).toBeFalsy();
   });
 
   it('read_grid_map', async () => {
-    const { handleReadGridMap } = await import('../src/tools/coverage.js');
+    const { handleReadGridMap } = await import('../src/tools/scene_inspectors.js');
     const r = handleReadGridMap(PROJECT, {});
     expect(r.isError).toBeFalsy();
   });
 
   it('read_audio_listener', async () => {
-    const { handleReadAudioListener } = await import('../src/tools/coverage.js');
+    const { handleReadAudioListener } = await import('../src/tools/scene_inspectors.js');
     const r = handleReadAudioListener(PROJECT, {});
     expect(r.isError).toBeFalsy();
   });
 
   it('read_vehicle_body', async () => {
-    const { handleReadVehicleBody } = await import('../src/tools/coverage.js');
+    const { handleReadVehicleBody } = await import('../src/tools/scene_inspectors.js');
     const r = handleReadVehicleBody(PROJECT, {});
     expect(r.isError).toBeFalsy();
   });
 
   it('read_spring_arm', async () => {
-    const { handleReadSpringArm } = await import('../src/tools/coverage.js');
+    const { handleReadSpringArm } = await import('../src/tools/scene_inspectors.js');
     const r = handleReadSpringArm(PROJECT, {});
     expect(r.isError).toBeFalsy();
   });
 
   it('read_light_2d', async () => {
-    const { handleReadLight2d } = await import('../src/tools/coverage.js');
+    const { handleReadLight2d } = await import('../src/tools/scene_inspectors.js');
     const r = handleReadLight2d(PROJECT, {});
     expect(r.isError).toBeFalsy();
   });
 
   it('read_sprite_frames', async () => {
-    const { handleReadSpriteFrames } = await import('../src/tools/coverage.js');
+    const { handleReadSpriteFrames } = await import('../src/tools/scene_inspectors.js');
     const r = handleReadSpriteFrames(PROJECT, {});
     expect(r.isError).toBeFalsy();
   });

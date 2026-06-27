@@ -1,5 +1,5 @@
 // ============================================================
-// Godot MCP Server — Live Editor Bridge v1.2.0 (dual-mode)
+// Godot MCP Server — Live Editor Bridge v1.3.3 (dual-mode)
 // ============================================================
 // Communicates with Godot Editor via TCP (preferred) or by
 // spawning Godot as a child process with stdin/stdout.
@@ -15,8 +15,10 @@ import { ErrorCode, toolError, wrapError } from '../utils/errors.js';
 import { findGodotBinary } from '../utils/godot_cli.js';
 
 const EDITOR_PORT = 9876;
-const TCP_TIMEOUT = 3000; // quick check for existing editor
+const TCP_TIMEOUT = 800;  // quick check for existing editor (reduced from 3000ms)
 const SPAWN_TIMEOUT = 15000;
+const HEALTH_CACHE_MS = 60000;  // 60s health cache (was 30s)
+const MAX_RESTART_ATTEMPTS = 3;
 const RESPONSE_MARKER = '__MCP__:';
 
 let _editorProcess: ChildProcess | null = null;
@@ -26,6 +28,7 @@ let _projectRoot: string | null = null;
 let _lastHealthCheck = 0;
 let _lastHealthStatus = false;
 let _useTcp: boolean | null = null; // null = unknown, true = TCP, false = spawn
+let _restartAttempts = 0;
 
 // ---- Dual-mode send ----
 
@@ -150,6 +153,17 @@ function ensureEditorProcess(): ChildProcess {
     }
     _pendingRequests.clear();
     _editorProcess = null;
+
+    // Auto-restart on unexpected exit (not caused by shutdown)
+    if (code !== 0 && _restartAttempts < MAX_RESTART_ATTEMPTS) {
+      _restartAttempts++;
+      console.error(`[Godot MCP] Auto-restarting editor (attempt ${_restartAttempts}/${MAX_RESTART_ATTEMPTS})...`);
+      try {
+        ensureEditorProcess();
+      } catch {
+        console.error('[Godot MCP] Editor auto-restart failed');
+      }
+    }
   });
 
   _editorProcess.on('error', (err) => {
@@ -188,16 +202,18 @@ function sendViaSpawn(method: string, params: Record<string, any> = {}): Promise
 /** Initialize the editor bridge with the project root. Call once on startup. */
 export function initEditorBridge(projectRoot: string): void {
   _projectRoot = projectRoot;
+  _restartAttempts = 0;
 }
 
 /** Check if editor is currently reachable */
 export function isEditorHealthy(): boolean {
-  if (Date.now() - _lastHealthCheck < 30000) return _lastHealthStatus;
+  if (Date.now() - _lastHealthCheck < HEALTH_CACHE_MS) return _lastHealthStatus;
   return false;
 }
 
 /** Shut down the editor process gracefully */
 export function shutdownEditorBridge(): void {
+  _restartAttempts = MAX_RESTART_ATTEMPTS; // prevent auto-restart during shutdown
   if (_editorProcess && !_editorProcess.killed) {
     _editorProcess.kill();
   }

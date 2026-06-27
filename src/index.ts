@@ -27,6 +27,8 @@ interface CliConfig {
   godotPath?: string;
   help?: boolean;
   installAddons?: boolean;
+  enablePlugin?: boolean;
+  readOnly?: boolean;
   transport: TransportMode;
   port: number;
   host: string;
@@ -60,8 +62,11 @@ function parseArgs(): CliConfig {
       case '-h':
         result.help = true;
         break;
-      case '--install-addons':
-        result.installAddons = true;
+      case '--enable-plugin':
+        result.enablePlugin = true;
+        break;
+      case '--read-only':
+        result.readOnly = true;
         break;
       case '--transport':
       case '-t':
@@ -100,6 +105,8 @@ OPTIONS:
   --project-path, -p <path>  Godot 项目根目录（默认：自动检测）
   --godot-path, -g <path>    Godot 可执行文件路径（默认：自动检测）
   --install-addons            将编辑器插件 (addons/) 安装到目标项目
+  --enable-plugin             安装 addons 并自动在 project.godot 中启用插件
+  --read-only                 只读模式：拒绝所有写入/删除操作（安全模式）
 
 TRANSPORT OPTIONS:
   --transport, -t <mode>     传输协议（默认：stdio）
@@ -204,9 +211,65 @@ async function main(): Promise<void> {
     process.exit(0);
   }
 
+  // --enable-plugin: 安装 addons 并自动在 project.godot 中启用插件
+  if (config.enablePlugin) {
+    if (!config.projectPath) {
+      console.error('Error: --enable-plugin requires --project-path (-p) to specify the target Godot project.');
+      process.exit(1);
+    }
+    const root = findProjectRoot(config.projectPath);
+    if (!root) {
+      console.error(`Error: No Godot project found at "${config.projectPath}" (project.godot not found)`);
+      process.exit(1);
+    }
+    installAddonsToProject(root);
+
+    // Auto-enable plugin in project.godot
+    const projectFile = path.join(root, 'project.godot');
+    let content = fs.readFileSync(projectFile, 'utf-8');
+    if (!content.includes('[editor_plugins]')) {
+      content += '\n\n[editor_plugins]\n';
+    }
+    if (!content.includes('enabled=PackedStringArray("res://addons/godot_mcp/plugin.cfg"')) {
+      // Find [editor_plugins] section and update
+      const sections = content.split('\n[');
+      let found = false;
+      for (let i = 0; i < sections.length; i++) {
+        if (sections[i].startsWith('editor_plugins]') || sections[i].startsWith('editor_plugins\n')) {
+          if (!sections[i].includes('godot_mcp')) {
+            sections[i] = sections[i].replace(/enabled\s*=\s*PackedStringArray\(([^)]*)\)/, (_, plugins) => {
+              const arr = plugins.split(',').map((s: string) => s.trim()).filter(Boolean);
+              arr.push('"res://addons/godot_mcp/plugin.cfg"');
+              return `enabled=PackedStringArray(${arr.join(', ')})`;
+            });
+            // If no enabled line, add one
+            if (!sections[i].includes('enabled=')) {
+              sections[i] += '\nenabled=PackedStringArray("res://addons/godot_mcp/plugin.cfg")';
+            }
+          }
+          found = true;
+        }
+      }
+      content = sections.join('\n[');
+      if (!found) {
+        content += 'editor_plugins]\nenabled=PackedStringArray("res://addons/godot_mcp/plugin.cfg")';
+      }
+    }
+    fs.writeFileSync(projectFile, content);
+    console.log('✅ Editor plugin enabled in project.godot');
+    console.log('   Restart Godot for the plugin to take effect.');
+    process.exit(0);
+  }
+
   // 设置 GODOT_PATH 环境变量
   if (config.godotPath) {
     process.env.GODOT_PATH = config.godotPath;
+  }
+
+  // --read-only: 设置全局只读模式
+  if (config.readOnly) {
+    process.env.GODOT_MCP_READ_ONLY = 'true';
+    console.error('[Godot MCP] Running in READ-ONLY mode — write operations will be rejected');
   }
 
   // 验证项目路径

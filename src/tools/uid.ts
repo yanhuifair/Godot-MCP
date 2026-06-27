@@ -1,5 +1,5 @@
 // ============================================================
-// Godot MCP Server - UID Management Tools (Godot 4.4+)
+// Godot MCP Server - UID Management Tools (Godot 4.x)
 // ============================================================
 
 import { z } from 'zod';
@@ -40,7 +40,7 @@ export function handleGetUid(
       if (uidMatch) {
         return { content: [{ type: 'text', text: `UID: ${uidMatch[1]}\nFile: ${args.path}\nType: Scene` }] };
       }
-      return { content: [{ type: 'text', text: `No UID found in ${args.path}. The file may not have been saved in Godot 4.4+ yet.` }] };
+      return { content: [{ type: 'text', text: `No UID found in ${args.path}. The file may not have been saved in Godot 4.x yet.` }] };
     }
 
     // For .tres resources
@@ -117,7 +117,7 @@ export function handleUpdateProjectUids(
           lines.push(`  ${m.type}: ${m.file}`);
         }
         lines.push('');
-        lines.push('To fix: open the project in Godot 4.4+ and run Project → Tools → Update UIDs,');
+        lines.push('To fix: open the project in Godot 4.x and run Project → Tools → Update UIDs,');
         lines.push('or save each scene individually. File-based UID generation is not possible');
         lines.push('(UIDs must be cryptographically unique and registered in uid_cache.bin).');
       }

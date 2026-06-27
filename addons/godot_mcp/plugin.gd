@@ -2,8 +2,9 @@
 extends EditorPlugin
 
 # ============================================================
-# Godot MCP Editor Plugin v1.3.2
+# Godot MCP Editor Plugin v1.3.4
 # ============================================================
+# ⚠️  Godot 4.x only. Godot 3 is NOT supported.
 # Dual-mode communication with the MCP server:
 # - stdio mode: when spawned by MCP (MCP_STDIO=true), reads
 #   commands from stdin, writes responses to stdout.
@@ -42,7 +43,7 @@ func _enter_tree() -> void:
 
 	if _stdio_mode:
 		_start_stdin_reader()
-		_send_stdout({"jsonrpc": "2.0", "id": 0, "result": {"ready": true, "version": "1.3.2"}})
+		_send_stdout({"jsonrpc": "2.0", "id": 0, "result": {"ready": true, "version": "1.3.4"}})
 	else:
 		_start_tcp_server()
 
@@ -50,9 +51,9 @@ func _enter_tree() -> void:
 	set_process(true)
 
 	if _stdio_mode:
-		print("[Godot MCP] Plugin v1.3.2 loaded — stdio mode")
+		print("[Godot MCP] Plugin v1.3.4 loaded — stdio mode")
 	else:
-		print("[Godot MCP] Plugin v1.3.2 loaded — TCP on port ", DEFAULT_PORT)
+		print("[Godot MCP] Plugin v1.3.4 loaded — TCP on port ", DEFAULT_PORT)
 
 
 func _exit_tree() -> void:
@@ -170,7 +171,7 @@ var _last_output_line_count: int = 0
 
 func _capture_editor_output() -> void:
 	# Navigate to output panel via editor main screen
-	var editor_main = get_editor_interface().get_editor_main_screen()
+	var editor_main = EditorInterface.get_editor_main_screen()
 	if not editor_main:
 		return
 	# For now, rely on print() forwarding which already works
@@ -424,8 +425,55 @@ func _parse_value(raw: String):
 		var p = s.split(",", false)
 		return Rect2(float(p[0]), float(p[1]), float(p[2]), float(p[3]))
 
+	if raw.begins_with("Vector3i("):
+		var s = raw.trim_prefix("Vector3i(").trim_suffix(")")
+		var p = s.split(",", false)
+		return Vector3i(int(p[0]), int(p[1]), int(p[2]))
+
+	if raw.begins_with("Vector4i("):
+		var s = raw.trim_prefix("Vector4i(").trim_suffix(")")
+		var p = s.split(",", false)
+		return Vector4i(int(p[0]), int(p[1]), int(p[2]), int(p[3]))
+
+	if raw.begins_with("Quaternion("):
+		var s = raw.trim_prefix("Quaternion(").trim_suffix(")")
+		var p = s.split(",", false)
+		return Quaternion(float(p[0]), float(p[1]), float(p[2]), float(p[3]))
+
+	if raw.begins_with("Plane("):
+		var s = raw.trim_prefix("Plane(").trim_suffix(")")
+		var p = s.split(",", false)
+		return Plane(float(p[0]), float(p[1]), float(p[2]), float(p[3]))
+
+	if raw.begins_with("Transform3D("):
+		var s = raw.trim_prefix("Transform3D(").trim_suffix(")")
+		var p = s.split(",", false)
+		if p.size() >= 12:
+			return Transform3D(
+				Vector3(float(p[0]), float(p[1]), float(p[2])),
+				Vector3(float(p[3]), float(p[4]), float(p[5])),
+				Vector3(float(p[6]), float(p[7]), float(p[8])),
+				Vector3(float(p[9]), float(p[10]), float(p[11]))
+			)
+		return Transform3D()
+
+	if raw.begins_with("AABB("):
+		var s = raw.trim_prefix("AABB(").trim_suffix(")")
+		var p = s.split(",", false)
+		if p.size() >= 6:
+			return AABB(Vector3(float(p[0]), float(p[1]), float(p[2])), Vector3(float(p[3]), float(p[4]), float(p[5])))
+		return AABB()
+
 	if raw.begins_with("Transform2D("):
-		return Transform2D() # parsing full matrix is complex; return identity
+		var s = raw.trim_prefix("Transform2D(").trim_suffix(")")
+		var p = s.split(",", false)
+		if p.size() >= 6:
+			return Transform2D(
+				Vector2(float(p[0]), float(p[1])),
+				Vector2(float(p[2]), float(p[3])),
+				Vector2(float(p[4]), float(p[5]))
+			)
+		return Transform2D()
 
 	if raw.begins_with("NodePath("):
 		return NodePath(raw.trim_prefix("NodePath(").trim_suffix(")"))
@@ -475,12 +523,11 @@ func _value_to_json_string(val) -> String:
 # ============================================================
 
 func _cmd_get_open_scene() -> Dictionary:
-	var editor = get_editor_interface()
-	var es = editor.get_edited_scene_root()
+	var es = EditorInterface.get_edited_scene_root()
 	if es:
 		var path = es.scene_file_path
 		if not path or path == "":
-			var open_scenes = editor.get_open_scenes()
+			var open_scenes = EditorInterface.get_open_scenes()
 			if open_scenes.size() > 0:
 				path = open_scenes[0]
 		if not path:
@@ -497,7 +544,7 @@ func _cmd_get_open_scene() -> Dictionary:
 
 
 func _cmd_get_current_scene_tree() -> Dictionary:
-	var root = get_editor_interface().get_edited_scene_root()
+	var root = EditorInterface.get_edited_scene_root()
 	if not root:
 		return {"error": "No scene open"}
 	var nodes: Array = []
@@ -518,11 +565,11 @@ func _build_tree(node: Node, out: Array, depth: int) -> void:
 
 
 func _cmd_get_open_scenes() -> Dictionary:
-	return {"scenes": Array(get_editor_interface().get_open_scenes())}
+	return {"scenes": Array(EditorInterface.get_open_scenes())}
 
 
 func _cmd_get_selection() -> Dictionary:
-	var sel = get_editor_interface().get_selection()
+	var sel = EditorInterface.get_selection()
 	var nodes = sel.get_selected_nodes()
 	var result: Array = []
 	for node in nodes:
@@ -539,19 +586,19 @@ func _cmd_set_selection(params: Dictionary) -> Dictionary:
 	var property_value = params.get("value", "")
 	if not node_path: return {"error": "Missing node_path"}
 
-	var root = get_editor_interface().get_edited_scene_root()
+	var root = EditorInterface.get_edited_scene_root()
 	if not root: return {"error": "No scene open"}
 
 	var node = root.get_node(str(node_path))
 	if not node: return {"error": "Node not found: " + str(node_path)}
 
-	get_editor_interface().get_selection().clear()
-	get_editor_interface().get_selection().add_node(node)
-	get_editor_interface().edit_node(node)
+	EditorInterface.get_selection().clear()
+	EditorInterface.get_selection().add_node(node)
+	EditorInterface.edit_node(node)
 
 	if property_key and property_value:
 		_node_set_property(node, property_key, property_value)
-		get_editor_interface().save_scene()
+		EditorInterface.save_scene()
 
 	var result = {"ok": true, "selected": str(node_path)}
 	if property_key: result["set"] = property_key
@@ -563,28 +610,31 @@ func _cmd_set_selection(params: Dictionary) -> Dictionary:
 # ============================================================
 
 func _cmd_save_scene() -> Dictionary:
-	get_editor_interface().save_scene()
+	EditorInterface.save_scene()
 	return {"ok": true}
 
 
 func _cmd_save_all_scenes() -> Dictionary:
-	get_editor_interface().save_all_scenes()
+	EditorInterface.save_all_scenes()
 	return {"ok": true}
 
 
 func _cmd_close_scene() -> Dictionary:
-	get_editor_interface().reload_scene_from_path("")
-	return {"ok": true}
+	# Close the current scene by saving and then clearing it.
+	# EditorInterface doesn't have a direct "close" method, but we can
+	# save first, then clear the edited scene.
+	EditorInterface.save_scene()
+	EditorInterface.reload_scene_from_path("")
+	return {"ok": true, "message": "Scene closed (saved and cleared)"}
 
 
 func _cmd_reload_scene() -> Dictionary:
-	var editor = get_editor_interface()
-	var root = editor.get_edited_scene_root()
+	var root = EditorInterface.get_edited_scene_root()
 	var scene_path = root.scene_file_path if root else ""
 	if not scene_path:
 		return {"error": "No scene open to reload"}
-	editor.save_scene()
-	editor.reload_scene_from_path(scene_path)
+	EditorInterface.save_scene()
+	EditorInterface.reload_scene_from_path(scene_path)
 	return {"ok": true, "scene": scene_path, "message": "Scene saved and reloaded"}
 
 
@@ -603,9 +653,14 @@ func _cmd_stop_project() -> Dictionary:
 
 
 func _cmd_pause_project() -> Dictionary:
-	# Actually pauses using the editor's built-in pause
-	EditorInterface.play_main_scene()
-	return {"ok": true, "message": "Project started (pause toggle not directly supported via API)"}
+	# Godot 4.x exposes get_scene_tree().paused to toggle pause state.
+	# We toggle the pause state of the running scene tree.
+	var tree = get_tree()
+	if tree:
+		tree.paused = not tree.paused
+		var is_paused = tree.paused
+		return {"ok": true, "paused": is_paused, "message": "Project paused" if is_paused else "Project resumed"}
+	return {"error": "No scene tree available"}
 
 
 func _cmd_is_playing() -> Dictionary:
@@ -635,22 +690,36 @@ func _cmd_redo() -> Dictionary:
 
 
 func _cmd_cut_selected() -> Dictionary:
-	var es = get_editor_interface().get_selection()
+	var es = EditorInterface.get_selection()
 	var nodes = es.get_selected_nodes()
 	if nodes.is_empty(): return {"ok": true, "cut": 0}
-	var root = get_editor_interface().get_edited_scene_root()
+	var root = EditorInterface.get_edited_scene_root()
 	_clipboard_nodes = []
+	
+	# Use undo_redo for proper undo support
+	var ur = get_undo_redo()
+	ur.create_action("Cut Nodes")
 	for n in nodes:
-		_clipboard_nodes.append({"type": n.get_class(), "name": n.name, "parent_path": _get_node_path(n.get_parent()) if n.get_parent() else ""})
-		n.queue_free()
-	get_editor_interface().get_selection().clear()
-	get_editor_interface().save_scene()
+		var parent_path = _get_node_path(n.get_parent()) if n.get_parent() else ""
+		_clipboard_nodes.append({
+			"type": n.get_class(),
+			"name": n.name,
+			"parent_path": parent_path,
+			"properties": _serialize_node_properties(n),
+		})
+		ur.add_do_method(n.get_parent(), "remove_child", n)
+		ur.add_undo_method(n.get_parent(), "add_child", n)
+		ur.add_undo_reference(n)
+	ur.commit_action()
+	
+	EditorInterface.get_selection().clear()
+	EditorInterface.save_scene()
 	return {"ok": true, "cut": nodes.size()}
 
 var _clipboard_nodes: Array = []
 
 func _cmd_copy_selected() -> Dictionary:
-	var es = get_editor_interface().get_selection()
+	var es = EditorInterface.get_selection()
 	var nodes = es.get_selected_nodes()
 	if nodes.is_empty(): return {"ok": true, "copied": 0}
 	_clipboard_nodes = []
@@ -660,12 +729,15 @@ func _cmd_copy_selected() -> Dictionary:
 
 func _cmd_paste() -> Dictionary:
 	if _clipboard_nodes.is_empty(): return {"ok": true, "pasted": 0}
-	var root = get_editor_interface().get_edited_scene_root()
+	var root = EditorInterface.get_edited_scene_root()
 	if not root: return {"error": "No scene open"}
-	var es = get_editor_interface().get_selection()
+	var es = EditorInterface.get_selection()
 	var parent = root
 	var sel = es.get_selected_nodes()
 	if not sel.is_empty(): parent = sel[0]
+	
+	var ur = get_undo_redo()
+	ur.create_action("Paste Nodes")
 	var pasted = 0
 	for item in _clipboard_nodes:
 		var t = item["type"]
@@ -674,14 +746,30 @@ func _cmd_paste() -> Dictionary:
 		node.name = item["name"]
 		parent.add_child(node)
 		node.set_owner(root)
+		
+		# Restore serialized properties
+		var props = item.get("properties", {})
+		if typeof(props) == TYPE_DICTIONARY:
+			for key in props:
+				_node_set_property(node, key, str(props[key]))
+		
+		ur.add_do_method(parent, "add_child", node)
+		ur.add_do_method(node, "set_owner", root)
+		ur.add_undo_method(parent, "remove_child", node)
 		pasted += 1
-	get_editor_interface().save_scene()
+	ur.commit_action()
+	EditorInterface.save_scene()
 	return {"ok": true, "pasted": pasted}
 
 
 func _cmd_unpause_project() -> Dictionary:
-	if EditorInterface.is_playing_scene():
-		return {"ok": true, "message": "Project is playing (unpause via editor UI)"}
+	# Unpause the scene tree if it's currently paused
+	var tree = get_tree()
+	if tree and tree.paused:
+		tree.paused = false
+		return {"ok": true, "paused": false, "message": "Project unpaused"}
+	elif tree and not tree.paused and EditorInterface.is_playing_scene():
+		return {"ok": true, "paused": false, "message": "Project is already running (not paused)"}
 	return {"ok": true, "message": "Project not playing"}
 
 
@@ -696,7 +784,7 @@ func _cmd_select_node(params: Dictionary) -> Dictionary:
 func _cmd_move_node(params: Dictionary) -> Dictionary:
 	var node_path = params.get("node_path", "")
 	var position = params.get("position", null)
-	var root = get_editor_interface().get_edited_scene_root()
+	var root = EditorInterface.get_edited_scene_root()
 	if not root: return {"error": "No scene open"}
 
 	var node = root.get_node(str(node_path))
@@ -722,7 +810,7 @@ func _cmd_move_node(params: Dictionary) -> Dictionary:
 func _cmd_move_node_3d(params: Dictionary) -> Dictionary:
 	var node_path = params.get("node_path", "")
 	var position = params.get("position", null)
-	var root = get_editor_interface().get_edited_scene_root()
+	var root = EditorInterface.get_edited_scene_root()
 	if not root: return {"error": "No scene open"}
 
 	var node = root.get_node(str(node_path))
@@ -738,7 +826,7 @@ func _cmd_move_node_3d(params: Dictionary) -> Dictionary:
 
 
 func _cmd_delete_selected() -> Dictionary:
-	var sel = get_editor_interface().get_selection()
+	var sel = EditorInterface.get_selection()
 	var nodes = sel.get_selected_nodes()
 	if nodes.is_empty():
 		return {"ok": true, "deleted": 0}
@@ -756,7 +844,7 @@ func _cmd_add_node(params: Dictionary) -> Dictionary:
 
 	if not node_type: return {"error": "Missing node type"}
 
-	var root = get_editor_interface().get_edited_scene_root()
+	var root = EditorInterface.get_edited_scene_root()
 	if not root: return {"error": "No scene open"}
 
 	# Determine parent
@@ -785,7 +873,7 @@ func _cmd_add_node(params: Dictionary) -> Dictionary:
 	for key in properties:
 		_node_set_property(new_node, key, str(properties[key]))
 
-	get_editor_interface().save_scene()
+	EditorInterface.save_scene()
 
 	return {
 		"ok": true,
@@ -799,7 +887,7 @@ func _cmd_remove_node(params: Dictionary) -> Dictionary:
 	var node_path = params.get("path", "")
 	if not node_path: return {"error": "Missing path"}
 
-	var root = get_editor_interface().get_edited_scene_root()
+	var root = EditorInterface.get_edited_scene_root()
 	if not root: return {"error": "No scene open"}
 
 	var node = root.get_node(str(node_path))
@@ -807,7 +895,7 @@ func _cmd_remove_node(params: Dictionary) -> Dictionary:
 	if node == root: return {"error": "Cannot remove root node"}
 
 	node.queue_free()
-	get_editor_interface().save_scene()
+	EditorInterface.save_scene()
 	return {"ok": true, "removed": str(node_path)}
 
 
@@ -815,7 +903,7 @@ func _cmd_get_node_properties(params: Dictionary) -> Dictionary:
 	var node_path = params.get("path", "")
 	if not node_path: return {"error": "Missing path"}
 
-	var root = get_editor_interface().get_edited_scene_root()
+	var root = EditorInterface.get_edited_scene_root()
 	if not root: return {"error": "No scene open"}
 
 	var node = root.get_node(str(node_path))
@@ -846,7 +934,7 @@ func _cmd_set_node_properties(params: Dictionary) -> Dictionary:
 	if not node_path: return {"error": "Missing path"}
 	if typeof(properties) != TYPE_DICTIONARY: return {"error": "properties must be a dictionary"}
 
-	var root = get_editor_interface().get_edited_scene_root()
+	var root = EditorInterface.get_edited_scene_root()
 	if not root: return {"error": "No scene open"}
 
 	var node = root.get_node(str(node_path))
@@ -855,7 +943,7 @@ func _cmd_set_node_properties(params: Dictionary) -> Dictionary:
 	for key in properties:
 		_node_set_property(node, key, str(properties[key]))
 
-	get_editor_interface().save_scene()
+	EditorInterface.save_scene()
 	return {"ok": true, "updated": properties.size()}
 
 
@@ -864,14 +952,14 @@ func _cmd_rename_node(params: Dictionary) -> Dictionary:
 	var new_name = params.get("name", "")
 	if not node_path or not new_name: return {"error": "Missing path or name"}
 
-	var root = get_editor_interface().get_edited_scene_root()
+	var root = EditorInterface.get_edited_scene_root()
 	if not root: return {"error": "No scene open"}
 
 	var node = root.get_node(str(node_path))
 	if not node: return {"error": "Node not found"}
 
 	node.name = new_name
-	get_editor_interface().save_scene()
+	EditorInterface.save_scene()
 	return {"ok": true, "renamed": new_name}
 
 
@@ -880,7 +968,7 @@ func _cmd_duplicate_node(params: Dictionary) -> Dictionary:
 	var new_name = params.get("name", "")
 	if not node_path: return {"error": "Missing path"}
 
-	var root = get_editor_interface().get_edited_scene_root()
+	var root = EditorInterface.get_edited_scene_root()
 	if not root: return {"error": "No scene open"}
 
 	var node = root.get_node(str(node_path))
@@ -892,7 +980,7 @@ func _cmd_duplicate_node(params: Dictionary) -> Dictionary:
 
 	node.get_parent().add_child(dup)
 	dup.set_owner(root)
-	get_editor_interface().save_scene()
+	EditorInterface.save_scene()
 
 	return {"ok": true, "name": dup.name, "path": _get_node_path(dup)}
 
@@ -902,7 +990,7 @@ func _cmd_reparent_node(params: Dictionary) -> Dictionary:
 	var new_parent_path = params.get("new_parent", "")
 	if not node_path or not new_parent_path: return {"error": "Missing path or new_parent"}
 
-	var root = get_editor_interface().get_edited_scene_root()
+	var root = EditorInterface.get_edited_scene_root()
 	if not root: return {"error": "No scene open"}
 
 	var node = root.get_node(str(node_path))
@@ -912,7 +1000,7 @@ func _cmd_reparent_node(params: Dictionary) -> Dictionary:
 
 	node.reparent(new_parent, true)
 	node.set_owner(root)
-	get_editor_interface().save_scene()
+	EditorInterface.save_scene()
 	return {"ok": true, "moved": str(node_path) + " → " + str(new_parent_path)}
 
 
@@ -936,7 +1024,7 @@ func _cmd_create_script(params: Dictionary) -> Dictionary:
 		return {"error": "Failed to save script: " + str(err)}
 
 	# Open in editor
-	get_editor_interface().edit_resource(script)
+	EditorInterface.edit_resource(script)
 	return {"ok": true, "path": path, "extends": extends_type}
 
 
@@ -945,7 +1033,7 @@ func _cmd_attach_script(params: Dictionary) -> Dictionary:
 	var script_path = params.get("script", "")
 	if not node_path or not script_path: return {"error": "Missing path or script"}
 
-	var root = get_editor_interface().get_edited_scene_root()
+	var root = EditorInterface.get_edited_scene_root()
 	if not root: return {"error": "No scene open"}
 
 	var node = root.get_node(str(node_path))
@@ -955,7 +1043,7 @@ func _cmd_attach_script(params: Dictionary) -> Dictionary:
 	if not script: return {"error": "Script not found at: " + str(script_path)}
 
 	node.set_script(script)
-	get_editor_interface().save_scene()
+	EditorInterface.save_scene()
 	return {"ok": true, "attached": script_path}
 
 
@@ -969,7 +1057,7 @@ func _cmd_run_gdscript(params: Dictionary) -> Dictionary:
 	if err != OK:
 		return {"error": "Parse error: " + expression.get_error_text()}
 
-	var result = expression.execute([], get_editor_interface().get_edited_scene_root())
+	var result = expression.execute([], EditorInterface.get_edited_scene_root())
 	if expression.has_execute_failed():
 		return {"error": "Execution error: " + expression.get_error_text()}
 
@@ -1014,7 +1102,7 @@ func _cmd_get_editor_info() -> Dictionary:
 
 
 func _cmd_get_breakpoints() -> Dictionary:
-	var script_editor = get_editor_interface().get_script_editor()
+	var script_editor = EditorInterface.get_script_editor()
 	var breakpoints: Array = []
 	# Breakpoints are per-script, iterate open scripts
 	for i in script_editor.get_open_script_editors().size():
@@ -1034,9 +1122,9 @@ func _cmd_set_breakpoint(params: Dictionary) -> Dictionary:
 	var line = params.get("line", 0)
 	if not script_path or line <= 0: return {"error": "Missing script or line"}
 
-	var script_editor = get_editor_interface().get_script_editor()
+	var script_editor = EditorInterface.get_script_editor()
 	# Open the script first
-	get_editor_interface().edit_resource(load(str(script_path)))
+	EditorInterface.edit_resource(load(str(script_path)))
 
 	# Set breakpoint via ScriptEditor
 	for se in script_editor.get_open_script_editors():
@@ -1053,7 +1141,7 @@ func _cmd_remove_breakpoint(params: Dictionary) -> Dictionary:
 	var line = params.get("line", 0)
 	if not script_path or line <= 0: return {"error": "Missing script or line"}
 
-	var script_editor = get_editor_interface().get_script_editor()
+	var script_editor = EditorInterface.get_script_editor()
 	for se in script_editor.get_open_script_editors():
 		var base = se.get_base_editor()
 		if base and base.has_method("remove_breakpoint"):
@@ -1070,14 +1158,14 @@ func _cmd_remove_breakpoint(params: Dictionary) -> Dictionary:
 func _cmd_open_asset(params: Dictionary) -> Dictionary:
 	var path = params.get("path", "")
 	if not path: return {"error": "Missing path"}
-	get_editor_interface().open_scene_from_path(str(path))
+	EditorInterface.open_scene_from_path(str(path))
 	return {"ok": true}
 
 
 func _cmd_show_in_filesystem(params: Dictionary) -> Dictionary:
 	var path = params.get("path", "")
 	if not path: return {"error": "Missing path"}
-	get_editor_interface().get_file_system_dock().navigate_to_path(str(path))
+	EditorInterface.get_file_system_dock().navigate_to_path(str(path))
 	return {"ok": true}
 
 
@@ -1139,16 +1227,16 @@ func _cmd_open_dock(params: Dictionary) -> Dictionary:
 
 	match dock_name.to_lower():
 		"filesystem", "files":
-			get_editor_interface().set_main_screen_editor("Filesystem")
+			EditorInterface.set_main_screen_editor("Filesystem")
 		"inspector", "inspector":
-			get_editor_interface().set_main_screen_editor("Inspector")
+			EditorInterface.set_main_screen_editor("Inspector")
 		"node", "scene":
-			get_editor_interface().set_main_screen_editor("Node")
+			EditorInterface.set_main_screen_editor("Node")
 		"output", "console":
 			# Show the bottom panel via editor main screen
-			var editor_node = get_editor_interface().get_editor_main_screen()
+			var editor_node = EditorInterface.get_editor_main_screen()
 			# Try to find and activate the output panel
-			get_editor_interface().set_main_screen_editor("Script")
+			EditorInterface.set_main_screen_editor("Script")
 		_:
 			return {"error": "Unknown dock: " + dock_name + ". Valid: filesystem, inspector, scene, output"}
 
@@ -1176,14 +1264,14 @@ func _cmd_create_editor_scene(params: Dictionary) -> Dictionary:
 	var packed = PackedScene.new(); packed.pack(root)
 	var err = ResourceSaver.save(packed, str(path)); root.queue_free()
 	if err != OK: return {"error": "Failed to save: " + str(err)}
-	get_editor_interface().open_scene_from_path(str(path))
+	EditorInterface.open_scene_from_path(str(path))
 	return {"ok": true, "path": path, "root": root_type}
 
 
 func _cmd_instantiate_scene(params: Dictionary) -> Dictionary:
 	var sp = params.get("scene", ""); var pp = params.get("parent", "."); var nn = params.get("name", "")
 	if not sp: return {"error": "Missing scene path"}
-	var root = get_editor_interface().get_edited_scene_root()
+	var root = EditorInterface.get_edited_scene_root()
 	if not root: return {"error": "No scene open"}
 	var packed = load(str(sp))
 	if not packed: return {"error": "Scene not found: " + sp}
@@ -1192,7 +1280,7 @@ func _cmd_instantiate_scene(params: Dictionary) -> Dictionary:
 	var parent: Node = root
 	if pp != ".": parent = root.get_node(str(pp)); if not parent: return {"error": "Parent not found"}
 	parent.add_child(inst); inst.set_owner(root)
-	get_editor_interface().save_scene()
+	EditorInterface.save_scene()
 	return {"ok": true, "name": inst.name, "type": inst.get_class(), "path": _get_node_path(inst)}
 
 
@@ -1209,21 +1297,21 @@ func _cmd_set_main_scene(params: Dictionary) -> Dictionary:
 # ============================================================
 
 func _cmd_debug_continue() -> Dictionary:
-	var se = get_editor_interface().get_script_editor()
+	var se = EditorInterface.get_script_editor()
 	if not se:
 		return {"error": "Script editor not available"}
 	se.debug_continue()
 	return {"ok": true}
 
 func _cmd_debug_step() -> Dictionary:
-	var se = get_editor_interface().get_script_editor()
+	var se = EditorInterface.get_script_editor()
 	if not se:
 		return {"error": "Script editor not available"}
 	se.debug_step()
 	return {"ok": true}
 
 func _cmd_debug_step_over() -> Dictionary:
-	var se = get_editor_interface().get_script_editor()
+	var se = EditorInterface.get_script_editor()
 	if not se:
 		return {"error": "Script editor not available"}
 	se.debug_next()
@@ -1233,7 +1321,7 @@ func _cmd_debug_break() -> Dictionary:
 	EditorInterface.stop_playing_scene(); return {"ok": true}
 
 func _cmd_get_stack_trace() -> Dictionary:
-	var se = get_editor_interface().get_script_editor()
+	var se = EditorInterface.get_script_editor()
 	if not se: return {"error": "Script editor not available"}
 	var dbg = se.get_debugger()
 	if not dbg: return {"error": "Debugger not running. Start project in debug mode first."}
@@ -1244,7 +1332,7 @@ func _cmd_get_stack_trace() -> Dictionary:
 	return {"stack": st, "count": st.size()}
 
 func _cmd_get_debug_variables() -> Dictionary:
-	var se = get_editor_interface().get_script_editor()
+	var se = EditorInterface.get_script_editor()
 	if not se: return {"error": "Script editor not available"}
 	var dbg = se.get_debugger()
 	if not dbg: return {"error": "Debugger not running"}
@@ -1259,7 +1347,7 @@ func _cmd_evaluate_expression(params: Dictionary) -> Dictionary:
 	if not expr_str: return {"error": "Missing expression"}
 	var expr = Expression.new()
 	if expr.parse(expr_str) != OK: return {"error": "Parse error: " + expr.get_error_text()}
-	var result = expr.execute([], get_editor_interface().get_edited_scene_root())
+	var result = expr.execute([], EditorInterface.get_edited_scene_root())
 	if expr.has_execute_failed(): return {"error": "Eval error: " + expr.get_error_text()}
 	return {"ok": true, "result": str(result)}
 
@@ -1307,34 +1395,34 @@ func _cmd_connect_signal(params: Dictionary) -> Dictionary:
 	var np = params.get("node", ""); var sn = params.get("signal", "")
 	var tp = params.get("target", ""); var mt = params.get("method", "")
 	if not np or not sn or not mt: return {"error": "Missing node, signal, or method"}
-	var root = get_editor_interface().get_edited_scene_root()
+	var root = EditorInterface.get_edited_scene_root()
 	if not root: return {"error": "No scene open"}
 	var src = root.get_node(str(np)); var tgt = root.get_node(str(tp)) if tp else root
 	if not src: return {"error": "Source not found"}
 	if not tgt: return {"error": "Target not found"}
 	if not src.has_signal(sn): return {"error": "Signal not found: " + sn}
 	src.connect(sn, Callable(tgt, mt))
-	get_editor_interface().save_scene()
+	EditorInterface.save_scene()
 	return {"ok": true, "signal": sn, "from": np, "to": tp}
 
 func _cmd_disconnect_signal(params: Dictionary) -> Dictionary:
 	var np = params.get("node", ""); var sn = params.get("signal", "")
 	var tp = params.get("target", ""); var mt = params.get("method", "")
 	if not np or not sn: return {"error": "Missing node or signal"}
-	var root = get_editor_interface().get_edited_scene_root()
+	var root = EditorInterface.get_edited_scene_root()
 	if not root: return {"error": "No scene open"}
 	var src = root.get_node(str(np))
 	if not src: return {"error": "Node not found"}
 	if tp and mt: src.disconnect(sn, Callable(root.get_node(str(tp)), mt))
 	else:
 		for c in src.get_signal_connection_list(sn): src.disconnect(sn, c["callable"])
-	get_editor_interface().save_scene()
+	EditorInterface.save_scene()
 	return {"ok": true, "disconnected": sn}
 
 func _cmd_list_node_signals(params: Dictionary) -> Dictionary:
 	var np = params.get("node", "")
 	if not np: return {"error": "Missing node path"}
-	var root = get_editor_interface().get_edited_scene_root()
+	var root = EditorInterface.get_edited_scene_root()
 	if not root: return {"error": "No scene open"}
 	var node = root.get_node(str(np))
 	if not node: return {"error": "Node not found"}
@@ -1355,7 +1443,7 @@ func _cmd_editor_export(params: Dictionary) -> Dictionary:
 	return {"message": "Export via editor is limited. Use Godot CLI export_project for reliable export.", "preset": params.get("preset", "")}
 
 func _cmd_get_scene_changes() -> Dictionary:
-	var root = get_editor_interface().get_edited_scene_root()
+	var root = EditorInterface.get_edited_scene_root()
 	if not root: return {"scene": null, "modified": false}
 	return {"scene": root.scene_file_path, "modified": get_undo_redo().get_current_action_name() != ""}
 
@@ -1486,21 +1574,21 @@ func _cmd_get_plugin_list() -> Dictionary:
 			if FileAccess.file_exists(cp):
 				var cfg = ConfigFile.new()
 				if cfg.load(cp) == OK:
-					plugins.append({"id": fn, "name": cfg.get_value("plugin", "name", fn), "version": cfg.get_value("plugin", "version", "?"), "enabled": get_editor_interface().is_plugin_enabled(fn)})
+					plugins.append({"id": fn, "name": cfg.get_value("plugin", "name", fn), "version": cfg.get_value("plugin", "version", "?"), "enabled": EditorInterface.is_plugin_enabled(fn)})
 		fn = dir.get_next()
 	return {"plugins": plugins, "count": plugins.size()}
 
 func _cmd_enable_plugin(params: Dictionary) -> Dictionary:
 	var p = params.get("plugin", ""); if not p: return {"error": "Missing plugin name"}
-	get_editor_interface().set_plugin_enabled(p, true); return {"ok": true, "plugin": p}
+	EditorInterface.set_plugin_enabled(p, true); return {"ok": true, "plugin": p}
 
 func _cmd_disable_plugin(params: Dictionary) -> Dictionary:
 	var p = params.get("plugin", ""); if not p: return {"error": "Missing plugin name"}
-	get_editor_interface().set_plugin_enabled(p, false); return {"ok": true, "plugin": p}
+	EditorInterface.set_plugin_enabled(p, false); return {"ok": true, "plugin": p}
 
 func _cmd_take_screenshot(params: Dictionary) -> Dictionary:
 	var path = params.get("path", "res://editor_screenshot.png")
-	var vp = get_editor_interface().get_editor_main_screen().get_viewport()
+	var vp = EditorInterface.get_editor_main_screen().get_viewport()
 	if not vp: return {"error": "No editor viewport"}
 	var img = vp.get_texture().get_image()
 	if not img: return {"error": "Failed to capture"}
@@ -1573,7 +1661,7 @@ func _cmd_create_folder(params: Dictionary) -> Dictionary:
 	var path = params.get("path", ""); if not path: return {"error": "Missing path"}
 	var err = DirAccess.make_dir_recursive_absolute(str(path))
 	if err != OK: return {"error": "Failed to create: " + str(err)}
-	get_editor_interface().get_file_system_dock().navigate_to_path(str(path))
+	EditorInterface.get_file_system_dock().navigate_to_path(str(path))
 	return {"ok": true, "path": path}
 
 func _cmd_delete_asset(params: Dictionary) -> Dictionary:
@@ -1582,7 +1670,7 @@ func _cmd_delete_asset(params: Dictionary) -> Dictionary:
 	if not dir: return {"error": "Cannot access parent directory"}
 	var err = dir.remove(str(path))
 	if err != OK: return {"error": "Failed to delete: " + str(err)}
-	get_editor_interface().get_file_system_dock().call_deferred("update_file_list")
+	EditorInterface.get_file_system_dock().call_deferred("update_file_list")
 	return {"ok": true, "deleted": path}
 
 func _cmd_rename_asset(params: Dictionary) -> Dictionary:
@@ -1592,7 +1680,7 @@ func _cmd_rename_asset(params: Dictionary) -> Dictionary:
 	if not dir: return {"error": "Cannot access directory"}
 	var err = dir.rename(str(from), str(to))
 	if err != OK: return {"error": "Failed to rename: " + str(err)}
-	get_editor_interface().get_file_system_dock().navigate_to_path(str(to))
+	EditorInterface.get_file_system_dock().navigate_to_path(str(to))
 	return {"ok": true, "from": from, "to": to}
 
 func _cmd_move_asset(params: Dictionary) -> Dictionary:
@@ -1601,7 +1689,7 @@ func _cmd_move_asset(params: Dictionary) -> Dictionary:
 	var err = DirAccess.copy_absolute(str(from), str(to))
 	if err == OK: DirAccess.remove_absolute(str(from))
 	else: return {"error": "Failed to move: " + str(err)}
-	get_editor_interface().get_file_system_dock().navigate_to_path(str(to))
+	EditorInterface.get_file_system_dock().navigate_to_path(str(to))
 	return {"ok": true, "from": from, "to": to}
 
 func _cmd_duplicate_asset(params: Dictionary) -> Dictionary:
@@ -1609,7 +1697,7 @@ func _cmd_duplicate_asset(params: Dictionary) -> Dictionary:
 	if not from or not to: return {"error": "Missing from/to"}
 	var err = DirAccess.copy_absolute(str(from), str(to))
 	if err != OK: return {"error": "Failed to duplicate: " + str(err)}
-	get_editor_interface().get_file_system_dock().navigate_to_path(str(to))
+	EditorInterface.get_file_system_dock().navigate_to_path(str(to))
 	return {"ok": true, "from": from, "to": to}
 
 
@@ -1618,7 +1706,7 @@ func _cmd_duplicate_asset(params: Dictionary) -> Dictionary:
 # ============================================================
 
 func _cmd_get_editor_camera() -> Dictionary:
-	var vp = get_editor_interface().get_editor_main_screen().get_viewport()
+	var vp = EditorInterface.get_editor_main_screen().get_viewport()
 	if not vp: return {"error": "No viewport"}
 	# Find the editor's Camera3D (usually Camera3D "EditorCamera")
 	var cam: Camera3D = null
@@ -1627,7 +1715,7 @@ func _cmd_get_editor_camera() -> Dictionary:
 	if cam:
 		return {"position": str(cam.position), "rotation": str(cam.rotation), "fov": cam.fov}
 	# Fallback: check spatial editor
-	var spatial_editor = get_editor_interface().get_editor_main_screen()
+	var spatial_editor = EditorInterface.get_editor_main_screen()
 	return {"position": "Vector3(0,0,0)", "note": "Camera data may not be directly accessible"}
 
 func _cmd_set_editor_camera(params: Dictionary) -> Dictionary:
@@ -1635,7 +1723,7 @@ func _cmd_set_editor_camera(params: Dictionary) -> Dictionary:
 	if not pos_str: return {"error": "Missing position"}
 	var p = pos_str.replace("Vector3(", "").replace(")", "").split(",")
 	if p.size() < 3: return {"error": "Invalid position format. Use Vector3(x,y,z) string"}
-	var vp = get_editor_interface().get_editor_main_screen().get_viewport()
+	var vp = EditorInterface.get_editor_main_screen().get_viewport()
 	if not vp: return {"error": "No viewport"}
 	for c in vp.get_children():
 		if c is Camera3D:
@@ -1677,7 +1765,7 @@ func _cmd_add_autoload(params: Dictionary) -> Dictionary:
 	var cfg = ConfigFile.new(); cfg.load("res://project.godot")
 	cfg.set_value("autoload", name, str(path))
 	cfg.save("res://project.godot")
-	get_editor_interface().call_deferred("set_plugin_enabled", "reload_current_project", true)
+	EditorInterface.call_deferred("set_plugin_enabled", "reload_current_project", true)
 	return {"ok": true, "name": name, "path": path}
 
 func _cmd_remove_autoload(params: Dictionary) -> Dictionary:
@@ -1738,18 +1826,28 @@ func _cmd_reimport_asset(params: Dictionary) -> Dictionary:
 	var path = params.get("path", "")
 	if not path: return {"error": "Missing path"}
 	# EditorFileSystem reimport
-	var fs = get_editor_interface().get_resource_filesystem()
+	var fs = EditorInterface.get_resource_filesystem()
 	if fs: fs.reimport_files(PackedStringArray([str(path)]))
 	else: return {"error": "Resource filesystem not available"}
 	return {"ok": true, "reimported": path}
 
 func _cmd_bake_lightmaps() -> Dictionary:
-	# Trigger lightmap baking
-	OS.execute("godot", ["--headless", "--path", ProjectSettings.globalize_path("res://"), "--editor", "--quit-after", "100"], [], false)
-	return {"message": "Lightmap baking requires Godot CLI. Use export_project or run Godot headless.", "ok": true}
+	# Lightmap baking in Godot 4.x requires manual steps in the editor.
+	# The `bake` button is in the 3D editor toolbar (Bake Lightmaps).
+	# From GDScript, we can try to trigger it if a LightmapGI node exists.
+	var root = EditorInterface.get_edited_scene_root()
+	if not root: return {"error": "No scene open"}
+	
+	var lightmap_nodes = _find_all_nodes(root, "LightmapGI")
+	if lightmap_nodes.size() > 0:
+		# Try to bake via LightmapGI node
+		lightmap_nodes[0].bake()
+		return {"ok": true, "baked": true, "message": "Lightmap baking triggered"}
+	
+	return {"message": "No LightmapGI node found in scene. Add a LightmapGI node and use the Bake Lightmaps button in the 3D editor toolbar.", "ok": true}
 
 func _cmd_bake_navigation() -> Dictionary:
-	var root = get_editor_interface().get_edited_scene_root()
+	var root = EditorInterface.get_edited_scene_root()
 	if not root: return {"error": "No scene open"}
 	# Navigate to navigation regions and trigger bake
 	for node in _find_all_nodes(root, "NavigationRegion3D"):
@@ -1790,11 +1888,29 @@ func _build_runtime_tree(node: Node, out: Array, depth: int) -> void:
 		_build_runtime_tree(c, out, depth + 1)
 
 func _cmd_get_performance_monitors() -> Dictionary:
+	# Godot 4.x Performance monitors — use enum values directly
 	var monitors: Dictionary = {}
-	var names = ["time/process", "physics/objects", "objects/node_count", "render/objects/visible", "render/draw_calls", "memory/static", "video_mem/used"]
-	for n in names:
-		monitors[n] = Performance.get_monitor(Performance[n.replace("/", "_").to_upper()]) if Performance.has_method("get_monitor") else "N/A"
-	return {"monitors": monitors, "fps": Engine.get_frames_per_second() if EditorInterface.is_playing_scene() else "not running"}
+	
+	# Map readable names to Performance.Monitor enum values
+	var monitor_map = {
+		"time/process": Performance.TIME_PROCESS,
+		"time/physics_process": Performance.TIME_PHYSICS_PROCESS,
+		"objects/node_count": Performance.OBJECT_NODE_COUNT,
+		"objects/orphan_node_count": Performance.OBJECT_ORPHAN_NODE_COUNT,
+		"render/objects/visible": Performance.RENDER_TOTAL_OBJECTS_IN_FRAME,
+		"render/draw_calls": Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME,
+		"memory/static": Performance.MEMORY_STATIC,
+		"memory/static_max": Performance.MEMORY_STATIC_MAX,
+		"video_mem/used": Performance.RENDER_VIDEO_MEM_USED,
+		"physics/objects": Performance.PHYSICS_3D_ACTIVE_OBJECTS,
+	}
+	
+	for key in monitor_map:
+		var val = Performance.get_monitor(monitor_map[key])
+		monitors[key] = str(val) if typeof(val) == TYPE_FLOAT else val
+	
+	monitors["fps"] = Engine.get_frames_per_second() if EditorInterface.is_playing_scene() else "not running"
+	return {"monitors": monitors}
 
 func _cmd_get_dependency_list(params: Dictionary) -> Dictionary:
 	var path = params.get("path", "")
@@ -1809,7 +1925,7 @@ func _cmd_get_dependency_list(params: Dictionary) -> Dictionary:
 func _get_node_path(node: Node) -> String:
 	var parts: Array[String] = []
 	var current: Node = node
-	var scene_root = get_editor_interface().get_edited_scene_root()
+	var scene_root = EditorInterface.get_edited_scene_root()
 	while current and current != scene_root:
 		parts.push_front(current.name)
 		current = current.get_parent()
@@ -1825,6 +1941,20 @@ func _generate_node_name(type_name: String, parent: Node) -> String:
 		idx += 1
 		name = base + str(idx)
 	return name
+
+
+func _serialize_node_properties(node: Node) -> Dictionary:
+	# Serialize editor-visible properties for clipboard persistence.
+	# This ensures cut/copy/paste preserves property values.
+	var props: Dictionary = {}
+	for prop in node.get_property_list():
+		var pname = prop["name"]
+		if pname.begins_with("_"): continue
+		var usage = prop.get("usage", 0)
+		if not (usage & PROPERTY_USAGE_EDITOR): continue
+		var val = node.get(pname)
+		props[pname] = _value_to_json_string(val)
+	return props
 
 
 func _send_response(id: int, result: Dictionary) -> void:

@@ -32,19 +32,12 @@ export function findGodotBinary(godotPath?: string): string | null {
     return envPath;
   }
 
-  // 2. Common macOS locations
+  // 2. Common macOS locations (Godot 4.x only — Godot 3 is not supported)
   if (os.platform() === 'darwin') {
+    const godot4Versions = ['4.0', '4.1', '4.2', '4.3', '4.4', '4.5', '4.6', '4.7', '4.8', '4.9', '5.0'];
     const macPaths = [
       '/Applications/Godot.app/Contents/MacOS/Godot',
-      '/Applications/Godot_4.0.app/Contents/MacOS/Godot',
-      '/Applications/Godot_4.1.app/Contents/MacOS/Godot',
-      '/Applications/Godot_4.2.app/Contents/MacOS/Godot',
-      '/Applications/Godot_4.3.app/Contents/MacOS/Godot',
-      '/Applications/Godot_4.4.app/Contents/MacOS/Godot',
-      '/Applications/Godot_4.5.app/Contents/MacOS/Godot',
-      '/Applications/Godot_4.6.app/Contents/MacOS/Godot',
-      '/Applications/Godot_4.7.app/Contents/MacOS/Godot',
-      '/Applications/Godot_4.8.app/Contents/MacOS/Godot',
+      ...godot4Versions.map(v => `/Applications/Godot_${v}.app/Contents/MacOS/Godot`),
       path.join(os.homedir(), 'Applications/Godot.app/Contents/MacOS/Godot'),
     ];
 

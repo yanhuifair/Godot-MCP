@@ -22,7 +22,8 @@ const BINARY_RES_HEADER = 'GDROM'; // 4-byte magic for Godot binary resources
  */
 export function isBinaryResource(content: Buffer | string): boolean {
   if (Buffer.isBuffer(content)) {
-    return content.length >= 4 && content.toString('ascii', 0, 4) === BINARY_RES_HEADER;
+    if (content.length < 4) return false; // guard against empty/small files
+    return content.toString('ascii', 0, 4) === BINARY_RES_HEADER;
   }
   // For string content, it's text-based (.tres)
   return false;

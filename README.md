@@ -1,45 +1,56 @@
-# Godot MCP
+# <div align="center">Godot MCP</div>
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Tests](https://img.shields.io/badge/tests-138%20passed-brightgreen)](.)
 [![npm](https://img.shields.io/npm/v/@yanhuifair/godot-mcp)](https://www.npmjs.com/package/@yanhuifair/godot-mcp)
+[![Node](https://img.shields.io/badge/node-%3E%3D18-green)](.)
+[![Godot](https://img.shields.io/badge/godot-4.x-blue)](https://godotengine.org)
 
-[中文文档](README-zh.md)
+[English](README.md) | [中文文档](README-zh.md)
 
-> **Model Context Protocol server for Godot Engine** — 281 tools, 26 categories, Godot 4.6/4.7 coverage. File-based CRUD + live editor plugin. AI assistants read, inspect, and modify Godot projects through **Stdio**, **SSE**, or **Streamable HTTP** transport.
+---
+
+A **Model Context Protocol (MCP) server** that enables AI assistants to interact with Godot Engine projects. AI can read, inspect, and modify every aspect of your Godot project — from scene files and scripts to materials, animations, audio buses, and the live editor itself. **282 tools, 26 categories, 12 AI clients supported.**
+
+| Requirement | |
+|---|---|
+| Godot | 4.x (Godot 3 not supported) |
+| Node.js | >= 18 |
+| AI Client | Any MCP-compatible client (see [Configuration](#ai-client-configuration)) |
 
 ---
 
 ## Table of Contents
 
-- [Quick Start](#quick-start)
-- [Transport Modes](#transport-modes)
-- [Feature Overview](#feature-overview)
-- [All Tools](#all-tools)
-- [Installation](#installation)
-- [AI Client Configuration](#ai-client-configuration)
-- [Usage Examples](#usage-examples)
-- [Editor Plugin](#editor-plugin)
-- [Architecture](#architecture)
-- [Supported Formats](#supported-formats)
-- [Development](#development)
-- [Build VSIX](#build-vsix)
+1. [Quick Start](#quick-start)
+2. [What You Can Do](#what-you-can-do)
+3. [Architecture](#architecture)
+4. [Implementation Principles](#implementation-principles)
+5. [Transport Modes](#transport-modes)
+6. [Installation](#installation)
+7. [AI Client Configuration](#ai-client-configuration)
+8. [Usage Examples](#usage-examples)
+9. [Editor Plugin](#editor-plugin)
+10. [All Tools](#all-tools)
+11. [Supported Formats](#supported-formats)
+12. [Development](#development)
+13. [Build VSIX](#build-vsix)
 
 ---
 
 ## Quick Start
 
-### 1. Install the plugin (one-time)
+### Step 1: Install the Editor Plugin
 
 ```bash
-npx @yanhuifair/godot-mcp --install-addons -p /path/to/your/godot/project
+npx @yanhuifair/godot-mcp --enable-plugin -p /path/to/your/godot/project
 ```
 
-Then enable in Godot: **Project → Project Settings → Plugins → Godot MCP → Enable**.
+This copies the plugin to `addons/godot_mcp/` and auto-enables it in `project.godot`. No manual Godot steps required.
 
-### 2. Configure your AI client
+### Step 2: Configure Your AI Client
 
-Create `.vscode/mcp.json` in your project root (or see [AI Client Configuration](#ai-client-configuration) for other clients):
+Create `.vscode/mcp.json` in your project root:
 
 ```json
 {
@@ -53,13 +64,211 @@ Create `.vscode/mcp.json` in your project root (or see [AI Client Configuration]
 }
 ```
 
-### 3. Start chatting
+See [AI Client Configuration](#ai-client-configuration) for Cursor, Claude Desktop, Windsurf, Codex, Cline, Aider, Cody, Goose, and others.
 
-The AI client auto-launches the MCP server. **File-based tools** (.tscn, .tres, .gd) work immediately. **Editor tools** (play, select nodes, etc.) cause MCP to spawn Godot automatically — no need to manually open the editor.
+### Step 3: Start Chatting
 
-> "List all scenes in the project"
-> "Find all CharacterBody2D nodes"
-> "Run the game and take a screenshot"
+The AI client auto-launches the MCP server. File-based tools (.tscn, .tres, .gd) work immediately. Editor tools (play, select nodes, debug) cause MCP to spawn Godot automatically.
+
+```
+"List all scenes in the project"
+"Find all CharacterBody2D nodes"
+"Run the game and take a screenshot"
+```
+
+---
+
+## What You Can Do
+
+Godot MCP provides comprehensive coverage of the Godot 4.x engine through 282 tools in 26 categories.
+
+### Quick Demo
+
+```bash
+# One command to set up everything
+npx @yanhuifair/godot-mcp --enable-plugin -p .
+
+# Then ask your AI:
+> "Create a 2D platformer scene with a CharacterBody2D player"
+> "Add a Timer node, connect its timeout signal, write the handler"
+> "Create a metallic PBR material and apply it to all MeshInstance3D nodes"
+> "Set up an audio bus with reverb, set SFX volume to -6dB"
+> "Set a breakpoint at line 42, run the game, step through the debugger"
+```
+
+### Feature Overview
+
+| Category | Tools | Description |
+|---|---|---|
+| Editor | 89 | Live editor control — select, play, undo, save, breakpoints, file ops, performance |
+| Scene | 22 | Scene CRUD — nodes, signals, transforms, collision, sprites |
+| Project | 22 | Config, input map, file ops, autoloads, validation, unused assets |
+| Script | 21 | GDScript/Shader CRUD, structure analysis, code injection, validation |
+| Domain | 11 | Curve, Gradient, Path, Skeleton, ReflectionProbe, MultiMesh, NoiseTexture |
+| Animation | 10 | AnimationPlayer/AnimationTree — tracks, keyframes, parameters |
+| Godot Engine | 9 | Engine detection, launch editor, run/export project, screenshot |
+| Coverage | 18 | Mesh primitives, 2D lights, vehicles, spring arm, decal, occluder, grid map |
+| Nodes | 8 | CharacterBody, AnimatedSprite, Audio, Video, Parallax, RichText, Container, Tab |
+| Resource | 8 | .tres CRUD, PBR materials, themes, 14 templates |
+| Audio | 7 | Audio bus layout, effects, volume |
+| Shader Graph | 8 | VisualShader graph — 40+ node types, connections, parameters |
+| Utility | 6 | Signal catalog, StyleBox, AtlasTexture, popup listing, cohesion report |
+| Rendering | 5 | MeshInstance, Viewport, Area, RayCast/ShapeCast |
+| Environment | 4 | Environment read/write, 4 presets |
+| Inspector | 5 | Camera, Light, Particle node inspection |
+| Physics | 4 | PhysicsMaterial CRUD, collision layers |
+| Import | 3 | .import file read/write |
+| TileMap | 3 | TileSet resources, TileMapLayer inspection |
+| Navigation | 3 | NavigationRegion, NavigationMesh |
+| Translation | 3 | CSV/PO translation files |
+| Joints | 3 | Physics joints — create, configure, list |
+| UID | 3 | File UID query, batch update, missing UID detection |
+| 2D Geometry | 2 | CollisionPolygon2D, shape point editing |
+| Diff | 2 | Scene and resource comparison |
+| Other | 8 | GDExtension, C#, World3D, CameraAttributes, SpriteFrames, Texture |
+
+**Total: 282 tools across 26 categories**
+
+### Core Capabilities in Detail
+
+---
+
+## Architecture
+
+### System Overview
+
+```
+                        MCP Protocol (stdio/SSE/Streamable HTTP)
+  +-----------------+                                        +------------------+
+  |   AI Client      |<-------------------------------------->|  Godot MCP Server |
+  |  (VS Code/Cursor |                                        |  (TypeScript)     |
+  |   Claude/etc.)   |                                        |                  |
+  +-----------------+                                        |  +-------------+ |
+                                                             |  | Tool Registry| |
+                                                             |  |  (282 tools) | |
+                                                             |  +------+------+ |
+                                                             |         |        |
+                                                             |    +----v-----+  |
+                        File I/O (direct)                    |    | Parsers   |  |
+  +------------------+<-------------------------------------->|    | .tscn     |  |
+  |   Godot Project   |                                       |    | .tres     |  |
+  |   Files on Disk   |                                       |    | .godot    |  |
+  |  (.tscn/.tres/.gd)|                                       |    +----------+  |
+  +------------------+                                       |                  |
+                                                             |  +-------------+ |
+                        stdin/stdout (spawned process)       |  | Godot CLI   | |
+  +------------------+<-------------------------------------->|  | (spawn/edit) | |
+  |   Godot Editor    |                                       |  +-------------+ |
+  |  (GDScript addon) |                                       +------------------+
+  |  TCP port 9876    |
+  |  97 commands      |
+  +------------------+
+```
+
+### Communication Paths
+
+The server uses three distinct communication paths depending on the operation:
+
+1. **Direct File I/O** — For file-based tools (read_scene, write_script, create_resource, etc.), the server reads and writes Godot project files directly on disk using custom parsers. No Godot process is required. This is the fastest path.
+
+2. **Godot CLI** — For engine operations (launch_editor, run_project, export_project, get_godot_version), the server spawns Godot as a subprocess and communicates via command-line arguments and stdout/stderr.
+
+3. **Editor Bridge (dual-mode)** — For live editor tools (editor_get_selection, editor_play, editor_set_breakpoint, etc.), the MCP server communicates with a running Godot editor instance. Two modes are supported:
+   - **TCP mode** (default): Connects to an already-running Godot on `localhost:9876`. The editor plugin listens on this port.
+   - **Stdio mode** (fallback): Spawns Godot as a child process with `--editor --path <project>`, sets `MCP_STDIO=true`, and communicates via stdin/stdout using JSON-RPC with a `__MCP__:` marker prefix. This mode auto-starts and auto-restarts Godot as needed.
+
+### Project Structure
+
+```
+godot-mcp/
+├── src/
+│   ├── index.ts              # CLI entry point, argument parsing, transport dispatch
+│   ├── server.ts             # MCP server factory, tool registration, request routing
+│   ├── tools/                # 28 tool handler files (one per category)
+│   │   ├── register.ts       # Centralized registration (282 tools)
+│   │   ├── project.ts        # Project management tools
+│   │   ├── scene.ts          # Scene editing tools
+│   │   ├── script.ts         # Script and shader tools
+│   │   ├── editor.ts         # Live editor bridge (TCP + stdio)
+│   │   ├── resource.ts       # Resource/material/theme tools
+│   │   ├── godot.ts          # Godot engine control
+│   │   ├── animation.ts      # Animation pipeline
+│   │   ├── audio.ts          # Audio bus management
+│   │   ├── scene_inspectors.ts  # 2D lights, vehicles, spring arm, etc.
+│   │   ├── mesh.ts           # 3D mesh primitives
+│   │   ├── shader_graph.ts   # VisualShader graph editing
+│   │   └── ... (18 more files)
+│   ├── parsers/
+│   │   ├── scene_parser.ts   # .tscn file parser (sections, nodes, connections)
+│   │   ├── resource_parser.ts # .tres file parser
+│   │   ├── config_parser.ts  # project.godot INI parser
+│   │   └── parser_helpers.ts # Shared utilities (quote handling, bracket balancing)
+│   ├── transports/
+│   │   ├── stdio.ts          # Stdio transport (default, for local AI clients)
+│   │   └── http-server.ts    # SSE + Streamable HTTP transport
+│   └── utils/
+│       ├── types.ts          # TypeScript type definitions
+│       ├── file_utils.ts     # File system operations with path traversal protection
+│       ├── godot_cli.ts      # Godot binary detection, process management
+│       ├── registry.ts       # ToolRegistry class with sorted listing
+│       ├── errors.ts         # Structured error codes
+│       └── cache.ts          # TTL-based file cache for parsed documents
+├── addons/
+│   └── godot_mcp/            # Godot editor plugin
+│       ├── plugin.cfg         # Plugin metadata
+│       └── plugin.gd          # stdin reader, TCP server, 97 command handlers
+├── test/                     # 138 tests across 4 test files
+│   └── fixtures/             # Test fixture files
+├── scripts/
+│   └── sync-addons.js        # Post-build: syncs addons to dist/
+├── package.json
+└── tsconfig.json
+```
+
+---
+
+## Implementation Principles
+
+### File-Based Parsing
+
+All Godot file formats (.tscn, .tres, project.godot) are parsed directly in TypeScript using custom parsers. This eliminates the need to launch Godot for file operations, making reads and writes near-instantaneous.
+
+**Scene parser** (`parsers/scene_parser.ts`):
+- Parses all `.tscn` sections: `[gd_scene]`, `[ext_resource]`, `[sub_resource]`, `[node]`, `[connection]`
+- Handles multi-line property values with balanced bracket/quote detection
+- Builds node hierarchy trees from parent references
+- Supports round-trip serialization for safe edits
+
+**Resource parser** (`parsers/resource_parser.ts`):
+- Parses `.tres` text resources with section-based structure
+- Detects binary `.res` files via `GDROM` magic header (returns unsupported error)
+- Extracts header, external resources, sub-resources, and main resource properties
+
+**Config parser** (`parsers/config_parser.ts`):
+- Parses INI-style `project.godot` and `.cfg` files
+- Handles multi-line values with indentation-based continuation
+- Preserves comments for round-trip editing
+
+### Dual-Mode Editor Bridge
+
+The editor plugin (`addons/godot_mcp/plugin.gd`) implements 97 command handlers that wrap Godot's `EditorInterface` API. Communication uses JSON-RPC 2.0 over two channels:
+
+- **TCP mode** (port 9876): When Godot is running independently, the plugin accepts TCP connections and processes commands. This is the preferred mode for interactive development.
+
+- **Stdio mode**: When the MCP server spawns Godot as a child process (`godot --editor --path <project>`), the plugin reads JSON-RPC requests from stdin and writes responses to stdout with a `__MCP__:` prefix marker. The server filters for these markers to distinguish JSON-RPC from Godot's standard output.
+
+The bridge auto-detects which mode to use: it first attempts a rapid TCP health check (800ms timeout), and falls back to spawning Godot if no existing instance is found. If the spawned process exits unexpectedly, it auto-restarts up to 3 times.
+
+### Parameter Normalization
+
+To accommodate AI clients that may use either `snake_case` or `camelCase` parameter naming, the server automatically normalizes 30+ common parameter names (`project_path` -> `projectPath`, `scene_path` -> `scenePath`, etc.) before Zod schema validation.
+
+### Safety Guarantees
+
+- **Path traversal protection**: All file operations validate that resolved paths stay within the project root
+- **Automatic backups**: Write operations on script and scene files create `.bak` backup copies
+- **Read-only mode**: `--read-only` flag rejects all write and delete operations
+- **Structured errors**: All errors use typed error codes (`FILE_NOT_FOUND`, `PARSE_ERROR`, `VALIDATION_ERROR`, etc.) with actionable suggestions
 
 ---
 
@@ -69,7 +278,7 @@ Godot MCP supports three transport protocols. Choose based on your client and de
 
 | Mode | Protocol | Use Case | Default |
 |---|---|---|---|
-| **Stdio** | Standard I/O (stdin/stdout) | Local AI clients (VS Code, Claude Desktop, Cursor, Windsurf) | ✅ |
+| **Stdio** | Standard I/O (stdin/stdout) | Local AI clients (VS Code, Claude Desktop, Cursor, Windsurf) | Yes |
 | **SSE** | Server-Sent Events over HTTP | Older MCP clients, web-based clients, remote access | |
 | **Streamable HTTP** | MCP 2025 Streamable HTTP | Modern MCP clients, production deployments, remote access | |
 
@@ -77,14 +286,184 @@ Godot MCP supports three transport protocols. Choose based on your client and de
 
 JSON-RPC communication over standard I/O (stdin/stdout). Ideal for local development — no network configuration needed.
 
-**Start the server:**
-
 ```bash
-# stdio is the default mode, no -t needed
 npx @yanhuifair/godot-mcp -p /path/to/your/godot/project
 ```
 
-**Client config:**
+### SSE (Server-Sent Events)
+
+HTTP-based transport using SSE for server-to-client streaming. Compatible with older MCP clients.
+
+```bash
+npx @yanhuifair/godot-mcp -t sse --port 3000 -p /path/to/your/godot/project
+```
+
+| Option | Description | Default |
+|---|---|---|
+| `-t sse` | Enable SSE transport mode | — |
+| `--port <number>` | HTTP listen port | `3000` |
+| `--host <string>` | Bind address (use `0.0.0.0` for remote access) | `127.0.0.1` |
+
+Client config:
+
+```json
+{
+  "mcpServers": {
+    "godot-mcp": {
+      "url": "http://127.0.0.1:3000/sse"
+    }
+  }
+}
+```
+
+### Streamable HTTP (MCP 2025)
+
+Modern HTTP transport based on the MCP 2025 spec. Supports session management, reconnection with resume, and both stateful and stateless modes.
+
+```bash
+npx @yanhuifair/godot-mcp -t streamable-http --port 3000 -p /path/to/your/godot/project
+```
+
+Endpoints:
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/mcp` | Establish SSE stream (supports `Last-Event-ID` reconnection) |
+| `POST` | `/mcp` | Send JSON-RPC requests/notifications |
+| `DELETE` | `/mcp` | Close session |
+
+Client config:
+
+```json
+{
+  "mcpServers": {
+    "godot-mcp": {
+      "url": "http://127.0.0.1:3000/mcp",
+      "transportType": "streamable-http"
+    }
+  }
+}
+```
+
+### All Transports Simultaneously
+
+```bash
+npx @yanhuifair/godot-mcp -t all --port 3000 -p /path/to/your/godot/project
+```
+
+Starts: Stdio + SSE (`/sse`) + Streamable HTTP (`/mcp`) + Health Check (`/health`)
+
+```bash
+curl http://127.0.0.1:3000/health
+# {"status":"ok","version":"1.3.4","projectRoot":"/path/to/project","endpoints":{...}}
+```
+
+---
+
+## Installation
+
+### npx (recommended, no pre-install)
+
+```bash
+npx -y @yanhuifair/godot-mcp -p /path/to/your/godot/project
+```
+
+### Global Install
+
+```bash
+npm install -g @yanhuifair/godot-mcp
+```
+
+### From Source
+
+```bash
+git clone https://github.com/yanhuifair/Godot-MCP.git
+cd godot-mcp
+npm install
+npm run build
+```
+
+### Environment Variables
+
+| Variable | Description |
+|---|---|
+| `GODOT_PATH` | Path to Godot binary (optional, auto-detected) |
+| `GODOT_MCP_TEST_PROJECT` | Path to test project for integration tests |
+
+Godot auto-detection order: `GODOT_PATH` -> `/Applications/Godot.app` -> `PATH` -> snap/flatpak -> Windows Program Files
+
+---
+
+## AI Client Configuration
+
+### VS Code / GitHub Copilot
+
+**Method 1: Project-level config (recommended)**
+
+Create `.vscode/mcp.json` in your Godot project root:
+
+```json
+{
+  "mcpServers": {
+    "godot-mcp": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@yanhuifair/godot-mcp", "-p", "."]
+    }
+  }
+}
+```
+
+After saving, reload VS Code (`Cmd+Shift+P` -> `Developer: Reload Window`). Open Copilot Chat (`Cmd+Shift+I`), look for the tools indicator in the chat input. Send a test message:
+
+> "List all scenes in the project"
+
+Tip: Commit `.vscode/mcp.json` to your repository so every team member gets the MCP server automatically.
+
+**Method 2: User-level config**
+
+Open VS Code settings (`Cmd+Shift+P` -> `Preferences: Open User Settings (JSON)`) and add:
+
+```jsonc
+{
+  "mcp": {
+    "servers": {
+      "godot-mcp": {
+        "command": "npx",
+        "args": ["-y", "@yanhuifair/godot-mcp", "-p", "/path/to/your/godot/project"]
+      }
+    }
+  }
+}
+```
+
+**Method 3: Install via `--enable-plugin`**
+
+```bash
+npx @yanhuifair/godot-mcp --enable-plugin -p /path/to/your/godot/project
+```
+
+This installs the editor plugin and auto-enables it. Combined with the MCP config above, you get full file-based tools + live editor control.
+
+### Cursor
+
+Cursor supports both project-level and user-level MCP configuration.
+
+**Project-level** — `.cursor/mcp.json` in your project root:
+
+```json
+{
+  "mcpServers": {
+    "godot-mcp": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@yanhuifair/godot-mcp", "-p", "."]
+    }
+  }
+}
+```
+
+**User-level** — `~/.cursor/mcp.json` (macOS/Linux) or `%USERPROFILE%\.cursor\mcp.json` (Windows):
 
 ```json
 {
@@ -98,172 +477,397 @@ npx @yanhuifair/godot-mcp -p /path/to/your/godot/project
 }
 ```
 
-If using a global install:
+After configuring, open Cursor Settings -> MCP to verify the server appears with a green status indicator. Use Agent mode in chat (Cmd+L) to invoke MCP tools.
+
+### Claude Desktop
+
+**macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+**Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
 
 ```json
 {
   "mcpServers": {
     "godot-mcp": {
       "type": "stdio",
-      "command": "godot-mcp",
-      "args": ["-p", "/path/to/your/godot/project"]
+      "command": "npx",
+      "args": ["-y", "@yanhuifair/godot-mcp", "-p", "/path/to/your/godot/project"]
     }
   }
 }
 ```
 
-> **Supported clients**: Claude Desktop, VS Code / GitHub Copilot, Cursor, Windsurf, Cline, Roo Code. These clients automatically manage the server process lifecycle.
+After saving, fully quit and restart Claude Desktop. Look for the hammer icon in the chat input to confirm MCP tools are loaded. Send a test:
 
----
+> "Get the Godot version"
 
-### SSE (Server-Sent Events)
+### Claude CLI (`claude`)
 
-HTTP-based transport using SSE for server-to-client streaming. Compatible with older MCP clients that don't support Streamable HTTP.
-
-**Start the server:**
+Install the Claude CLI first, then register the MCP server:
 
 ```bash
-npx @yanhuifair/godot-mcp -t sse --port 3000 -p /path/to/your/godot/project
+# One-time registration
+claude mcp add godot-mcp -- npx -y @yanhuifair/godot-mcp -p /path/to/your/godot/project
+
+# With environment variables (e.g., custom Godot path)
+claude mcp add godot-mcp -e GODOT_PATH=/path/to/godot -- npx -y @yanhuifair/godot-mcp -p .
+
+# List registered servers
+claude mcp list
+
+# Remove if needed
+claude mcp remove godot-mcp
 ```
 
-| Option | Description | Default |
-|---|---|---|
-| `-t sse` | Enable SSE transport mode | — |
-| `--port <number>` | HTTP listen port | `3000` |
-| `--host <string>` | Bind address (use `0.0.0.0` for remote access) | `127.0.0.1` |
+Then use interactively or non-interactively:
 
-**Client config:**
+```bash
+# Interactive session
+claude
+
+# Non-interactive (pipe mode)
+echo "List all scenes in my Godot project" | claude -p
+```
+
+### Windsurf
+
+`~/.codeium/windsurf/mcp_config.json` (macOS/Linux) or `%USERPROFILE%\.codeium\windsurf\mcp_config.json` (Windows):
 
 ```json
 {
   "mcpServers": {
     "godot-mcp": {
-      "url": "http://127.0.0.1:3000/sse"
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@yanhuifair/godot-mcp", "-p", "/path/to/your/godot/project"]
     }
   }
 }
 ```
 
-> **Note**: Each SSE connection creates an independent Server + Transport instance. Ensure authentication is configured for production remote access.
+Restart Windsurf after saving. Open Cascade (Cmd+L) and verify tools appear in the MCP panel.
 
----
+### OpenAI Codex CLI
 
-### Streamable HTTP (MCP 2025)
+Codex uses `.codex.toml` or `.codex.yaml` in your project root, or `~/.codex/config.yaml` for user-level config.
 
-Modern HTTP transport based on the MCP 2025 spec. Supports session management, reconnection with resume, and both stateful and stateless modes.
+**Project-level** (`.codex.toml` in your Godot project):
 
-**Start the server:**
-
-```bash
-npx @yanhuifair/godot-mcp -t streamable-http --port 3000 -p /path/to/your/godot/project
+```yaml
+mcp_servers:
+  godot-mcp:
+    type: stdio
+    command: npx
+    args:
+      - "-y"
+      - "@yanhuifair/godot-mcp"
+      - "-p"
+      - "."
 ```
 
-| Option | Description | Default |
-|---|---|---|
-| `-t streamable-http` | Enable Streamable HTTP mode | — |
-| `--port <number>` | HTTP listen port | `3000` |
-| `--host <string>` | Bind address (use `0.0.0.0` for remote access) | `127.0.0.1` |
+**Global install** (if you ran `npm install -g @yanhuifair/godot-mcp`):
 
-**Endpoints:**
+```yaml
+mcp_servers:
+  godot-mcp:
+    type: stdio
+    command: godot-mcp
+    args:
+      - "-p"
+      - "."
+```
 
-| Method | Path | Purpose |
-|---|---|---|
-| `GET` | `/mcp` | Establish SSE stream (supports `Last-Event-ID` reconnection) |
-| `POST` | `/mcp` | Send JSON-RPC requests/notifications |
-| `DELETE` | `/mcp` | Close session |
+Run Codex in your Godot project directory:
 
-**Client config:**
+```bash
+# Interactive session
+codex
+
+# Non-interactive
+codex exec "List all scenes in the project"
+codex exec "Create a new CharacterBody2D script for the player"
+
+# Verify MCP tools are loaded
+codex exec "Get the Godot version"
+```
+
+### Cline (VS Code Extension)
+
+Cline reads MCP servers from VS Code user settings. Open `Cmd+Shift+P` -> `Preferences: Open User Settings (JSON)` and add:
+
+```jsonc
+{
+  "cline.mcpServers": {
+    "godot-mcp": {
+      "command": "npx",
+      "args": ["-y", "@yanhuifair/godot-mcp", "-p", "/path/to/your/godot/project"]
+    }
+  }
+}
+```
+
+After saving, click the Cline extension icon in the sidebar, then click "Restart MCP Servers" in the Cline panel. The server should show as connected. Use Cline in any VS Code window — MCP tools are available automatically.
+
+### Roo Code (VS Code Extension)
+
+Roo Code also reads MCP servers from VS Code user settings:
+
+```jsonc
+{
+  "rooCode.mcpServers": {
+    "godot-mcp": {
+      "command": "npx",
+      "args": ["-y", "@yanhuifair/godot-mcp", "-p", "/path/to/your/godot/project"]
+    }
+  }
+}
+```
+
+After saving, open Roo Code and the MCP tools will be available in the tool selection menu. If the server doesn't appear, click the refresh button in the Roo Code MCP settings panel.
+
+### Continue (VS Code / JetBrains)
+
+Continue uses `~/.continue/config.json` (macOS/Linux) or `%USERPROFILE%\.continue\config.json` (Windows).
+
+Add a new entry to the `mcpServers` array. If the array doesn't exist, create it:
 
 ```json
 {
-  "mcpServers": {
+  "models": [...],
+  "mcpServers": [
+    {
+      "name": "godot-mcp",
+      "transport": {
+        "type": "stdio",
+        "command": "npx",
+        "args": ["-y", "@yanhuifair/godot-mcp", "-p", "/path/to/your/godot/project"]
+      }
+    }
+  ]
+}
+```
+
+After saving, open Continue in VS Code (Cmd+L or Cmd+I). Tools are discovered automatically. Send:
+
+> "List all .tscn files in my project"
+
+### Aider
+
+Aider supports MCP servers via `.aider.conf.yml` (project root or home directory) or command-line flags.
+
+**Config file** (`.aider.conf.yml`):
+
+```yaml
+mcp_servers:
+  - name: godot-mcp
+    command: npx
+    args:
+      - "-y"
+      - "@yanhuifair/godot-mcp"
+      - "-p"
+      - "."
+```
+
+**Command-line**:
+
+```bash
+# Single project
+aider --mcp-server "godot-mcp=npx -y @yanhuifair/godot-mcp -p ."
+
+# With custom Godot path
+aider --mcp-server "godot-mcp=npx -y @yanhuifair/godot-mcp -p /path/to/project"
+
+# With global install
+aider --mcp-server "godot-mcp=godot-mcp -p ."
+```
+
+Aider's `/tools` command lists all available MCP tools. Use them directly in chat:
+
+```
+/tools                    # List all 282 tools
+Create a new Node2D scene called "MainMenu"
+```
+
+### Cody (Sourcegraph)
+
+Cody is available as a VS Code extension. Add MCP config to VS Code user settings:
+
+```jsonc
+{
+  "cody.mcpServers": {
     "godot-mcp": {
-      "url": "http://127.0.0.1:3000/mcp",
-      "transportType": "streamable-http"
+      "command": "npx",
+      "args": ["-y", "@yanhuifair/godot-mcp", "-p", "/path/to/your/godot/project"]
     }
   }
 }
 ```
 
-> **Use cases**: Production deployments, remote team collaboration, scenarios requiring session persistence and reconnection.
+After saving, open Cody chat (Cmd+Shift+/). Click the MCP icon in the chat input to see available tools. If tools don't appear, reload the VS Code window.
+
+### Goose
+
+Goose uses `~/.config/goose/config.yaml` (macOS/Linux) or `%APPDATA%\goose\config.yaml` (Windows):
+
+```yaml
+mcp_servers:
+  godot-mcp:
+    command: npx
+    args:
+      - "-y"
+      - "@yanhuifair/godot-mcp"
+      - "-p"
+      - "/path/to/your/godot/project"
+```
+
+After saving, restart Goose. Use `/mcp` to list available servers and `/tools` to browse tools:
+
+```
+/mcp                      # List connected MCP servers
+/tools                    # Browse available tools
+List all scenes           # Direct tool invocation
+```
+
+### Troubleshooting
+
+| Problem | Solution |
+|---|---|
+| Server not starting | Ensure Node.js >= 18: `node -v` |
+| "Command not found" | Use `npx` method or `npm install -g @yanhuifair/godot-mcp` |
+| Plugin not showing in Godot | Click Restart in the Plugins tab, or reopen the project |
+| Editor process won't start | Ensure Godot is installed and in PATH, or set `GODOT_PATH` |
+| Tools not appearing in chat | Reload VS Code: `Cmd+Shift+P` -> `Developer: Reload Window` |
 
 ---
 
-### Enable All Transports Simultaneously
+## Usage Examples
 
-For debugging or mixed-client environments, use `all` mode:
+The following examples show what you can ask your AI assistant. Each maps to one or more MCP tools (shown in parentheses).
 
-```bash
-npx @yanhuifair/godot-mcp -t all --port 3000 -p /path/to/your/godot/project
-```
+### Project Exploration
 
-Starts simultaneously:
-- **Stdio** — Standard I/O
-- **SSE** — `http://127.0.0.1:3000/sse`
-- **Streamable HTTP** — `http://127.0.0.1:3000/mcp`
-- **Health Check** — `http://127.0.0.1:3000/health`
+| Command | Tools Used |
+|---|---|
+| "Show me the project structure" | `list_project_files` |
+| "Generate a project overview report" | `generate_project_report` |
+| "What autoloads are configured?" | `list_autoloads` |
+| "Check my project for broken references" | `validate_project` |
+| "Find unused assets I should clean up" | `find_unused_assets` |
 
-```bash
-# Health check
-curl http://127.0.0.1:3000/health
-# → {"status":"ok","version":"1.3.2","projectRoot":"/path/to/project","endpoints":{...}}
-```
+### Scene Creation and Editing
 
-### Disable Specific HTTP Endpoints
+| Command | Tools Used |
+|---|---|
+| "Create a 2D platformer scene with a CharacterBody2D root" | `create_scene` |
+| "Add a Cooldown Timer node under the Player" | `add_node` |
+| "Clone the Enemy node as Enemy2" | `clone_node` |
+| "Connect body_entered signal from Player to _on_body_entered" | `connect_signal` |
+| "Set the Player collision shape to CapsuleShape2D" | `set_collision_shape` |
+| "Load the player.png texture onto the Sprite" | `load_sprite` |
+| "Search all scenes for Timer nodes" | `find_nodes_in_scenes` |
+| "List all Button and Label nodes" | `list_ui_nodes` |
 
-If you only need one HTTP mode:
+### Script and Shader
 
-```bash
-# Only Streamable HTTP (disable SSE)
-npx @yanhuifair/godot-mcp -t streamable-http --no-sse --port 3000 -p .
+| Command | Tools Used |
+|---|---|
+| "Analyze the structure of player.gd" | `read_script_structure` |
+| "Add a dash method to the Player script" | `add_script_function` |
+| "Search all scripts for references to 'velocity'" | `search_in_scripts` |
+| "Validate all GDScripts for syntax errors" | `validate_script` |
+| "Create a new spatial shader with vertex displacement" | `create_shader` |
+| "Validate and compile the hurricane shader" | `validate_shader` + `compile_shader` |
 
-# Only SSE (disable Streamable HTTP)
-npx @yanhuifair/godot-mcp -t sse --no-streamable-http --port 3000 -p .
-```
+### Materials and Resources
+
+| Command | Tools Used |
+|---|---|
+| "Create a metallic PBR material with roughness 0.3" | `create_resource` |
+| "List all materials grouped by type" | `list_materials` |
+| "Change the albedo color of player_material" | `set_material_param` |
+| "Show me all .tres files in the project" | `list_resources` |
+
+### Animation
+
+| Command | Tools Used |
+|---|---|
+| "Show all player animations with their keyframes" | `read_animation` |
+| "Add a position track to the idle animation" | `add_animation_track` |
+| "Set a keyframe at 0.5s with value Vector2(100, 0)" | `set_keyframe` |
+| "Show the AnimationTree state machine" | `read_animation_tree` |
+
+### Audio
+
+| Command | Tools Used |
+|---|---|
+| "Show the audio bus layout" | `read_audio_bus_layout` |
+| "Add a reverb effect to the Master bus" | `add_bus_effect` |
+| "Set the SFX bus volume to -6 dB" | `set_bus_volume` |
+| "List all .wav and .ogg files" | `list_audio_files` |
+
+### Run, Debug, and Export
+
+| Command | Tools Used |
+|---|---|
+| "Run the game at 1280x720 and take a screenshot" | `run_project` + `capture_screenshot` |
+| "Set a breakpoint at player.gd line 42" | `editor_set_breakpoint` |
+| "Step through the debugger and show local variables" | `editor_debug_step` + `editor_get_debug_variables` |
+| "Stop the running game" | `stop_project` |
+| "Export the project for macOS" | `export_project` |
 
 ---
 
-## Feature Overview
+## Editor Plugin
 
-| Category | Tools | Highlights |
-|---|---|---|
-| **Editor** | 78 | Live editor control: select, play, undo, save, breakpoints, search, file ops, performance |
-| **Scene** | 21 | Full scene CRUD + node add/remove/modify/clone + signals + transforms + collision + sprites |
-| **Project** | 22 | Config read/write, input map, file ops, autoloads, validation, unused asset detection |
-| **Script** | 21 | GDScript/Shader CRUD + structure analysis + code search + signal/function/export injection + shader validation/compilation |
-| **Domain** | 11 | Curve, Gradient, Path, Skeleton, ReflectionProbe, MultiMesh, NoiseTexture |
-| **Animation** | 10 | AnimationPlayer/AnimationTree full pipeline: create, tracks, keyframes, params |
-| **Godot Engine** | 9 | Engine detection, launch editor, run/export project, screenshot, process control |
-| **Coverage** | 8 | Mesh primitives, 2D lights, VehicleBody, SpringArm, Decal, Occluder |
-| **Nodes** | 8 | CharacterBody, AnimatedSprite, Audio, Video, Parallax, RichText, Container, Tab |
-| **Resource** | 8 | .tres CRUD, PBR materials, themes, 14 templates |
-| **Audio** | 7 | Audio bus layout CRUD, effects, volume, audio file detection |
-| **Shader Graph** | 7 | VisualShader graph node add/remove/connect, param editing |
-| **Utility** | 6 | All signals list, StyleBox, AtlasTexture, Popup, project icon, cohesion report |
-| **Rendering** | 5 | MeshInstance, Viewport, Area, RayCast/ShapeCast |
-| **Environment** | 4 | Environment .tres read/write + 4 presets |
-| **Inspector** | 5 | Camera, Light, Particle node inspection and editing |
-| **Physics** | 4 | PhysicsMaterial CRUD, collision layer names |
-| **Import** | 3 | .import file read/write and listing |
-| **TileMap** | 3 | TileSet resource parsing, TileMapLayer inspection |
-| **Navigation** | 3 | NavigationRegion inspection + NavigationMesh creation |
-| **Translation** | 3 | CSV/PO translation file read/write |
-| **Joints** | 3 | Physics joint creation, params, listing |
-| **UID** | 3 | File UID query, batch update, missing UID detection |
-| **2D Geometry** | 2 | CollisionPolygon2D, CollisionShape2D shape config |
-| **Diff** | 2 | Scene and resource line-by-line/property comparison |
-| **Other** | 8 | GDExtension, C#, World3D, CameraAttributes, SpriteFrames, GridMap, Texture |
+The editor plugin enables real-time interaction with the Godot editor. MCP spawns Godot as a child process when editor tools are invoked, communicating via stdin/stdout with JSON-RPC 2.0.
 
-**Total: 281 tools across 26 categories**
+### Install
+
+```bash
+npx @yanhuifair/godot-mcp --enable-plugin -p /path/to/your/godot/project
+```
+
+This installs the plugin to `addons/godot_mcp/` and auto-enables it in `project.godot`. No manual steps required.
+
+### Editor Commands (89 tools)
+
+**View & Selection:** `editor_get_selection` `editor_set_selection` `editor_get_open_scene` `editor_read_current_scene` `editor_get_info` `editor_get_rect` `editor_focus` `editor_show_in_filesystem` `editor_open_dock`
+
+**Playback Control:** `editor_play` `editor_stop` `editor_run_specific_scene` `editor_get_running_scene_tree` `editor_get_performance_monitors`
+
+**Edit Operations:** `editor_undo` `editor_redo` `editor_save` `editor_save_all` `editor_reload_scene` `editor_delete_selected`
+
+**Scene Operations:** `editor_create_scene` `editor_instantiate_scene` `editor_set_main_scene` `editor_get_scene_changes`
+
+**Node Operations:** `editor_add_node` `editor_remove_node` `editor_duplicate_node` `editor_rename_node` `editor_reparent_node` `editor_move_node` `editor_get_node_properties` `editor_set_node_properties`
+
+**Scripting:** `editor_create_script` `editor_attach_script` `editor_run_gdscript` `editor_evaluate_expression`
+
+**Debugging:** `editor_set_breakpoint` `editor_remove_breakpoint` `editor_get_breakpoints` `editor_debug_continue` `editor_debug_step` `editor_debug_step_over` `editor_debug_break` `editor_get_stack_trace` `editor_get_debug_variables`
+
+**Signals:** `editor_connect_signal` `editor_disconnect_signal` `editor_list_node_signals`
+
+**File System:** `editor_open_asset` `editor_list_filesystem` `editor_create_folder` `editor_delete_asset` `editor_rename_asset` `editor_move_asset` `editor_duplicate_asset` `editor_reimport_asset` `editor_get_dependency_list`
+
+**Project Settings:** `editor_get_project_setting` `editor_set_project_setting` `editor_get_editor_setting` `editor_set_editor_setting` `editor_get_project_directory`
+
+**Input & Autoloads:** `editor_get_input_map` `editor_add_input_action` `editor_remove_input_action` `editor_get_autoload_list` `editor_add_autoload` `editor_remove_autoload`
+
+**Assets & Baking:** `editor_bake_lightmaps` `editor_bake_navigation` `editor_take_screenshot`
+
+**Class Documentation:** `editor_get_class_list` `editor_get_method_list` `editor_get_class_property_list` `editor_get_class_signal_list` `editor_get_class_doc` `editor_search_help`
+
+**Camera & Viewport:** `editor_get_editor_camera` `editor_set_editor_camera` `editor_toggle_grid` `editor_toggle_snap`
+
+**Other:** `editor_get_recent_scenes` `editor_simulate_key` `editor_get_plugin_list` `editor_enable_plugin` `editor_disable_plugin` `editor_get_error_list` `editor_clear_errors` `editor_health_check`
 
 ---
 
 ## All Tools
 
-> 🔍 Click each category to expand and see all tools with descriptions. For detailed usage examples, see [Usage Examples](#usage-examples). Editor tools are also listed with descriptions in [Editor Plugin](#editor-plugin).
+Click each category to expand and see all tools with descriptions.
 
 <details>
-<summary><b>🎬 Editor</b> (89 tools) — Live editor control</summary>
+<summary>Editor (89 tools) — Live editor control</summary>
 
 | Tool | Description |
 |---|---|
@@ -360,7 +964,7 @@ npx @yanhuifair/godot-mcp -t sse --no-streamable-http --port 3000 -p .
 </details>
 
 <details>
-<summary><b>🏗️ Scene</b> (22 tools) — Full scene CRUD + nodes + signals + transforms</summary>
+<summary>Scene (22 tools) — Full scene CRUD + nodes + signals + transforms</summary>
 
 | Tool | Description |
 |---|---|
@@ -390,7 +994,7 @@ npx @yanhuifair/godot-mcp -t sse --no-streamable-http --port 3000 -p .
 </details>
 
 <details>
-<summary><b>📁 Project</b> (22 tools) — Config, input map, file ops, autoloads, validation</summary>
+<summary>Project (22 tools) — Config, input map, file ops, autoloads, validation</summary>
 
 | Tool | Description |
 |---|---|
@@ -419,7 +1023,7 @@ npx @yanhuifair/godot-mcp -t sse --no-streamable-http --port 3000 -p .
 </details>
 
 <details>
-<summary><b>📝 Script</b> (21 tools) — GDScript/Shader CRUD + analysis + injection + validation</summary>
+<summary>Script (21 tools) — GDScript/Shader CRUD + analysis + injection + validation</summary>
 
 | Tool | Description |
 |---|---|
@@ -437,8 +1041,8 @@ npx @yanhuifair/godot-mcp -t sse --no-streamable-http --port 3000 -p .
 | `create_shader` | Create a new .gdshader from template. |
 | `list_shaders` | List all .gdshader files. |
 | `write_shader` | Write content to a .gdshader. |
-| `validate_shader` | Validate .gdshader for syntax issues (shader_type, braces, declarations). |
-| `compile_shader` | Compile (reimport) a .gdshader via Godot editor or local validation. |
+| `validate_shader` | Validate .gdshader for syntax issues. |
+| `compile_shader` | Compile (reimport) a .gdshader via Godot editor. |
 | `list_visual_shaders` | List VisualShader graph files. |
 | `read_visual_shader` | Read a VisualShader graph. |
 | `read_shader_include` | Read a .gdshaderinc file. |
@@ -448,26 +1052,7 @@ npx @yanhuifair/godot-mcp -t sse --no-streamable-http --port 3000 -p .
 </details>
 
 <details>
-<summary><b>🎯 Domain</b> (11 tools) — Curve, Gradient, Path, Skeleton, ReflectionProbe, MultiMesh, NoiseTexture</summary>
-
-| Tool | Description |
-|---|---|
-| `read_curve` | Read a Curve resource. |
-| `create_curve` | Create a Curve .tres resource. |
-| `read_gradient` | Read a Gradient resource. |
-| `create_gradient` | Create a Gradient .tres resource. |
-| `list_paths` | List Path2D/Path3D nodes across scenes. |
-| `read_path` | Read a Path2D/Path3D node with curve points. |
-| `list_skeletons` | List Skeleton3D nodes. |
-| `read_skeleton` | Read Skeleton3D bone hierarchy. |
-| `read_reflection_probe` | Read ReflectionProbe settings. |
-| `read_multi_mesh` | Read MultiMeshInstance settings. |
-| `create_noise_texture` | Create a NoiseTexture2D/3D .tres. |
-
-</details>
-
-<details>
-<summary><b>🎞️ Animation</b> (10 tools) — AnimationPlayer/AnimationTree full pipeline</summary>
+<summary>Animation (10 tools) — AnimationPlayer/AnimationTree pipeline</summary>
 
 | Tool | Description |
 |---|---|
@@ -485,7 +1070,7 @@ npx @yanhuifair/godot-mcp -t sse --no-streamable-http --port 3000 -p .
 </details>
 
 <details>
-<summary><b>⚙️ Godot Engine</b> (9 tools) — Engine detection, launch, run, export, screenshot</summary>
+<summary>Godot Engine (9 tools) — Engine detection, launch, run, export</summary>
 
 | Tool | Description |
 |---|---|
@@ -502,7 +1087,7 @@ npx @yanhuifair/godot-mcp -t sse --no-streamable-http --port 3000 -p .
 </details>
 
 <details>
-<summary><b>🎨 Coverage</b> (18 tools) — Mesh primitives, 2D lights, VehicleBody, SpringArm, Decal & more</summary>
+<summary>Coverage (18 tools) — Mesh primitives, 2D lights, vehicles, spring arm, decal & more</summary>
 
 | Tool | Description |
 |---|---|
@@ -528,23 +1113,7 @@ npx @yanhuifair/godot-mcp -t sse --no-streamable-http --port 3000 -p .
 </details>
 
 <details>
-<summary><b>🔲 Nodes</b> (8 tools) — CharacterBody, AnimatedSprite, Audio, Video, Parallax, RichText, Container, Tab</summary>
-
-| Tool | Description |
-|---|---|
-| `read_character_body` | Read CharacterBody2D/3D properties. |
-| `read_animated_sprite` | Read AnimatedSprite2D/3D with animation and frame data. |
-| `read_audio_player` | Read AudioStreamPlayer2D/3D with stream and playback settings. |
-| `read_video_player` | Read VideoStreamPlayer with video stream and playback settings. |
-| `read_parallax` | Read ParallaxBackground/Parallax2D with layer configuration. |
-| `read_rich_text` | Read RichTextLabel with BBCode content. |
-| `read_container` | Read Container-derived nodes with child layout info. |
-| `read_tab_container` | Read TabContainer with tab names and counts. |
-
-</details>
-
-<details>
-<summary><b>📦 Resource</b> (8 tools) — .tres CRUD, PBR materials, themes, templates</summary>
+<summary>Resource (8 tools) — .tres CRUD, PBR materials, themes, templates</summary>
 
 | Tool | Description |
 |---|---|
@@ -560,7 +1129,7 @@ npx @yanhuifair/godot-mcp -t sse --no-streamable-http --port 3000 -p .
 </details>
 
 <details>
-<summary><b>🔊 Audio</b> (7 tools) — Audio bus layout CRUD, effects, volume</summary>
+<summary>Audio (7 tools) — Audio bus layout CRUD, effects, volume</summary>
 
 | Tool | Description |
 |---|---|
@@ -575,748 +1144,92 @@ npx @yanhuifair/godot-mcp -t sse --no-streamable-http --port 3000 -p .
 </details>
 
 <details>
-<summary><b>🧩 Shader Graph</b> (8 tools) — VisualShader graph node add/remove/connect, param editing</summary>
+<summary>Shader Graph (8 tools) — VisualShader graph node editing, 40+ node types</summary>
 
 | Tool | Description |
 |---|---|
 | `create_visual_shader` | Create a new VisualShader .tres graph file. |
-| `add_shader_graph_node` | Add a node to a VisualShader graph. 40+ node types available (constants, math, textures, effects). |
+| `add_shader_graph_node` | Add a node to a VisualShader graph (40+ types: constants, math, textures, effects). |
 | `remove_shader_graph_node` | Remove a node from a VisualShader graph by index. |
 | `connect_shader_graph_nodes` | Connect two node ports in a VisualShader graph. |
 | `disconnect_shader_graph_nodes` | Disconnect two node ports in a VisualShader graph. |
 | `set_shader_node_param` | Set a parameter on a VisualShader node (constant, expression, operator, etc.). |
-| `list_shader_node_types` | List all VisualShader node types organized by category with input/output counts. |
+| `list_shader_node_types` | List all VisualShader node types organized by category with I/O counts. |
 | `get_shader_node_defaults` | Get default ports and parameters for a specific VisualShader node type. |
 
 </details>
 
 <details>
-<summary><b>🛠️ Utility</b> (6 tools) — Signals list, StyleBox, AtlasTexture, Popup, project icon, cohesion report</summary>
+<summary>Remaining Categories</summary>
 
-| Tool | Description |
-|---|---|
-| `list_all_signals` | List all built-in signals across Godot classes. |
-| `read_project_icon` | Read the project icon file. |
-| `read_stylebox` | Read StyleBox resources in themes and scenes. |
-| `create_atlas_texture` | Create an AtlasTexture .tres from a sprite sheet. |
-| `list_popups` | List Popup/PopupMenu/AcceptDialog nodes across scenes. |
-| `generate_cohesion_report` | Generate project code cohesion and coupling report. |
+**Domain (11):** `read_curve`, `create_curve`, `read_gradient`, `create_gradient`, `list_paths`, `read_path`, `list_skeletons`, `read_skeleton`, `read_reflection_probe`, `read_multi_mesh`, `create_noise_texture`
 
-</details>
+**Nodes (8):** `read_character_body`, `read_animated_sprite`, `read_audio_player`, `read_video_player`, `read_parallax`, `read_rich_text`, `read_container`, `read_tab_container`
 
-<details>
-<summary><b>🖼️ Rendering</b> (5 tools) — MeshInstance, Viewport, Area, RayCast/ShapeCast</summary>
+**Utility (6):** `list_all_signals`, `read_project_icon`, `read_stylebox`, `create_atlas_texture`, `list_popups`, `generate_cohesion_report`
 
-| Tool | Description |
-|---|---|
-| `read_mesh_instance` | Read MeshInstance3D with mesh and material slots. |
-| `set_mesh_surface_material` | Set material on a mesh surface slot. |
-| `read_viewport` | Read Viewport node configuration. |
-| `read_area` | Read Area2D/Area3D with collision and overlap settings. |
-| `read_raycast` | Read RayCast2D/3D or ShapeCast2D/3D configuration. |
+**Rendering (5):** `read_mesh_instance`, `set_mesh_surface_material`, `read_viewport`, `read_area`, `read_raycast`
 
-</details>
+**Environment (4):** `read_environment`, `list_environments`, `create_environment`, `set_environment_param`
 
-<details>
-<summary><b>🌍 Environment</b> (4 tools) — Environment .tres read/write + presets</summary>
+**Inspector (5):** `list_cameras`, `read_camera`, `list_lights`, `set_light_param`, `read_particles`
 
-| Tool | Description |
-|---|---|
-| `read_environment` | Read Environment resource. |
-| `list_environments` | List Environment resources. |
-| `create_environment` | Create Environment from preset. |
-| `set_environment_param` | Set environment parameter. |
+**Physics (4):** `list_physics_materials`, `read_physics_material`, `create_physics_material`, `read_collision_layers`
+
+**Import (3):** `read_import_config`, `list_import_files`, `write_import_config`
+
+**TileMap (3):** `list_tilesets`, `read_tileset`, `read_tilemap`
+
+**Navigation (3):** `list_nav_regions`, `read_nav_region`, `create_nav_mesh`
+
+**Translation (3):** `list_translations`, `read_translation`, `create_translation`
+
+**Joints (3):** `create_joint`, `set_joint_param`, `list_joints`
+
+**UID (3):** `get_uid`, `update_project_uids`, `list_missing_uids`
+
+**2D Geometry (2):** `create_collision_polygon`, `set_shape_points`
+
+**Diff (2):** `diff_scene`, `diff_resource`
+
+**Other (8):** `read_gdextension`, `list_csproj`, `create_world`, `read_texture_info`
 
 </details>
-
-<details>
-<summary><b>🔍 Inspector</b> (5 tools) — Camera, Light, Particle node inspection and editing</summary>
-
-| Tool | Description |
-|---|---|
-| `list_cameras` | List Camera nodes. |
-| `read_camera` | Read camera configuration. |
-| `list_lights` | List light nodes. |
-| `set_light_param` | Set light parameter. |
-| `read_particles` | List particle systems. |
-
-</details>
-
-<details>
-<summary><b>⚡ Physics</b> (4 tools) — PhysicsMaterial CRUD, collision layer names</summary>
-
-| Tool | Description |
-|---|---|
-| `list_physics_materials` | List PhysicsMaterials. |
-| `read_physics_material` | Read PhysicsMaterial. |
-| `create_physics_material` | Create PhysicsMaterial. |
-| `read_collision_layers` | Read collision layer names. |
-
-</details>
-
-<details>
-<summary><b>📥 Import</b> (3 tools) — .import file read/write and listing</summary>
-
-| Tool | Description |
-|---|---|
-| `read_import_config` | Read .import file config. |
-| `list_import_files` | List .import files grouped by type. |
-| `write_import_config` | Write import settings. |
-
-</details>
-
-<details>
-<summary><b>🗺️ TileMap</b> (3 tools) — TileSet resource parsing, TileMapLayer inspection</summary>
-
-| Tool | Description |
-|---|---|
-| `list_tilesets` | List TileSet resources. |
-| `read_tileset` | Read TileSet resource. |
-| `read_tilemap` | Read TileMapLayer in scene. |
-
-</details>
-
-<details>
-<summary><b>🧭 Navigation</b> (3 tools) — NavigationRegion inspection + NavigationMesh creation</summary>
-
-| Tool | Description |
-|---|---|
-| `list_nav_regions` | List NavigationRegion nodes. |
-| `read_nav_region` | Read navigation region. |
-| `create_nav_mesh` | Create NavigationMesh .tres. |
-
-</details>
-
-<details>
-<summary><b>🌐 Translation</b> (3 tools) — CSV/PO translation file read/write</summary>
-
-| Tool | Description |
-|---|---|
-| `list_translations` | List translation files. |
-| `read_translation` | Read translation file. |
-| `create_translation` | Create translation CSV. |
-
-</details>
-
-<details>
-<summary><b>🔗 Joints</b> (3 tools) — Physics joint creation, params, listing</summary>
-
-| Tool | Description |
-|---|---|
-| `create_joint` | Create a physics joint (PinJoint, HingeJoint, SliderJoint, etc.). |
-| `set_joint_param` | Set a parameter on a physics joint. |
-| `list_joints` | List all physics joints in a scene. |
-
-</details>
-
-<details>
-<summary><b>🆔 UID</b> (3 tools) — File UID query, batch update, missing UID detection</summary>
-
-| Tool | Description |
-|---|---|
-| `get_uid` | Get UID for a file. |
-| `update_project_uids` | Scan for missing UIDs. |
-| `list_missing_uids` | List files missing UIDs. |
-
-</details>
-
-<details>
-<summary><b>📐 2D Geometry</b> (2 tools) — CollisionPolygon2D, CollisionShape2D shape config</summary>
-
-| Tool | Description |
-|---|---|
-| `create_collision_polygon` | Create a CollisionPolygon2D with vertex points. |
-| `set_shape_points` | Set the shape points on a CollisionShape2D. |
-
-</details>
-
-<details>
-<summary><b>🔄 Diff</b> (2 tools) — Scene and resource comparison</summary>
-
-| Tool | Description |
-|---|---|
-| `diff_scene` | Compare two scene files. |
-| `diff_resource` | Compare two resource files. |
-
-</details>
-
-<details>
-<summary><b>📋 Other</b> (8 tools) — GDExtension, C#, World3D, GridMap, Texture & more</summary>
-
-| Tool | Description |
-|---|---|
-| `read_gdextension` | Read .gdextension config. |
-| `list_csproj` | List C# project files. |
-| `create_world` | Create World3D .tres. |
-| `read_texture_info` | Read texture asset info. |
-
-</details>
-
----
-
-## Installation
-
-### npx (recommended, no pre-install)
-
-```bash
-npx -y @yanhuifair/godot-mcp -p /path/to/your/godot/project
-```
-
-### Global Install
-
-```bash
-npm install -g @yanhuifair/godot-mcp
-```
-
-### From Source
-
-```bash
-git clone https://github.com/yanhuifair/Godot-MCP.git
-cd godot-mcp
-npm install
-npm run build
-```
-
-### Environment Variables
-
-| Variable | Description |
-|---|---|
-| `GODOT_PATH` | Path to Godot binary (optional, auto-detected) |
-
-Godot auto-detection: `GODOT_PATH` → `/Applications/Godot.app` → `PATH` → snap/flatpak
-
----
-
-## AI Client Configuration
-
-### VS Code / GitHub Copilot
-
-#### Method 1: VSIX Extension (recommended)
-
-```bash
-npm run vsix
-# → godot-mcp-1.3.2.vsix
-
-code --install-extension godot-mcp-1.3.2.vsix
-```
-
-After installation, the MCP server auto-registers. Copilot / Cline / Roo Code discover it automatically — **no manual config required**. Skip to [Verify Setup](#verify-setup).
-
-#### Method 2: Project-level config
-
-Create `.vscode/mcp.json` in your Godot project root:
-
-```json
-{
-  "mcpServers": {
-    "godot-mcp": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "@yanhuifair/godot-mcp", "-p", "."]
-    }
-  }
-}
-```
-
-> If you installed globally (`npm install -g`), use `"command": "godot-mcp"` and omit `-y @yanhuifair/godot-mcp` from args:
->
-> ```json
-> {
->   "mcpServers": {
->     "godot-mcp": {
->       "type": "stdio",
->       "command": "godot-mcp",
->       "args": ["-p", "."]
->     }
->   }
-> }
-> ```
-
-> 💡 **Tip**: Commit `.vscode/mcp.json` to your repo so every team member gets the MCP server automatically.
-
-#### SSE (Server-Sent Events) — HTTP transport
-
-For remote or web-based MCP clients that use SSE. See [Transport Modes → SSE](#sse-server-sent-events) for full details.
-
-1. Start the server in SSE mode:
-   ```bash
-   npx @yanhuifair/godot-mcp -t sse --port 3000 -p .
-   ```
-
-2. Configure `.vscode/mcp.json`:
-   ```json
-   {
-     "mcpServers": {
-       "godot-mcp": {
-         "url": "http://127.0.0.1:3000/sse"
-       }
-     }
-   }
-   ```
-
-#### Streamable HTTP — MCP 2025 transport
-
-For modern MCP clients supporting the Streamable HTTP spec. See [Transport Modes → Streamable HTTP](#streamable-httpmcp-2025) for full details.
-
-1. Start the server in Streamable HTTP mode:
-   ```bash
-   npx @yanhuifair/godot-mcp -t streamable-http --port 3000 -p .
-   ```
-
-2. Configure `.vscode/mcp.json`:
-   ```json
-   {
-     "mcpServers": {
-       "godot-mcp": {
-         "url": "http://127.0.0.1:3000/mcp",
-         "transportType": "streamable-http"
-       }
-     }
-   }
-   ```
-
-#### All transports simultaneously
-
-Run all three transports at once (stdio + SSE + Streamable HTTP). See [Transport Modes → Enable All Transports Simultaneously](#enable-all-transports-simultaneously).
-
-```bash
-npx @yanhuifair/godot-mcp -t all --port 3000 -p .
-```
-
-#### Verify Setup
-
-1. Open your Godot project folder in VS Code
-2. Open Copilot Chat (`⇧⌘I` / `Ctrl+Shift+I`)
-3. Look for the 🔌 MCP tools indicator in the chat input
-4. Send a test message:
-
-> "List all scenes in the project"
-
-If the server responds with your project's scenes, it's working.
-
-#### Enable Editor Plugin (live control)
-
-For real-time editor control — select nodes, play/stop, undo/redo, set breakpoints — install the plugin (one-time setup):
-
-```bash
-npx @yanhuifair/godot-mcp --install-addons -p .
-```
-
-Then enable in Godot Editor: **Project → Project Settings → Plugins → Godot MCP → Enable**. Confirm in the **Output** panel:
-
-```
-[Godot MCP] Plugin v1.3.2 loaded — ready on stdin/stdout
-```
-
-> 💡 After enabling once, close Godot. MCP spawns it automatically when you use editor commands.
-
-Now try:
-
-> "Run the game at 1280x720"
-> "Select the Player node and show its properties"
-
-#### Troubleshooting
-
-| Problem | Solution |
-|---|---|
-| Server not starting | Ensure Node.js ≥18: `node -v` |
-| "Command not found" | Use `npx` method or `npm install -g @yanhuifair/godot-mcp` |
-| Plugin not showing in Godot | Click **Restart** in the Plugins tab, or reopen the project |
-| Editor process won't start | Ensure Godot is installed and in PATH, or set `GODOT_PATH` |
-| Tools not appearing in chat | Reload VS Code: `Cmd+Shift+P` → `Developer: Reload Window` |
-
-### Cursor
-
-`~/.cursor/mcp.json`:
-
-```json
-{
-  "mcpServers": {
-    "godot-mcp": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "@yanhuifair/godot-mcp", "-p", "/path/to/your/godot/project"]
-    }
-  }
-}
-```
-
-Or with a global install:
-
-```json
-{
-  "mcpServers": {
-    "godot-mcp": {
-      "type": "stdio",
-      "command": "godot-mcp",
-      "args": ["-p", "/path/to/your/godot/project"]
-    }
-  }
-}
-```
-
-### Claude Desktop
-
-`~/Library/Application Support/Claude/claude_desktop_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "godot-mcp": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "@yanhuifair/godot-mcp", "-p", "/path/to/your/godot/project"]
-    }
-  }
-}
-```
-
-### Windsurf
-
-`~/.codeium/windsurf/mcp_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "godot-mcp": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "@yanhuifair/godot-mcp", "-p", "/path/to/your/godot/project"]
-    }
-  }
-}
-```
-
-### Local Development
-
-```json
-{
-  "mcpServers": {
-    "godot-mcp": {
-      "type": "stdio",
-      "command": "node",
-      "args": ["/path/to/godot-mcp/dist/index.js", "-p", "/path/to/your/godot/project"]
-    }
-  }
-}
-```
-
----
-
-## Usage Examples
-
-### Browse Project
-
-```
-"Show me the project structure"
-→ list_project_files → full file tree
-
-"Generate a project overview report"
-→ generate_project_report → scenes/scripts/shaders/resources stats
-
-"Check project health"
-→ validate_project → broken refs, missing UIDs
-```
-
-### Create Resources
-
-```
-"Create a 2D platformer scene"
-→ create_scene → scenes/main.tscn
-
-"Create a metallic material"
-→ create_resource → materials/metal.tres
-→ set_material_param → metallic=0.9, roughness=0.3
-```
-
-### Search & Locate
-
-```
-"Find all Timer nodes"
-→ find_nodes_in_scenes → cross-scene search with paths
-
-"Search for _ready functions"
-→ search_in_scripts → matches with function context
-
-"List all UI buttons in the project"
-→ list_ui_nodes → anchors, positions, text
-```
-
-### Run & Debug
-
-```
-"Run the game at 1280x720 and take a screenshot"
-→ run_project → launches game
-→ capture_screenshot → gameplay.png
-
-"Capture the game window with a custom name"
-→ capture_screenshot output_path="gameplay.png" window_title="My Game" delay=2
-
-"Stop the running game"
-→ stop_project → terminates all Godot processes
-```
-
-### Script Operations
-
-```
-"Analyze player.gd structure"
-→ read_script_structure → class name, signals, exports, functions
-
-"Add a dash method to Player"
-→ add_script_function → safe method injection
-
-"Validate all scripts"
-→ validate_script → per-file syntax/logic check
-```
-
-### Shader Validation & Compilation
-
-```
-"Validate hurricane.gdshader for syntax errors"
-→ validate_shader → shader_type, braces, declarations check
-
-"Compile the hurricane shader"
-→ compile_shader → triggers Godot's shader compiler via editor plugin
-```
-
-### Animation Editing
-
-```
-"Show player animations"
-→ read_animation → track list + keyframes
-
-"Add a position track to idle animation"
-→ add_animation_track → track_path=".:position"
-
-"Set a keyframe at 0.5s"
-→ set_keyframe → time=0.5, value="Vector2(100,0)"
-```
-
-### Audio Setup
-
-```
-"Show audio bus layout"
-→ read_audio_bus_layout → bus hierarchy, volumes, effects
-
-"Add reverb to Master"
-→ add_bus_effect → effect_type="Reverb"
-
-"Set SFX bus volume"
-→ set_bus_volume → bus_index=2, volume_db=-6.0
-```
-
-### Scene Editing
-
-```
-"Add a Timer under Player"
-→ add_node → type=Timer, name=Cooldown
-
-"Clone Enemy node as Enemy2"
-→ clone_node → clone_source="Main/Enemy", name="Enemy2"
-
-"Connect body_entered signal"
-→ connect_signal → from_node="Player", signal="body_entered", method="_on_body_entered"
-```
-
----
-
-## Editor Plugin
-
-The editor plugin enables **real-time editor control** — select nodes, play/stop, undo/redo, save, breakpoints, debugging, and more. MCP spawns Godot as a child process when editor tools are invoked, communicating via stdin/stdout.
-
-> **How it works**: When you say "Run the game", the MCP server spawns `godot --editor --path <project>`, the plugin reads commands from stdin, executes them, and writes results to stdout. The Godot window opens automatically — no manual steps.
-
-### Install the Plugin
-
-**Option 1: CLI one-liner (recommended)**
-
-```bash
-godot-mcp --install-addons -p /path/to/your/godot/project
-```
-
-**Option 2: Manual copy**
-
-```bash
-cp -r addons/godot_mcp /path/to/your/godot/project/addons/
-```
-
-Then enable in Godot: **Project → Project Settings → Plugins → Godot MCP → Enable**
-
-If not visible, click **Restart** or reopen the project.
-
-Confirm in the **Output** panel:
-
-```
-[Godot MCP] Plugin v1.3.2 loaded — ready on stdin/stdout
-```
-
-> 💡 After enabling the plugin once, you can close Godot. MCP will launch it automatically when needed.
-
-### Editor Tools (78 tools)
-
-**View & Selection:**
-`editor_get_selection` `editor_set_selection` `editor_get_open_scene` `editor_read_current_scene` `editor_get_info` `editor_get_rect` `editor_focus` `editor_show_in_filesystem` `editor_open_dock`
-
-**Playback Control:**
-`editor_play` `editor_stop` `editor_run_specific_scene` `editor_get_running_scene_tree` `editor_get_performance_monitors`
-
-**Edit Operations:**
-`editor_undo` `editor_redo` `editor_save` `editor_save_all` `editor_reload_scene` `editor_delete_selected`
-
-**Scene Operations:**
-`editor_create_scene` `editor_instantiate_scene` `editor_set_main_scene` `editor_get_scene_changes`
-
-**Node Operations:**
-`editor_add_node` `editor_remove_node` `editor_duplicate_node` `editor_rename_node` `editor_reparent_node` `editor_move_node` `editor_get_node_properties` `editor_set_node_properties`
-
-**Scripting:**
-`editor_create_script` `editor_attach_script` `editor_run_gdscript` `editor_evaluate_expression`
-
-**Debugging:**
-`editor_set_breakpoint` `editor_remove_breakpoint` `editor_get_breakpoints` `editor_debug_continue` `editor_debug_step` `editor_debug_step_over` `editor_debug_break` `editor_get_stack_trace` `editor_get_debug_variables`
-
-**Signals:**
-`editor_connect_signal` `editor_disconnect_signal` `editor_list_node_signals`
-
-**File System:**
-`editor_open_asset` `editor_list_filesystem` `editor_create_folder` `editor_delete_asset` `editor_rename_asset` `editor_move_asset` `editor_duplicate_asset` `editor_reimport_asset` `editor_get_dependency_list`
-
-**Project Settings:**
-`editor_get_project_setting` `editor_set_project_setting` `editor_get_editor_setting` `editor_set_editor_setting` `editor_get_project_directory`
-
-**Input & Autoloads:**
-`editor_get_input_map` `editor_add_input_action` `editor_remove_input_action` `editor_get_autoload_list` `editor_add_autoload` `editor_remove_autoload`
-
-**Assets:**
-`editor_bake_lightmaps` `editor_bake_navigation` `editor_take_screenshot`
-
-**Class Documentation:**
-`editor_get_class_list` `editor_get_method_list` `editor_get_class_property_list` `editor_get_class_signal_list` `editor_get_class_doc` `editor_search_help`
-
-**Camera & Viewport:**
-`editor_get_editor_camera` `editor_set_editor_camera` `editor_toggle_grid` `editor_toggle_snap`
-
-**Other:**
-`editor_get_recent_scenes` `editor_simulate_key` `editor_get_plugin_list` `editor_enable_plugin` `editor_disable_plugin` `editor_get_error_list` `editor_clear_errors` `editor_health_check`
-
----
-
-## Architecture
-
-```
-┌─────────────────────┐
-│   AI Client          │
-│ (Cursor/Claude/Copilot)│
-└────────┬────────────┘
-         │ MCP (stdio)
-┌────────▼──────────────┐      stdin/stdout     ┌──────────────────┐
-│   Godot MCP Server      │ ◄───────────────────► │  Godot Editor     │
-│   (TypeScript, 281 tools)│  (spawns as child)  │  (GDScript addon) │
-│                        │                       │                  │
-│  ┌──────────────────┐  │                       │  78 editor cmds   │
-│  │  Tool Handlers    │  │                       │  JSON-RPC/stdio  │
-│  └──────────────────┘  │                       └──────────────────┘
-│  ┌──────────────────┐  │
-│  │  File Parsers     │  │  .tscn / .tres / .gd / .gdshader / .import / .csv
-│  └──────────────────┘  │
-│  ┌──────────────────┐  │
-│  │  Godot CLI        │  │  Launch, run, export, screenshot
-│  └──────────────────┘  │
-└────────────────────────┘
-```
-
-### Project Structure
-
-```
-godot-mcp/
-├── src/
-│   ├── index.ts              # CLI entry point
-│   ├── server.ts             # MCP server core
-│   ├── tools/                # 33 handler files
-│   │   ├── register.ts       # Centralized registration (281 tools)
-│   │   ├── project.ts        # Project tools
-│   │   ├── scene.ts          # Scene tools
-│   │   ├── script.ts         # Script + shader tools
-│   │   ├── editor.ts         # Live editor tools
-│   │   ├── resource.ts       # Resource/material/theme
-│   │   ├── godot.ts          # Engine control
-│   │   ├── animation.ts      # Animation pipeline
-│   │   ├── audio.ts          # Audio bus
-│   │   ├── environment.ts    # Environment resources
-│   │   ├── physics.ts        # Physics materials
-│   │   ├── import.ts         # Import config
-│   │   ├── inspector.ts      # Node inspectors
-│   │   ├── shader_graph.ts   # VisualShader graph
-│   │   ├── tileset.ts        # TileMap/TileSet
-│   │   ├── navigation.ts     # Navigation mesh
-│   │   ├── translation.ts    # Translation files
-│   │   ├── diff.ts           # File comparison
-│   │   ├── texture.ts        # Texture info
-│   │   ├── extension.ts      # GDExtension/C#
-│   │   ├── uid.ts            # File UIDs
-│   │   ├── joint.ts          # Physics joints
-│   │   ├── geometry.ts       # 2D geometry shapes
-│   │   ├── rendering.ts      # Mesh/Viewport/RayCast
-│   │   ├── domain.ts         # Curve/Gradient/Skeleton/Path
-│   │   ├── nodes.ts          # Node-specific inspectors
-│   │   ├── utility.ts        # Utilities
-│   │   └── coverage.ts       # Mesh/2D lights/vehicles etc.
-│   ├── parsers/
-│   │   ├── scene_parser.ts   # .tscn parser
-│   │   ├── resource_parser.ts # .tres parser
-│   │   ├── config_parser.ts  # project.godot parser
-│   │   └── parser_helpers.ts # Shared parsing utilities
-│   └── utils/
-│       ├── types.ts          # Type definitions
-│       ├── file_utils.ts     # File system operations
-│       ├── godot_cli.ts      # Godot CLI interface
-│       ├── registry.ts       # Tool registry
-│       ├── errors.ts         # Error codes
-│       └── cache.ts          # File cache
-├── addons/
-│   └── godot_mcp/            # Godot editor plugin
-│       ├── plugin.cfg         # Plugin metadata
-│       └── plugin.gd          # stdin reader + command handlers
-├── dist/                     # Compiled output
-├── test/                     # Test suite
-├── package.json
-└── README.md
-```
 
 ---
 
 ## Supported Formats
 
-| Format | Extension | Support |
+| Format | Extension | Operations |
 |---|---|---|
-| Scene | `.tscn` | ✅ Read, write, create, edit (7 operations) |
-| Script | `.gd` | ✅ Read, write, create, validate, analyze |
-| Script | `.cs` | ✅ Read, write, create |
-| Shader | `.gdshader` | ✅ Read, write, create |
-| Shader Include | `.gdshaderinc` | ✅ Read, write, create |
-| VisualShader | `.tres` | ✅ Read, list, graph editing |
-| Resource | `.tres` | ✅ Read, write, create (14 templates) |
-| Resource | `.res` | ❌ Not supported (binary) |
-| Config | `project.godot` | ✅ Read, write |
-| Config | `export_presets.cfg` | ✅ Read |
-| Import | `.import` | ✅ Read, write |
-| Environment | `.tres` | ✅ Read, write, create (4 presets) |
-| Animation | `.tres` / `.tscn` | ✅ Read, create, modify params |
-| AudioBus | `.tres` | ✅ Read, write, create |
-| PhysicsMaterial | `.tres` | ✅ Read, write, create |
-| TileSet | `.tres` | ✅ Read, list |
-| Translation | `.csv` / `.po` | ✅ Read, create |
+| Scene | `.tscn` | Read, write, create, edit |
+| Script | `.gd` | Read, write, create, validate, analyze |
+| Script | `.cs` | Read, write, create |
+| Shader | `.gdshader` | Read, write, create, validate, compile |
+| Shader Include | `.gdshaderinc` | Read, write, create |
+| VisualShader | `.tres` | Read, list, graph editing |
+| Resource | `.tres` | Read, write, create (14 templates) |
+| Resource | `.res` | Not supported (binary) |
+| Config | `project.godot` | Read, write |
+| Config | `export_presets.cfg` | Read |
+| Import | `.import` | Read, write |
+| Environment | `.tres` | Read, write, create (4 presets) |
+| Animation | `.tres` / `.tscn` | Read, create, modify |
+| AudioBus | `.tres` | Read, write, create |
+| PhysicsMaterial | `.tres` | Read, write, create |
+| TileSet | `.tres` | Read, list |
+| Translation | `.csv` / `.po` | Read, create |
 
 ---
 
 ## Development
 
 ```bash
-npm install              # Install dependencies
-npm run build            # Build TypeScript → dist/
-npm run dev              # Dev mode (tsx hot reload)
-npm test                 # Run 138 tests
-npm run test:watch       # Watch mode
+npm install          # Install dependencies
+npm run build        # Build TypeScript to dist/
+npm run dev          # Dev mode (tsx hot reload)
+npm test             # Run 138 tests
+npm run test:watch   # Watch mode
 ```
 
 ### CLI Options
@@ -1325,17 +1238,25 @@ npm run test:watch       # Watch mode
 |---|---|
 | `-p, --project-path` | Path to Godot project root |
 | `-g, --godot-path` | Path to Godot binary (optional) |
-| `--install-addons` | Copy addons/godot_mcp to target Godot project |
+| `-t, --transport` | Transport mode: `stdio`, `sse`, `streamable-http`, `all` |
+| `--port` | HTTP port (default: 3000) |
+| `--host` | HTTP bind address (default: 127.0.0.1) |
+| `--install-addons` | Copy editor plugin to target Godot project |
+| `--enable-plugin` | Install and auto-enable the editor plugin |
+| `--read-only` | Reject all write and delete operations |
+| `--no-sse` | Disable SSE endpoint |
+| `--no-streamable-http` | Disable Streamable HTTP endpoint |
 | `-h, --help` | Show help |
 
 ### Tech Stack
 
-- **Runtime**: Node.js ≥18
+- **Runtime**: Node.js >= 18
 - **Language**: TypeScript 5.5
 - **MCP SDK**: @modelcontextprotocol/sdk ^1.29
-- **Schema**: Zod ^3.24
+- **Schema Validation**: Zod ^3.24
+- **HTTP Server**: Express ^5.2
 - **Test**: Vitest ^2.0
-- **Transport**: stdio
+- **Transport**: stdio (default), SSE, Streamable HTTP
 
 ---
 
@@ -1343,19 +1264,23 @@ npm run test:watch       # Watch mode
 
 ```bash
 npm run vsix
-# → godot-mcp-1.3.2.vsix
+# Output: godot-mcp-1.3.4.vsix
 ```
 
-See [VS Code Setup](#vs-code--github-copilot) for installation and usage.
+Install in VS Code:
+
+```bash
+code --install-extension godot-mcp-1.3.4.vsix
+```
 
 ---
 
 ## Limitations
 
-- Binary `.res` files not supported — use `.tres` (text format)
-- Godot CLI tools require the Godot Engine binary
-- Screenshots depend on OS-native tools
-- `edit_scene` uses AST manipulation on `.tscn`; complex refactors may need manual verification
+- Binary `.res` files are not parseable — use `.tres` (text format) for editable resources
+- Godot CLI tools (`launch_editor`, `run_project`, `export_project`) require the Godot Engine binary
+- `edit_scene` uses text manipulation on `.tscn`; complex refactors may require manual verification
+- Screenshots depend on OS-native screenshot utilities
 
 ---
 

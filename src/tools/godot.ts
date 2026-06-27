@@ -67,14 +67,22 @@ export function handleGetGodotVersion(): ToolResult {
     }
 
     const info = getGodotVersion(binaryPath);
-    const result = [
+    const lines = [
       `Godot Version: ${info.version}`,
       `Binary Path: ${info.path}`,
       `Platform: ${info.platform}`,
-    ].join('\n');
+    ];
+
+    // Warn if Godot 3.x is detected (not supported)
+    const majorMatch = info.version.match(/^(\d+)\./);
+    if (majorMatch && parseInt(majorMatch[1], 10) < 4) {
+      lines.push('');
+      lines.push('⚠️  WARNING: Godot 3.x detected. This MCP server only supports Godot 4.x.');
+      lines.push('    Please install Godot 4.x from https://godotengine.org/download');
+    }
 
     return {
-      content: [{ type: 'text', text: result }],
+      content: [{ type: 'text', text: lines.join('\n') }],
     };
   } catch (err: any) {
     return {

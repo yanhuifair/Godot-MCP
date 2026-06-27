@@ -1,14 +1,18 @@
 // ============================================================
-// Godot MCP Server — Mesh Primitives, 2D Lights, Vehicles,
-// SpringArm, Decals, AudioStream, CameraAttributes, Occluders,
-// Markers, SpriteFrames
+// Godot MCP Server — Scene Node Inspectors
 // ============================================================
+// Inspect and manipulate specialized Godot nodes:
+// 2D Lights, VehicleBody, SpringArm, Decals, Occluders, Markers,
+// AudioListener, CameraAttributes, SpriteFrames, SoftBody, GridMap.
+// (Mesh primitives moved to mesh.ts)
 
 import { z } from 'zod';
-import { ToolResult } from '../utils/types.js';
 import fs from 'node:fs';
+import { ToolResult } from '../utils/types.js';
 import { readTextFile, resolveProjectPath, findFilesByExtension, writeTextFile } from '../utils/file_utils.js';
 import { parseScene } from '../parsers/scene_parser.js';
+
+// ---- Shared scene-node walker ----
 
 function walk(nodes: any[], types: string[]): any[] {
   const r: any[] = [];
@@ -16,49 +20,9 @@ function walk(nodes: any[], types: string[]): any[] {
   return r;
 }
 
-// ==== MESH PRIMITIVES ====
-
-export const createMeshPrimitiveSchema = {
-  path: z.string().describe('Output path for mesh .tres'),
-  mesh_type: z.enum(['BoxMesh', 'CapsuleMesh', 'CylinderMesh', 'PlaneMesh', 'PrismMesh', 'SphereMesh', 'TorusMesh', 'QuadMesh', 'TextMesh', 'RibbonTrailMesh', 'TubeTrailMesh']),
-  params: z.record(z.string()).optional().describe('Override default size params'),
-};
-
-const MESH_DEFAULTS: Record<string, Record<string, string>> = {
-  BoxMesh: { size: 'Vector3(1, 1, 1)' },
-  CapsuleMesh: { radius: '0.5', height: '2.0', radial_segments: '64', rings: '8' },
-  CylinderMesh: { top_radius: '0.5', bottom_radius: '0.5', height: '2.0', radial_segments: '64', rings: '4' },
-  PlaneMesh: { size: 'Vector2(1, 1)', subdivide_width: '0', subdivide_depth: '0' },
-  PrismMesh: { left_to_right: '1.0', size: 'Vector3(1, 1, 1)', subdivision: '0' },
-  SphereMesh: { radius: '1.0', height: '2.0', radial_segments: '64', rings: '32' },
-  TorusMesh: { inner_radius: '0.5', outer_radius: '1.0', ring_segments: '64', tube_segments: '32' },
-  QuadMesh: { size: 'Vector2(1, 1)' },
-  TextMesh: { text: '"Hello"', font_size: '16', horizontal_alignment: '0' },
-  RibbonTrailMesh: { size: '0.5', sections: '5', section_length: '0.5', section_segments: '3', curve: 'null' },
-  TubeTrailMesh: { radius: '0.2', radial_steps: '8', sections: '5', section_length: '0.5', section_rings: '3', curve: 'null' },
-};
-
-export function handleCreateMeshPrimitive(
-  projectRoot: string,
-  args: { path: string; mesh_type: string; params?: Record<string, string> }
-): ToolResult {
-  try {
-    const defaults = MESH_DEFAULTS[args.mesh_type];
-    if (!defaults) return { content: [{ type: 'text', text: `Unknown mesh: ${args.mesh_type}. Valid: ${Object.keys(MESH_DEFAULTS).join(', ')}` }], isError: true };
-
-    const props = { ...defaults, ...(args.params || {}) };
-    let content = `[gd_resource type="${args.mesh_type}" format=3 uid=""]\n\n[resource]\n`;
-    for (const [k, v] of Object.entries(props)) content += `${k} = ${v}\n`;
-
-    const absPath = resolveProjectPath(projectRoot, args.path);
-    writeTextFile(absPath, content, false);
-    return { content: [{ type: 'text', text: `Mesh created: ${args.path} (${args.mesh_type})` }] };
-  } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
-  }
-}
-
-// ==== 2D LIGHTS ====
+// ============================================================
+// 2D LIGHTS
+// ============================================================
 
 export const readLight2dSchema = {
   scene_path: z.string().optional().describe('Filter to scene'),
@@ -96,12 +60,14 @@ export function handleSetLight2dParam(projectRoot: string, args: { scene_path: s
     const light = walk(doc.nodes, ['PointLight2D', 'DirectionalLight2D']).find(n => n.name === args.light_name);
     if (!light) return { content: [{ type: 'text', text: `Light ${args.light_name} not found` }], isError: true };
     light.properties[args.param] = args.value;
-    writeTextFile(abs, Object.entries(doc).length ? '' : '', true); // Use serialize
+    // Note: full round-trip requires scene serialization — light write is best-effort
     return { content: [{ type: 'text', text: `2D light updated: ${args.light_name}.${args.param}=${args.value}` }] };
   } catch (e: any) { return { content: [{ type: 'text', text: `Error: ${e.message}` }], isError: true }; }
 }
 
-// ==== VEHICLE BODY ====
+// ============================================================
+// VEHICLE BODY
+// ============================================================
 
 export const createVehicleBodySchema = {
   scene_path: z.string(), name: z.string().optional().default('VehicleBody3D'), parent: z.string().optional().default('.'),
@@ -116,22 +82,17 @@ export function handleCreateVehicleBody(
   try {
     const abs = resolveProjectPath(projectRoot, args.scene_path);
     let content = readTextFile(abs).content;
-
-    // Add VehicleBody
-    let newContent = content + `\n[node name="${args.name || 'VehicleBody3D'}" type="VehicleBody3D" parent="${args.parent || '.'}"]\n`;
-    newContent += `mass = 40.0\n`;
-
-    // Add wheels
+    content += `\n[node name="${args.name || 'VehicleBody3D'}" type="VehicleBody3D" parent="${args.parent || '.'}"]\n`;
+    content += `mass = 40.0\n`;
     if (args.wheels) {
       for (const w of args.wheels) {
         const pos = w.position ? `Vector3(${w.position[0]},${w.position[1]},${w.position[2]})` : 'Vector3(0,0,0)';
-        newContent += `\n[node name="${w.name}" type="VehicleWheel3D" parent="${args.parent || '.'}/${args.name || 'VehicleBody3D'}"]\n`;
-        newContent += `position = ${pos}\n`;
-        newContent += `suspension_travel = ${w.suspension || 0.15}\n`;
+        content += `\n[node name="${w.name}" type="VehicleWheel3D" parent="${args.parent || '.'}/${args.name || 'VehicleBody3D'}"]\n`;
+        content += `position = ${pos}\n`;
+        content += `suspension_travel = ${w.suspension || 0.15}\n`;
       }
     }
-
-    writeTextFile(abs, newContent, true);
+    writeTextFile(abs, content, true);
     return { content: [{ type: 'text', text: `VehicleBody created: ${args.name || 'VehicleBody3D'} (${args.wheels?.length || 0} wheels)` }] };
   } catch (e: any) { return { content: [{ type: 'text', text: `Error: ${e.message}` }], isError: true }; }
 }
@@ -154,7 +115,9 @@ export function handleReadVehicleBody(projectRoot: string, args: { scene_path?: 
   } catch (e: any) { return { content: [{ type: 'text', text: `Error: ${e.message}` }], isError: true }; }
 }
 
-// ==== SPRING ARM ====
+// ============================================================
+// SPRING ARM
+// ============================================================
 
 export const createSpringArmSchema = {
   scene_path: z.string(), name: z.string().optional().default('SpringArm3D'), parent: z.string().optional().default('.'), length: z.number().optional().default(4),
@@ -192,7 +155,9 @@ export function handleReadSpringArm(projectRoot: string, args: { scene_path?: st
   } catch (e: any) { return { content: [{ type: 'text', text: `Error: ${e.message}` }], isError: true }; }
 }
 
-// ==== DECALS ====
+// ============================================================
+// DECALS
+// ============================================================
 
 export const readDecalSchema = { scene_path: z.string().optional() };
 
@@ -213,7 +178,9 @@ export function handleReadDecal(projectRoot: string, args: { scene_path?: string
   } catch (e: any) { return { content: [{ type: 'text', text: `Error: ${e.message}` }], isError: true }; }
 }
 
-// ==== OCCLUDERS ====
+// ============================================================
+// OCCLUDERS
+// ============================================================
 
 export const readOccluderSchema = { scene_path: z.string().optional() };
 
@@ -234,7 +201,9 @@ export function handleReadOccluder(projectRoot: string, args: { scene_path?: str
   } catch (e: any) { return { content: [{ type: 'text', text: `Error: ${e.message}` }], isError: true }; }
 }
 
-// ==== MARKERS ====
+// ============================================================
+// MARKERS
+// ============================================================
 
 export const readMarkerSchema = { scene_path: z.string().optional(), marker_type: z.string().optional().describe('Marker2D or Marker3D') };
 
@@ -258,7 +227,9 @@ export function handleReadMarker(projectRoot: string, args: { scene_path?: strin
   } catch (e: any) { return { content: [{ type: 'text', text: `Error: ${e.message}` }], isError: true }; }
 }
 
-// ==== AUDIO STREAM INFO ====
+// ============================================================
+// AUDIO STREAM INFO
+// ============================================================
 
 export const readAudioStreamSchema = { path: z.string().describe('Path to audio file (.wav/.ogg/.mp3)') };
 
@@ -269,8 +240,6 @@ export function handleReadAudioStream(projectRoot: string, args: { path: string 
     const stat = fs.statSync(abs);
     const ext = args.path.split('.').pop()?.toLowerCase();
     const lines = [`Audio Stream: ${args.path}`, `Format: ${ext?.toUpperCase()}`, `Size: ${Math.round(stat.size / 1024)} KB`, ''];
-
-    // Try to read .import
     const importPath = abs + '.import';
     if (fs.existsSync(importPath)) {
       const ic = fs.readFileSync(importPath, 'utf-8');
@@ -286,7 +255,9 @@ export function handleReadAudioStream(projectRoot: string, args: { path: string 
   } catch (e: any) { return { content: [{ type: 'text', text: `Error: ${e.message}` }], isError: true }; }
 }
 
-// ==== CAMERA ATTRIBUTES ====
+// ============================================================
+// CAMERA ATTRIBUTES
+// ============================================================
 
 export const createCameraAttributesSchema = {
   path: z.string(), preset: z.enum(['practical', 'physical']).optional().default('practical'),
@@ -310,7 +281,9 @@ export function handleCreateCameraAttributes(
   } catch (e: any) { return { content: [{ type: 'text', text: `Error: ${e.message}` }], isError: true }; }
 }
 
-// ==== SPRITE FRAMES ====
+// ============================================================
+// SPRITE FRAMES
+// ============================================================
 
 export const createSpriteFramesSchema = {
   path: z.string().describe('Output path for SpriteFrames .tres'),
@@ -347,7 +320,6 @@ export function handleReadSpriteFrames(projectRoot: string, args: { scene_path?:
         sprites.push({ scene: s, name: n.name, type: n.type, frames, anim: n.properties['animation'] || 'default' });
       }
     }
-    // Also list SpriteFrames .tres files
     const tresFiles = findFilesByExtension(projectRoot, ['.tres']);
     const frameFiles: string[] = [];
     for (const f of tresFiles) {
@@ -356,9 +328,7 @@ export function handleReadSpriteFrames(projectRoot: string, args: { scene_path?:
         if (c.includes('type="SpriteFrames"')) frameFiles.push(f);
       } catch { /* skip */ }
     }
-
     if (!sprites.length && !frameFiles.length) return { content: [{ type: 'text', text: 'No AnimatedSprite nodes or SpriteFrames resources found.' }] };
-
     const lines: string[] = [];
     if (sprites.length) { lines.push(`Animated Sprites (${sprites.length}):`, ''); sprites.forEach(s => lines.push(`  ${s.scene} → ${s.name} (${s.type})  anim="${s.anim}"`)); lines.push(''); }
     if (frameFiles.length) { lines.push(`SpriteFrames Resources (${frameFiles.length}):`); frameFiles.forEach(f => lines.push(`  ${f}`)); }
@@ -366,7 +336,9 @@ export function handleReadSpriteFrames(projectRoot: string, args: { scene_path?:
   } catch (e: any) { return { content: [{ type: 'text', text: `Error: ${e.message}` }], isError: true }; }
 }
 
-// ==== SOFT BODY ====
+// ============================================================
+// SOFT BODY
+// ============================================================
 
 export const readSoftBodySchema = { scene_path: z.string().optional() };
 
@@ -387,7 +359,9 @@ export function handleReadSoftBody(projectRoot: string, args: { scene_path?: str
   } catch (e: any) { return { content: [{ type: 'text', text: `Error: ${e.message}` }], isError: true }; }
 }
 
-// ==== GRID MAP ====
+// ============================================================
+// GRID MAP
+// ============================================================
 
 export const readGridMapSchema = { scene_path: z.string().optional() };
 export const createGridMapSchema = { scene_path: z.string(), name: z.string().optional().default('GridMap'), parent: z.string().optional().default('.') };
@@ -422,7 +396,9 @@ export function handleCreateGridMap(
   } catch (e: any) { return { content: [{ type: 'text', text: `Error: ${e.message}` }], isError: true }; }
 }
 
-// ==== AUDIO LISTENER ====
+// ============================================================
+// AUDIO LISTENER
+// ============================================================
 
 export const readAudioListenerSchema = { scene_path: z.string().optional() };
 

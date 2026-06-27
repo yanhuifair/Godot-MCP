@@ -1,4 +1,53 @@
 # Changelog
+## v1.3.4 (2026-06-28)
+
+### Documentation
+- **README.md** — Professional rewrite: removed emojis, added ASCII architecture diagram, Implementation Principles section, Quick Demo, structured Usage Examples with tool mapping tables
+- **README-zh.md** — Full Chinese translation synced with English README (12 client configs, 34 usage examples, 14 collapsible tool categories)
+- Language switcher moved to top of both READMEs
+- Added 12 AI client configuration guides: VS Code/Copilot (3 methods), Cursor, Claude Desktop, Claude CLI, Windsurf, Codex CLI, Cline, Roo Code, Continue, Aider, Cody, Goose — each with platform-specific paths, setup steps, and verification commands
+
+### Godot API Fixes
+- Replaced 84 deprecated `get_editor_interface()` calls with `EditorInterface` singleton throughout plugin.gd
+- Fixed `_cmd_bake_lightmaps()` to use `LightmapGI.bake()` instead of `OS.execute("godot"...)`
+- Fixed `_cmd_get_performance_monitors()` to use Godot 4.x `Performance.Monitor` enum values directly
+- Added Godot 3.x detection warning in `get_godot_version` tool
+
+### Version Support
+- All references updated from specific version numbers to unified "Godot 4.x"
+- Godot 3 explicitly marked as not supported in all documentation
+## v1.3.4 (2026-06-27)
+
+### Bug Fixes
+- **plugin.gd**: Fixed `_cmd_close_scene()` to properly save then clear scene (was calling invalid `reload_scene_from_path("")`)
+- **plugin.gd**: Fixed `_cmd_pause_project()` using `get_tree().paused` toggle (was incorrectly calling `play_main_scene()`)
+- **plugin.gd**: Fixed `_cmd_unpause_project()` to actually unpause via `get_tree().paused = false`
+- **plugin.gd**: Fixed `_cmd_cut_selected()` to use `undo_redo` system (was using `queue_free()` directly, breaking undo)
+- **plugin.gd**: Fixed `_cmd_paste()` to restore serialized node properties via new `_serialize_node_properties()` helper
+- **plugin.gd**: Added `_serialize_node_properties()` method for clipboard-aware cut/copy/paste
+- **plugin.gd**: Added missing `_parse_value` types: Vector3i, Vector4i, Quaternion, Plane, Transform3D, AABB; also fixed Transform2D to parse matrix values
+- **register.ts**: Registered `transform_node` tool (schema/handler existed but was never registered)
+- **resource_parser.ts**: Fixed `isBinaryResource()` crash on empty/small files (< 4 bytes)
+- **Tests**: Fixed coverage tools imports from `coverage.js` → `scene_inspectors.js`
+
+### Performance
+- **editor.ts**: Reduced TCP timeout from 3000ms to 800ms — first-call delay reduced from 15s+ to ~5s
+- **editor.ts**: Added auto-restart on unexpected editor process exit (up to 3 attempts)
+- **editor.ts**: Extended health check cache from 30s to 60s
+
+### Architecture — coverage.ts split
+- **New**: `src/tools/mesh.ts` — Mesh Primitives (create_mesh_primitive, 11 mesh types)
+- **New**: `src/tools/scene_inspectors.ts` — All scene node inspectors (24 handlers: 2D Lights, VehicleBody, SpringArm, Decals, Occluders, Markers, AudioStream, CameraAttributes, SpriteFrames, SoftBody, GridMap, AudioListener)
+- **Deleted**: `src/tools/coverage.ts` (444 lines → 2 clean files)
+
+### Features
+- **New**: `--enable-plugin` CLI flag — installs `addons/` and auto-enables plugin in `project.godot` (no manual Godot step required)
+- **New**: `--read-only` CLI flag — global read-only mode, rejects all write/delete operations
+- **New**: Automatic `snake_case` → `camelCase` parameter normalization in `server.ts` (maps `project_path` → `projectPath`, etc. for 30+ common parameters)
+
+### Documentation
+- Fixed README/README-zh tool count inconsistencies (Editor 78→89, Scene 21→22, Shader Graph 7→8, Total 281→282)
+- Updated MEMORY.md with current state and v1.3.4 fixes
 
 ## v1.3.0 (2026-06-24)
 
