@@ -1,0 +1,8 @@
+[gd_resource type="NoiseTexture2D" format=3 uid="uid://test_noise"]
+
+[resource]
+width = 256
+height = 256
+seamless = false
+as_normal_map = false
+noise = null

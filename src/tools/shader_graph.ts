@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { ToolResult } from '../utils/types.js';
 import { readTextFile, resolveProjectPath, writeTextFile } from '../utils/file_utils.js';
 import { parseResource } from '../parsers/resource_parser.js';
+import { unquote } from '../parsers/parser_helpers.js';
 
 // ---- Visual Shader Node Type Catalog ----
 
@@ -186,10 +187,8 @@ export function handleAddShaderGraphNode(
     const nextIdx = nodeRefs.size > 0 ? Math.max(...nodeRefs.keys()) + 1 : 0;
 
     // Create sub_resource for the node
-    const subId = nextUniqueId(
-      Object.keys(doc.subResources).length > 0 ? doc.subResources.map((s: any) => s.id) : [],
-      `${args.node_type}_node`
-    );
+    const existingIds = doc.subResources.map((s: any) => unquote(s.id));
+    const subId = nextUniqueId(existingIds.length > 0 ? existingIds : [], `${args.node_type}_node`);
 
     const subProps: Record<string, string> = { ...nodeInfo.defaultParams };
     if (args.params) Object.assign(subProps, args.params);
@@ -215,7 +214,7 @@ export function handleAddShaderGraphNode(
     newContent += ']\n';
 
     for (const sub of subList) {
-      newContent += `\n[sub_resource type="${sub.type}" id="${sub.id}"]\n`;
+      newContent += `\n[sub_resource type="${unquote(sub.type)}" id="${unquote(sub.id)}"]\n`;
       for (const [k, v] of Object.entries(sub.properties)) {
         newContent += `${k} = ${v}\n`;
       }
@@ -336,7 +335,7 @@ export function handleSetShaderNodeParam(
     }
 
     const subId = subIdMatch[1];
-    const sub = doc.subResources?.find((s: any) => s.id === subId);
+    const sub = doc.subResources?.find((s: any) => unquote(s.id) === subId);
     if (!sub) {
       return { content: [{ type: 'text', text: `Sub-resource ${subId} not found` }], isError: true };
     }
@@ -395,7 +394,7 @@ export function handleListShaderNodeTypes(args: { category?: string }): ToolResu
   }
 }
 
-export function handleGetShaderNodeDefaults(args: { node_type: string }): ToolResult {
+export function handleGetShaderNodeDefaults(_projectRoot: string, args: { node_type: string }): ToolResult {
   try {
     const info = SHADER_NODE_CATALOG[args.node_type];
     if (!info) {

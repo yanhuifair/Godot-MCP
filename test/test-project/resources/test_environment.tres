@@ -1,0 +1,38 @@
+[gd_resource type="Environment" format=3 uid="uid://test_env"]
+
+[resource]
+background_mode = 0
+background_sky = null
+background_sky_custom_fov = 0.0
+background_color = Color(0.3, 0.5, 0.7, 1.0)
+background_energy_multiplier = 1.0
+background_intensity = 30000.0
+tonemap_mode = 0
+tonemap_exposure = 1.0
+tonemap_white = 1.0
+ssao_enabled = false
+ssao_radius = 1.0
+ssao_intensity = 1.0
+ssao_power = 1.0
+ssao_detail = 0.5
+ssao_horizon = 0.1
+ssao_sharpness = 0.98
+ssao_direct_light_affect = 0.0
+ssao_ao_channel_affect = 0.0
+glow_enabled = true
+glow_levels/1 = 0.05
+glow_levels/2 = 0.0
+glow_levels/3 = 0.0
+glow_levels/4 = 0.0
+glow_levels/5 = 0.0
+glow_levels/6 = 0.0
+glow_levels/7 = 0.0
+glow_intensity = 0.8
+glow_strength = 1.0
+glow_mix = 0.05
+glow_bloom = 0.0
+glow_blend_mode = 0
+glow_hdr_bleed_threshold = 1.0
+glow_hdr_bleed_scale = 2.0
+glow_hdr_luminance_cap = 12.0
+glow_gamma = 0.0

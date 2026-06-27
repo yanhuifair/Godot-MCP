@@ -30,6 +30,96 @@ let _lastHealthStatus = false;
 let _useTcp: boolean | null = null; // null = unknown, true = TCP, false = spawn
 let _restartAttempts = 0;
 
+// ---- Persistent TCP connection ----
+let _tcpClient: net.Socket | null = null;
+let _tcpBuf = '';
+let _tcpPending: Map<number, { resolve: (value: any) => void; reject: (err: Error) => void }> = new Map();
+let _tcpReconnecting = false;
+
+function getTcpConnection(): Promise<net.Socket> {
+  return new Promise((resolve, reject) => {
+    // Return existing healthy connection
+    if (_tcpClient && !_tcpClient.destroyed && _tcpClient.readyState === 'open') {
+      resolve(_tcpClient);
+      return;
+    }
+
+    // Close stale connection
+    if (_tcpClient) {
+      try { _tcpClient.destroy(); } catch {}
+      _tcpClient = null;
+    }
+
+    // Reject all pending
+    for (const [id, p] of _tcpPending) {
+      p.reject(new Error('Connection lost'));
+    }
+    _tcpPending.clear();
+    _tcpBuf = '';
+
+    const client = new net.Socket();
+    const timer = setTimeout(() => {
+      client.destroy();
+      reject(new Error('TCP connection timed out'));
+    }, TCP_TIMEOUT);
+
+    client.connect(EDITOR_PORT, '127.0.0.1', () => {
+      clearTimeout(timer);
+      _tcpClient = client;
+      _lastHealthCheck = Date.now();
+      _lastHealthStatus = true;
+      _useTcp = true;
+
+      client.on('data', (chunk: Buffer) => {
+        _tcpBuf += chunk.toString();
+        // 解析完整的 JSON-RPC 响应（可能跨 chunk）
+        let idx: number;
+        while ((idx = _tcpBuf.indexOf('\n')) !== -1) {
+          const line = _tcpBuf.substring(0, idx).trim();
+          _tcpBuf = _tcpBuf.substring(idx + 1);
+          if (!line) continue;
+          try {
+            const response = JSON.parse(line);
+            const pending = _tcpPending.get(response.id);
+            if (pending) {
+              _tcpPending.delete(response.id);
+              if (response.error) {
+                pending.reject(new Error(response.error.message || 'Editor error'));
+              } else {
+                pending.resolve(response.result);
+              }
+            }
+          } catch {}
+        }
+      });
+
+      client.on('error', () => {
+        _lastHealthStatus = false;
+        _tcpClient = null;
+        for (const [, p] of _tcpPending) {
+          p.reject(new Error('TCP connection error'));
+        }
+        _tcpPending.clear();
+      });
+
+      client.on('close', () => {
+        _tcpClient = null;
+        for (const [, p] of _tcpPending) {
+          p.reject(new Error('TCP connection closed'));
+        }
+        _tcpPending.clear();
+      });
+
+      resolve(client);
+    });
+
+    client.on('error', () => {
+      clearTimeout(timer);
+      reject(new Error('TCP connection failed'));
+    });
+  });
+}
+
 // ---- Dual-mode send ----
 
 export function sendEditorCommand(method: string, params: Record<string, any> = {}): Promise<any> {
@@ -43,52 +133,25 @@ export function sendEditorCommand(method: string, params: Record<string, any> = 
   });
 }
 
-// ---- TCP mode (connect to already-running Godot) ----
+// ---- TCP mode (persistent connection to already-running Godot) ----
 
-function sendViaTcp(method: string, params: Record<string, any> = {}): Promise<any> {
+async function sendViaTcp(method: string, params: Record<string, any> = {}): Promise<any> {
+  const client = await getTcpConnection();
+  const id = Date.now();
+  const request = JSON.stringify({ jsonrpc: '2.0', id, method, params }) + '\n';
+
   return new Promise((resolve, reject) => {
-    const client = new net.Socket();
-    const request = JSON.stringify({ jsonrpc: '2.0', id: Date.now(), method, params });
-    let data = '';
-    let settled = false;
-    let timeout: NodeJS.Timeout;
+    const timer = setTimeout(() => {
+      _tcpPending.delete(id);
+      reject(new Error('TCP request timed out'));
+    }, TCP_TIMEOUT);
 
-    const finish = (err: Error | null, result?: any) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timeout);
-      client.destroy();
-      if (err) reject(err);
-      else resolve(result);
-    };
-
-    client.connect(EDITOR_PORT, '127.0.0.1', () => {
-      client.write(request);
+    _tcpPending.set(id, {
+      resolve: (result) => { clearTimeout(timer); resolve(result); },
+      reject: (err) => { clearTimeout(timer); reject(err); },
     });
 
-    client.on('data', (chunk: Buffer) => {
-      data += chunk.toString();
-      _lastHealthCheck = Date.now();
-      _lastHealthStatus = true;
-      _useTcp = true;
-      try {
-        const response = JSON.parse(data);
-        if (response.error) {
-          finish(new Error(response.error.message || 'Editor error'));
-        } else {
-          finish(null, response.result);
-        }
-      } catch {
-        finish(new Error('Invalid response from editor'));
-      }
-    });
-
-    client.on('error', () => {
-      _lastHealthStatus = false;
-      finish(new Error('Editor not reachable via TCP'));
-    });
-
-    timeout = setTimeout(() => finish(new Error('TCP connection timed out')), TCP_TIMEOUT);
+    client.write(request);
   });
 }
 

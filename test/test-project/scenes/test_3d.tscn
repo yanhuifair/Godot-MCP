@@ -1,0 +1,31 @@
+[gd_scene load_steps=4 format=3 uid="uid://test_3d_scene"]
+
+[ext_resource type="Material" path="res://resources/sample_material.tres" id="""""""""""""""""""""""""""""""""""""1"""""""""""""""""""""""""""""""""""""]
+[ext_resource type="Material" path="resources/sample_material.tres" id=""""""""""""""""""""""""""""""""""""material_2""""""""""""""""""""""""""""""""""""]
+
+[sub_resource type="BoxMesh" id="""""""""""""""""""""""""""""""""""""BoxMesh_hzrgj"""""""""""""""""""""""""""""""""""""]
+size = Vector3(2, 2, 2)
+[sub_resource type="SphereMesh" id="""""""""""""""""""""""""""""""""""""SphereMesh_hyhqk"""""""""""""""""""""""""""""""""""""]
+radius = 1.0
+height = 2.0
+[sub_resource type="BoxShape3D" id="""""""""""""""""""""""""""""""""""""box_shape"""""""""""""""""""""""""""""""""""""]
+
+[node name="Test3D" type="Node3D"]
+[node name="DirectionalLight3D" type="DirectionalLight3D"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5, 0)
+light_energy = 1.0
+[node name="Camera3D" type="Camera3D"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 8)
+[node name="Box" type="MeshInstance3D"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.5, 0.5, 0)
+mesh = SubResource("BoxMesh_hzrgj")
+material_override = ExtResource("1")
+surface_material_override/0 = ExtResource(""""""""""""""""""""""""""""""""""material_2"""""""""""""""""""""""""""""""""")
+[node name="Sphere" type="MeshInstance3D"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, 0.5, 0)
+mesh = SubResource("SphereMesh_hyhqk")
+[node name="StaticBody3D" type="StaticBody3D"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
+[node name="CollisionShape3D" type="CollisionShape3D" parent="StaticBody3D"]
+shape = SubResource("box_shape")
+size = Vector3(10, 0.5, 10)

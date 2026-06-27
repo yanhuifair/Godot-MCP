@@ -1,0 +1,9 @@
+[gd_scene format=3 uid="uid://test_markers_scene"]
+
+[node name="MarkerTest" type="Node2D"]
+
+[node name="SpawnPoint" type="Marker2D" parent="."]
+position = Vector2(100, 200)
+
+[node name="Waypoint" type="Marker2D" parent="."]
+position = Vector2(300, 400)

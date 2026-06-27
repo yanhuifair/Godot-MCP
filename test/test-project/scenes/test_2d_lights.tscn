@@ -1,0 +1,10 @@
+[gd_scene format=3 uid="uid://test_2d_lights_scene"]
+
+[node name="Lights2DTest" type="Node2D"]
+
+[node name="PointLight2D" type="PointLight2D" parent="."]
+energy = 0.8
+texture_scale = 2.0
+
+[node name="DirectionalLight2D" type="DirectionalLight2D" parent="."]
+energy = 0.5

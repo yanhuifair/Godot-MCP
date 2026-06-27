@@ -4,3 +4,14 @@ dist/
 .reasonix/
 .workbuddy/
 .mcp.json
+
+# Test artifacts
+test/test-project/.godot/
+test/test-project/**/*.bak
+test/test-project/resources/_*
+test/test-project/scenes/_*
+test/test-project/scripts/_*
+test/test-project/translations/_*
+test/test-project/_ed_*
+test/test-project/_temp_*
+test/test-project/_test_dir/

@@ -495,7 +495,7 @@ export function registerAllTools(registry: ToolRegistry): void {
   registry.register({ name: 'disconnect_shader_graph_nodes', description: 'Disconnect two node ports in a VisualShader graph.', schema: disconnectShaderGraphNodesSchema, handler: handleDisconnectShaderGraphNodes });
   registry.register({ name: 'set_shader_node_param', description: 'Set a parameter on a VisualShader node (constant, expression, operator, etc.).', schema: setShaderNodeParamSchema, handler: handleSetShaderNodeParam });
   registry.register({ name: 'list_shader_node_types', description: 'List all VisualShader node types organized by category with input/output counts.', schema: listShaderNodeTypesSchema, handler: (_, args) => handleListShaderNodeTypes(args) });
-  registry.register({ name: 'get_shader_node_defaults', description: 'Get default ports and parameters for a specific VisualShader node type.', schema: getShaderNodeDefaultsSchema, handler: (_, args) => handleGetShaderNodeDefaults(args) });
+  registry.register({ name: 'get_shader_node_defaults', description: 'Get default ports and parameters for a specific VisualShader node type.', schema: getShaderNodeDefaultsSchema, handler: (root, args) => handleGetShaderNodeDefaults(root, args) });
 
   // Mesh Primitives & Physics Types
   registry.register({ name: 'create_mesh_primitive', description: 'Create 3D mesh resource: Box, Capsule, Cylinder, Plane, Sphere, Torus, etc. (11 types).', schema: createMeshPrimitiveSchema, handler: handleCreateMeshPrimitive });

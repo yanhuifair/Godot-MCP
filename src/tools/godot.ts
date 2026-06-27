@@ -16,6 +16,8 @@ import {
   detectRunningGodot,
 } from '../utils/godot_cli.js';
 import { sendEditorCommand } from './editor.js';
+import fs from 'node:fs';
+import pathMod from 'node:path';
 
 // ---- Tool Schemas ----
 
@@ -282,19 +284,16 @@ export function handleListProjects(
   args: { directory?: string; recursive?: boolean }
 ): ToolResult {
   try {
-    const fsMod = require('node:fs') as typeof import('node:fs');
-    const pathMod = require('node:path') as typeof import('node:path');
-
     const startDir = args.directory || process.cwd();
     const recursive = args.recursive !== false;
-    const isProject = (dir: string) => fsMod.existsSync(pathMod.join(dir, 'project.godot'));
+    const isProject = (dir: string) => fs.existsSync(pathMod.join(dir, 'project.godot'));
 
     const found: { path: string; name: string }[] = [];
 
     function scan(dir: string, depth: number) {
       if (depth > 4) return;
       try {
-        const entries = fsMod.readdirSync(dir, { withFileTypes: true });
+        const entries = fs.readdirSync(dir, { withFileTypes: true });
         for (const entry of entries) {
           if (!entry.isDirectory() || entry.name.startsWith('.') || entry.name === 'node_modules') continue;
           const fullPath = pathMod.join(dir, entry.name);
@@ -315,7 +314,7 @@ export function handleListProjects(
     for (const proj of found) {
       let name = proj.name;
       try {
-        const configContent = fsMod.readFileSync(pathMod.join(proj.path, 'project.godot'), 'utf-8');
+        const configContent = fs.readFileSync(pathMod.join(proj.path, 'project.godot'), 'utf-8');
         const nameMatch = configContent.match(/config\/name="([^"]+)"/);
         if (nameMatch) name = nameMatch[1];
       } catch { /* use folder name */ }
