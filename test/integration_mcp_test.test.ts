@@ -7,9 +7,10 @@
 
 import { describe, it, expect, beforeAll } from 'vitest';
 import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 
 const PROJECT = process.env.GODOT_MCP_TEST_PROJECT || '';
-const SKIP_ALL = !PROJECT || !existsSync(PROJECT + '/project.godot');
+const SKIP_ALL = !PROJECT || !existsSync(join(PROJECT, 'project.godot'));
 
 // ---- Project Tools ----
 describe('Project Tools', () => {

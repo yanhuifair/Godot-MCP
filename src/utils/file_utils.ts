@@ -16,7 +16,8 @@ export function findProjectRoot(startDir?: string): string | null {
   // 1. Check cwd and upward
   for (let i = 0; i < 10; i++) {
     if (fs.existsSync(path.join(dir, 'project.godot'))) {
-      return dir;
+      // 解析符号链接，保持与 resolveProjectPath 一致
+      try { return fs.realpathSync(dir); } catch { return dir; }
     }
     const parent = path.dirname(dir);
     if (parent === dir) break;
@@ -31,7 +32,8 @@ export function findProjectRoot(startDir?: string): string | null {
       if (entry.isDirectory() && !entry.name.startsWith('.') && entry.name !== 'node_modules') {
         const sub = path.join(baseDir, entry.name);
         if (fs.existsSync(path.join(sub, 'project.godot'))) {
-          return sub;
+          // 解析符号链接
+          try { return fs.realpathSync(sub); } catch { return sub; }
         }
       }
     }
@@ -44,14 +46,38 @@ export function findProjectRoot(startDir?: string): string | null {
  * Resolve a project-relative path to an absolute path.
  */
 export function resolveProjectPath(projectRoot: string, relativePath: string): string {
+  // 拒绝绝对路径，防止绕过 projectRoot
+  if (path.isAbsolute(relativePath)) {
+    throw new Error(`Absolute path not allowed as relative path: "${relativePath}". Use a project-relative path instead.`);
+  }
+
   // Resolve project root first (handle macOS /var→/private/var symlinks)
-  const realRoot = fs.existsSync(projectRoot) ? fs.realpathSync(projectRoot) : path.resolve(projectRoot);
+  let realRoot: string;
+  try {
+    realRoot = fs.existsSync(projectRoot) ? fs.realpathSync(projectRoot) : path.resolve(projectRoot);
+  } catch (err) {
+    throw new Error(`Cannot resolve project root path "${projectRoot}": ${(err as Error).message}`);
+  }
+
   // Resolve target path (use path.resolve since file may not exist yet, e.g. for create operations)
   const resolved = path.resolve(realRoot, relativePath);
-  const resolvedReal = fs.existsSync(resolved) ? fs.realpathSync(resolved) : resolved;
 
-  if (!resolvedReal.startsWith(realRoot + path.sep) && resolvedReal !== realRoot) {
-    throw new Error(`Path traversal detected: "${relativePath}" resolves outside project root`);
+  let resolvedReal: string;
+  try {
+    resolvedReal = fs.existsSync(resolved) ? fs.realpathSync(resolved) : resolved;
+  } catch (err) {
+    // 如果 resolved 本身存在但无法访问，直接用 resolved 继续
+    resolvedReal = resolved;
+  }
+
+  // Windows 文件系统不区分大小写，统一小写比较防止误报
+  const normalizedResolved = resolvedReal.toLowerCase();
+  const normalizedRoot = (realRoot + path.sep).toLowerCase();
+  if (!normalizedResolved.startsWith(normalizedRoot) && normalizedResolved !== realRoot.toLowerCase()) {
+    throw new Error(
+      `Path traversal detected: "${relativePath}" resolves outside project root ` +
+      `(resolved: "${resolved}", realRoot: "${realRoot}")`
+    );
   }
   return resolved;
 }

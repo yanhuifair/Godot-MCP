@@ -396,7 +396,7 @@ npx @yanhuifair/godot-mcp -t all --port 3000 -p /path/to/your/godot/project
 
 ```bash
 curl http://127.0.0.1:3000/health
-# {"status":"ok","version":"1.3.6","projectRoot":"/path/to/project","endpoints":{...}}
+# {"status":"ok","version":"1.3.7","projectRoot":"/path/to/project","endpoints":{...}}
 ```
 
 ---
@@ -1284,13 +1284,13 @@ npm run test:watch   # 监听模式
 
 ```bash
 npm run vsix
-# 输出: godot-mcp-1.3.6.vsix
+# 输出: godot-mcp-1.3.7.vsix
 ```
 
 在 VS Code 中安装：
 
 ```bash
-code --install-extension godot-mcp-1.3.6.vsix
+code --install-extension godot-mcp-1.3.7.vsix
 ```
 
 ---

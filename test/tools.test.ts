@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdirSync, writeFileSync, existsSync, unlinkSync, rmdirSync, readFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync, existsSync, rmSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -36,14 +36,8 @@ max_health = 100
 });
 
 afterEach(() => {
-  const files = ['project.godot', 'main.tscn', 'player.gd', 'health.tres', 'new_scene.tscn', 'new_script.gd', 'player.gd.bak'];
-  for (const f of files) {
-    const fp = join(testDir, f);
-    if (existsSync(fp)) {
-      try { unlinkSync(fp); } catch { /* ignore */ }
-    }
-  }
-  try { rmdirSync(testDir); } catch { /* ignore */ }
+  // 递归删除整个测试目录，确保所有 .bak 等残留文件都被清理
+  try { rmSync(testDir, { recursive: true, force: true }); } catch { /* ignore */ }
 });
 
 // ---- Project Tools Tests ----

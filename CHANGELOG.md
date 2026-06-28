@@ -1,4 +1,15 @@
 # Changelog
+## v1.3.7 (2026-06-28)
+
+### Path & Security Fixes
+- **resolveProjectPath** — reject absolute paths to prevent path traversal bypass; add try/catch for `fs.realpathSync` EACCES errors; improve error message with resolved path details
+- **resolveProjectPath** — add `.toLowerCase()` for case-insensitive `startsWith` check on Windows
+- **findProjectRoot** — resolve symlinks via `fs.realpathSync` for consistency with `resolveProjectPath`
+- **sync-addons.js** — fix auto-detection candidate paths; add log messages when target not found (no longer silent)
+- **test cleanup** — use `rmSync({ recursive: true })` instead of manual file list to clean all `.bak` files
+- **integration test** — use `path.join` instead of string concatenation for cross-platform consistency
+- **.mcp.json** — fix path typo (`GodotMCP` → `Godot-MCP`)
+
 ## v1.3.4 (2026-06-28)
 
 ### Documentation
