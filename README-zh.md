@@ -46,7 +46,7 @@
 npx @yanhuifair/godot-mcp --enable-plugin -p /path/to/your/godot/project
 ```
 
-此命令将插件复制到 `addons/godot_mcp/` 并自动在 `project.godot` 中启用。无需手动操作 Godot。
+此命令将插件复制到 `addons/godot-mcp/` 并自动在 `project.godot` 中启用。无需手动操作 Godot。
 
 ### 第 2 步：配置 AI 客户端
 
@@ -247,7 +247,7 @@ godot-mcp/
 │       ├── errors.ts         # 结构化错误码
 │       └── cache.ts          # 基于 TTL 的文件缓存
 ├── addons/
-│   └── godot_mcp/            # Godot 编辑器插件
+│   └── godot-mcp/            # Godot 编辑器插件
 │       ├── plugin.cfg         # 插件元数据
 │       └── plugin.gd          # stdin 读取器、TCP 服务器、97 个命令处理器
 ├── test/                     # 167 个测试，分布在 7 个测试文件中
@@ -292,7 +292,7 @@ godot-mcp/
 
 ### 双模式编辑器桥
 
-编辑器插件（`addons/godot_mcp/plugin.gd`）实现了 97 个命令处理器，封装了 Godot 的 `EditorInterface` API。通信通过两个通道使用 JSON-RPC 2.0：
+编辑器插件（`addons/godot-mcp/plugin.gd`）实现了 97 个命令处理器，封装了 Godot 的 `EditorInterface` API。通信通过两个通道使用 JSON-RPC 2.0：
 
 - **TCP 模式**（端口 9876）：当 Godot 独立运行时，插件接受 TCP 连接并处理命令。这是交互式开发的首选模式。
 
@@ -396,7 +396,7 @@ npx @yanhuifair/godot-mcp -t all --port 3000 -p /path/to/your/godot/project
 
 ```bash
 curl http://127.0.0.1:3000/health
-# {"status":"ok","version":"1.3.7","projectRoot":"/path/to/project","endpoints":{...}}
+# {"status":"ok","version":"1.3.8","projectRoot":"/path/to/project","endpoints":{...}}
 ```
 
 ---
@@ -847,7 +847,7 @@ mcp_servers:
 npx @yanhuifair/godot-mcp --enable-plugin -p /path/to/your/godot/project
 ```
 
-此命令将插件安装到 `addons/godot_mcp/` 并自动在 `project.godot` 中启用。无需手动操作。
+此命令将插件安装到 `addons/godot-mcp/` 并自动在 `project.godot` 中启用。无需手动操作。
 
 ### 编辑器命令（89 个工具）
 
@@ -1284,13 +1284,13 @@ npm run test:watch   # 监听模式
 
 ```bash
 npm run vsix
-# 输出: godot-mcp-1.3.7.vsix
+# 输出: godot-mcp-1.3.8.vsix
 ```
 
 在 VS Code 中安装：
 
 ```bash
-code --install-extension godot-mcp-1.3.7.vsix
+code --install-extension godot-mcp-1.3.8.vsix
 ```
 
 ---

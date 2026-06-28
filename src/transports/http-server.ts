@@ -73,7 +73,7 @@ export async function runHttpTransport(options: HttpTransportOptions = {}): Prom
   app.get('/health', (_req: Request, res: Response) => {
     res.json({
       status: 'ok',
-      version: '1.3.7',
+      version: '1.3.8',
       projectRoot: getProjectRoot(),
       endpoints: {
         ...(enableSse ? { sse: `http://${host}:${port}/sse` } : {}),

@@ -46,7 +46,7 @@ A **Model Context Protocol (MCP) server** that enables AI assistants to interact
 npx @yanhuifair/godot-mcp --enable-plugin -p /path/to/your/godot/project
 ```
 
-This copies the plugin to `addons/godot_mcp/` and auto-enables it in `project.godot`. No manual Godot steps required.
+This copies the plugin to `addons/godot-mcp/` and auto-enables it in `project.godot`. No manual Godot steps required.
 
 ### Step 2: Configure Your AI Client
 
@@ -214,7 +214,7 @@ godot-mcp/
 │       ├── errors.ts         # Structured error codes
 │       └── cache.ts          # TTL-based file cache for parsed documents
 ├── addons/
-│   └── godot_mcp/            # Godot editor plugin
+│   └── godot-mcp/            # Godot editor plugin
 │       ├── plugin.cfg         # Plugin metadata
 │       └── plugin.gd          # stdin reader, TCP server, 97 command handlers
 ├── test/                     # 167 tests across 7 test files
@@ -259,7 +259,7 @@ All Godot file formats (.tscn, .tres, project.godot) are parsed directly in Type
 
 ### Dual-Mode Editor Bridge
 
-The editor plugin (`addons/godot_mcp/plugin.gd`) implements 97 command handlers that wrap Godot's `EditorInterface` API. Communication uses JSON-RPC 2.0 over two channels:
+The editor plugin (`addons/godot-mcp/plugin.gd`) implements 97 command handlers that wrap Godot's `EditorInterface` API. Communication uses JSON-RPC 2.0 over two channels:
 
 - **TCP mode** (port 9876): When Godot is running independently, the plugin accepts TCP connections and processes commands. This is the preferred mode for interactive development.
 
@@ -363,7 +363,7 @@ Starts: Stdio + SSE (`/sse`) + Streamable HTTP (`/mcp`) + Health Check (`/health
 
 ```bash
 curl http://127.0.0.1:3000/health
-# {"status":"ok","version":"1.3.7","projectRoot":"/path/to/project","endpoints":{...}}
+# {"status":"ok","version":"1.3.8","projectRoot":"/path/to/project","endpoints":{...}}
 ```
 
 ---
@@ -834,7 +834,7 @@ The editor plugin enables real-time interaction with the Godot editor. MCP spawn
 npx @yanhuifair/godot-mcp --enable-plugin -p /path/to/your/godot/project
 ```
 
-This installs the plugin to `addons/godot_mcp/` and auto-enables it in `project.godot`. No manual steps required.
+This installs the plugin to `addons/godot-mcp/` and auto-enables it in `project.godot`. No manual steps required.
 
 ### Editor Commands (89 tools)
 
@@ -1272,13 +1272,13 @@ npm run test:watch   # Watch mode
 
 ```bash
 npm run vsix
-# Output: godot-mcp-1.3.7.vsix
+# Output: godot-mcp-1.3.8.vsix
 ```
 
 Install in VS Code:
 
 ```bash
-code --install-extension godot-mcp-1.3.7.vsix
+code --install-extension godot-mcp-1.3.8.vsix
 ```
 
 ---

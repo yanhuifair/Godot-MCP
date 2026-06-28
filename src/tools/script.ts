@@ -1065,7 +1065,7 @@ export async function handleCompileShader(
     const hasIssues = validateText.includes('Issues:');
     const msg = hasIssues
       ? `Shader compilation attempted: ${args.path}\n\n⚠️  Validation found issues (see above). Fix them, then reimport the shader in Godot:\n  - Open the Godot editor\n  - Select the shader in the FileSystem dock\n  - Click "Reimport" or press Ctrl+Shift+R\n\nOr enable the Godot MCP editor plugin for automatic compilation.`
-      : `Shader ready for compilation: ${args.path}\n\n✨ Local validation passed. To compile:\n  1. Open the Godot editor\n  2. The shader will auto-compile on import\n\nOr enable the Godot MCP editor plugin for one-click compilation:\n  cp -r addons/godot_mcp <project>/addons/`;
+      : `Shader ready for compilation: ${args.path}\n\n✨ Local validation passed. To compile:\n  1. Open the Godot editor\n  2. The shader will auto-compile on import\n\nOr enable the Godot MCP editor plugin for one-click compilation:\n  cp -r addons/godot-mcp <project>/addons/`;
 
     return { content: [{ type: 'text', text: validateText + '\n\n' + msg }] };
   }

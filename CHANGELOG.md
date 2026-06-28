@@ -1,4 +1,10 @@
 # Changelog
+## v1.3.8 (2026-06-28)
+
+### Refactor
+- Rename addons directory from `godot_mcp` to `godot-mcp` (hyphenated)
+- sync-addons now checks version before copying (skip if versions match)
+
 ## v1.3.7 (2026-06-28)
 
 ### Path & Security Fixes

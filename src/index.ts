@@ -166,8 +166,8 @@ CLIENT CONFIGURATION EXAMPLES:
 // ---- Addons 安装 ----
 
 function installAddonsToProject(projectPath: string): void {
-  const sourceAddons = path.resolve(__dirname, '..', 'addons', 'godot_mcp');
-  const targetAddons = path.join(projectPath, 'addons', 'godot_mcp');
+  const sourceAddons = path.resolve(__dirname, '..', 'addons', 'godot-mcp');
+  const targetAddons = path.join(projectPath, 'addons', 'godot-mcp');
 
   if (!fs.existsSync(sourceAddons)) {
     console.error(`Error: addons directory not found at "${sourceAddons}"`);
@@ -182,7 +182,7 @@ function installAddonsToProject(projectPath: string): void {
   fs.mkdirSync(path.dirname(targetAddons), { recursive: true });
   fs.cpSync(sourceAddons, targetAddons, { recursive: true, force: true });
 
-  console.log(`✅ Editor plugin installed: addons/godot_mcp → ${targetAddons}`);
+  console.log(`✅ Editor plugin installed: addons/godot-mcp → ${targetAddons}`);
   console.log('   In Godot: Project → Project Settings → Plugins → Enable "Godot MCP"');
 }
 
@@ -230,21 +230,21 @@ async function main(): Promise<void> {
     if (!content.includes('[editor_plugins]')) {
       content += '\n\n[editor_plugins]\n';
     }
-    if (!content.includes('enabled=PackedStringArray("res://addons/godot_mcp/plugin.cfg"')) {
+    if (!content.includes('enabled=PackedStringArray("res://addons/godot-mcp/plugin.cfg"')) {
       // Find [editor_plugins] section and update
       const sections = content.split('\n[');
       let found = false;
       for (let i = 0; i < sections.length; i++) {
         if (sections[i].startsWith('editor_plugins]') || sections[i].startsWith('editor_plugins\n')) {
-          if (!sections[i].includes('godot_mcp')) {
+          if (!sections[i].includes('godot-mcp')) {
             sections[i] = sections[i].replace(/enabled\s*=\s*PackedStringArray\(([^)]*)\)/, (_, plugins) => {
               const arr = plugins.split(',').map((s: string) => s.trim()).filter(Boolean);
-              arr.push('"res://addons/godot_mcp/plugin.cfg"');
+              arr.push('"res://addons/godot-mcp/plugin.cfg"');
               return `enabled=PackedStringArray(${arr.join(', ')})`;
             });
             // If no enabled line, add one
             if (!sections[i].includes('enabled=')) {
-              sections[i] += '\nenabled=PackedStringArray("res://addons/godot_mcp/plugin.cfg")';
+              sections[i] += '\nenabled=PackedStringArray("res://addons/godot-mcp/plugin.cfg")';
             }
           }
           found = true;
@@ -252,7 +252,7 @@ async function main(): Promise<void> {
       }
       content = sections.join('\n[');
       if (!found) {
-        content += 'editor_plugins]\nenabled=PackedStringArray("res://addons/godot_mcp/plugin.cfg")';
+        content += 'editor_plugins]\nenabled=PackedStringArray("res://addons/godot-mcp/plugin.cfg")';
       }
     }
     fs.writeFileSync(projectFile, content);
