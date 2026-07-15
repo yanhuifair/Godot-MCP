@@ -574,9 +574,9 @@ t("read_reflection_probe", "../dist/tools/domain.js", ({ handleReadReflectionPro
   handleReadReflectionProbe(P, { scene_path: "scenes/test_3d.tscn" });
   pass("read_reflection_probe");
 });
-t("read_multi_mesh", "../dist/tools/domain.js", ({ handleReadMultiMesh }) => {
+t("read_multimesh", "../dist/tools/domain.js", ({ handleReadMultiMesh }) => {
   handleReadMultiMesh(P, { scene_path: "scenes/test_3d.tscn" });
-  pass("read_multi_mesh");
+  pass("read_multimesh");
 });
 t("create_noise_texture", "../dist/tools/domain.js", ({ handleCreateNoiseTexture }) => {
   const r = handleCreateNoiseTexture(P, { path: "resources/_tn.tres" });

@@ -1,4 +1,17 @@
 # Changelog
+## v1.3.9 (2026-07-16)
+
+### Bug Fixes
+- **server.ts** — Fix `PARAMETER_MAP` inversion (was normalizing `snake_case` → `camelCase`, which broke every tool's zod schema); now correctly maps `camelCase` → `snake_case` for client compatibility. Exported `normalizeParameterNames`.
+- **editor.ts** — Fix JSON-RPC response collision: replaced `Date.now()`/`Date.now()+Math.random()` request IDs with a monotonic `_requestIdCounter` (both TCP and spawn bridges), preventing mismatched responses under concurrent calls.
+- **utility.ts** — Harden `handleReadProjectIcon` regexes to tolerate whitespace around `=` (`config/name="..."`).
+- **http-server.ts** — Per-session Streamable HTTP transport: `/mcp` now creates a dedicated `StreamableHTTPServerTransport` per `Mcp-Session-Id` (was a single shared instance). Added optional `GODOT_MCP_TOKEN` Bearer/query auth (401 when set and missing/wrong; `/health` stays open).
+- **register.ts** — Removed dead inline `read_multimesh` schema (now uses shared `readMultiMeshSchema`); corrected category-count comments; total 282 tools.
+
+### Documentation
+- Renamed 9 tool names in READMEs + legacy tests for registry consistency (`editor_get_autoload_list`→`editor_get_autoloads`, `editor_get_class_property_list`→`editor_get_class_properties`, `editor_get_class_signal_list`→`editor_get_class_signals`, `editor_get_dependency_list`→`editor_get_dependencies`, `editor_get_editor_camera`→`editor_get_camera`, `editor_get_error_list`→`editor_get_errors`, `editor_get_performance_monitors`→`editor_get_performance`, `editor_set_editor_camera`→`editor_set_camera`, `read_multi_mesh`→`read_multimesh`).
+- Corrected README category counts (Project 22→21, Other 8→4) and normalization description; added missing `editor_get_scene_changes` to Chinese README; test-count claims updated (vitest 142 + legacy 167).
+
 ## v1.3.8 (2026-06-28)
 
 ### Refactor

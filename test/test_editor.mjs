@@ -276,10 +276,10 @@ try {
 }
 
 try {
-  const deps = await rpc("editor_get_dependency_list", { path: "res://scenes/main.tscn" });
-  pass("editor_get_dependency_list");
+  const deps = await rpc("editor_get_dependencies", { path: "res://scenes/main.tscn" });
+  pass("editor_get_dependencies");
 } catch (e) {
-  fail("editor_get_dependency_list", e.message);
+  fail("editor_get_dependencies", e.message);
 }
 
 // ====== 项目设置 ======
@@ -306,10 +306,10 @@ try {
 }
 
 try {
-  const autoloads = await rpc("editor_get_autoload_list");
-  pass("editor_get_autoload_list");
+  const autoloads = await rpc("editor_get_autoloads");
+  pass("editor_get_autoloads");
 } catch (e) {
-  fail("editor_get_autoload_list", e.message);
+  fail("editor_get_autoloads", e.message);
 }
 
 // ====== 插件管理 ======
@@ -324,17 +324,17 @@ try {
 // ====== 类文档 ======
 hdr("类文档");
 try {
-  const classProps = await rpc("editor_get_class_property_list", { class_name: "Node2D" });
-  pass("editor_get_class_property_list - Node2D");
+  const classProps = await rpc("editor_get_class_properties", { class_name: "Node2D" });
+  pass("editor_get_class_properties - Node2D");
 } catch (e) {
-  fail("editor_get_class_property_list", e.message);
+  fail("editor_get_class_properties", e.message);
 }
 
 try {
-  const classSignals = await rpc("editor_get_class_signal_list", { class_name: "Node" });
-  pass("editor_get_class_signal_list - Node");
+  const classSignals = await rpc("editor_get_class_signals", { class_name: "Node" });
+  pass("editor_get_class_signals - Node");
 } catch (e) {
-  fail("editor_get_class_signal_list", e.message);
+  fail("editor_get_class_signals", e.message);
 }
 
 // ====== 编辑器视图 ======
@@ -361,10 +361,10 @@ try {
 }
 
 try {
-  const errors = await rpc("editor_get_error_list");
-  pass("editor_get_error_list");
+  const errors = await rpc("editor_get_errors");
+  pass("editor_get_errors");
 } catch (e) {
-  fail("editor_get_error_list", e.message);
+  fail("editor_get_errors", e.message);
 }
 
 // ====== 编辑器相机（3D） ======
@@ -373,17 +373,17 @@ try {
   // 先打开 3D 场景
   await rpc("editor_open_asset", { path: "res://scenes/test_3d.tscn" });
   await new Promise((r) => setTimeout(r, 500));
-  const cam = await rpc("editor_get_editor_camera");
-  pass("editor_get_editor_camera");
+  const cam = await rpc("editor_get_camera");
+  pass("editor_get_camera");
 } catch (e) {
-  fail("editor_get_editor_camera", e.message);
+  fail("editor_get_camera", e.message);
 }
 
 try {
-  await rpc("editor_set_editor_camera", { position: [0, 5, 10], rotation: [0, 0, 0] });
-  pass("editor_set_editor_camera");
+  await rpc("editor_set_camera", { position: [0, 5, 10], rotation: [0, 0, 0] });
+  pass("editor_set_camera");
 } catch (e) {
-  fail("editor_set_editor_camera", e.message);
+  fail("editor_set_camera", e.message);
 }
 
 try {

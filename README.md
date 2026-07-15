@@ -1,7 +1,7 @@
 # <div align="center">Godot MCP</div>
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-167%20passed-brightgreen)](.)
+[![Tests](https://img.shields.io/badge/tests-142%20passed-brightgreen)](.)
 [![npm](https://img.shields.io/npm/v/@yanhuifair/godot-mcp)](https://www.npmjs.com/package/@yanhuifair/godot-mcp)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-green)](.)
 [![Godot](https://img.shields.io/badge/godot-4.x-blue)](https://godotengine.org)
@@ -102,7 +102,7 @@ npx @yanhuifair/godot-mcp --enable-plugin -p .
 |---|---|---|
 | Editor | 89 | Live editor control — select, play, undo, save, breakpoints, file ops, performance |
 | Scene | 22 | Scene CRUD — nodes, signals, transforms, collision, sprites |
-| Project | 22 | Config, input map, file ops, autoloads, validation, unused assets |
+| Project | 21 | Config, input map, file ops, autoloads, validation, unused assets |
 | Script | 21 | GDScript/Shader CRUD, structure analysis, code injection, validation |
 | Domain | 11 | Curve, Gradient, Path, Skeleton, ReflectionProbe, MultiMesh, NoiseTexture |
 | Animation | 10 | AnimationPlayer/AnimationTree — tracks, keyframes, parameters |
@@ -125,7 +125,7 @@ npx @yanhuifair/godot-mcp --enable-plugin -p .
 | UID | 3 | File UID query, batch update, missing UID detection |
 | 2D Geometry | 2 | CollisionPolygon2D, shape point editing |
 | Diff | 2 | Scene and resource comparison |
-| Other | 8 | GDExtension, C#, World3D, CameraAttributes, SpriteFrames, Texture |
+| Other | 4 | GDExtension, C#, World3D, Texture |
 
 **Total: 282 tools across 26 categories**
 
@@ -217,14 +217,15 @@ godot-mcp/
 │   └── godot-mcp/            # Godot editor plugin
 │       ├── plugin.cfg         # Plugin metadata
 │       └── plugin.gd          # stdin reader, TCP server, 97 command handlers
-├── test/                     # 167 tests across 7 test files
-│   ├── test_all.mjs          # Comprehensive 167-tool test suite
-│   ├── test_editor.mjs       # Editor bridge TCP tests
+├── test/                     # Vitest suite (142 tests) + legacy .mjs suites
+│   ├── test_all.mjs          # Legacy standalone suite (167 tool checks)
+│   ├── test_editor.mjs       # Legacy editor bridge TCP tests
 │   ├── test_runner.mjs       # Early integration test runner
 │   ├── tools.test.ts         # Vitest tool handler tests
 │   ├── parsers.test.ts       # Vitest parser tests
 │   ├── structural.test.ts    # Vitest structural tests
 │   ├── integration_mcp_test.test.ts  # Vitest integration tests
+│   ├── server_normalization.test.ts  # Vitest parameter-normalization tests
 │   ├── fixtures/             # Test fixture files (.tscn, .tres, .gd)
 │   └── test-project/         # Standalone Godot test project
 ├── scripts/
@@ -269,7 +270,7 @@ The bridge auto-detects which mode to use: it first attempts a rapid TCP health 
 
 ### Parameter Normalization
 
-To accommodate AI clients that may use either `snake_case` or `camelCase` parameter naming, the server automatically normalizes 30+ common parameter names (`project_path` -> `projectPath`, `scene_path` -> `scenePath`, etc.) before Zod schema validation.
+To accommodate AI clients that may use either `snake_case` or `camelCase` parameter naming, the server automatically normalizes 30+ common parameter names to the `snake_case` keys its Zod schemas expect (`projectPath` -> `project_path`, `scenePath` -> `scene_path`, etc.) before validation. The advertised `inputSchema` always uses `snake_case`, so `snake_case` inputs pass through unchanged.
 
 ### Safety Guarantees
 
@@ -363,7 +364,7 @@ Starts: Stdio + SSE (`/sse`) + Streamable HTTP (`/mcp`) + Health Check (`/health
 
 ```bash
 curl http://127.0.0.1:3000/health
-# {"status":"ok","version":"1.3.8","projectRoot":"/path/to/project","endpoints":{...}}
+# {"status":"ok","version":"1.3.9","projectRoot":"/path/to/project","endpoints":{...}}
 ```
 
 ---
@@ -840,7 +841,7 @@ This installs the plugin to `addons/godot-mcp/` and auto-enables it in `project.
 
 **View & Selection:** `editor_get_selection` `editor_set_selection` `editor_get_open_scene` `editor_read_current_scene` `editor_get_info` `editor_get_rect` `editor_focus` `editor_show_in_filesystem` `editor_open_dock`
 
-**Playback Control:** `editor_play` `editor_stop` `editor_run_specific_scene` `editor_get_running_scene_tree` `editor_get_performance_monitors`
+**Playback Control:** `editor_play` `editor_stop` `editor_run_specific_scene` `editor_get_running_scene_tree` `editor_get_performance`
 
 **Edit Operations:** `editor_undo` `editor_redo` `editor_save` `editor_save_all` `editor_reload_scene` `editor_delete_selected`
 
@@ -854,19 +855,19 @@ This installs the plugin to `addons/godot-mcp/` and auto-enables it in `project.
 
 **Signals:** `editor_connect_signal` `editor_disconnect_signal` `editor_list_node_signals`
 
-**File System:** `editor_open_asset` `editor_list_filesystem` `editor_create_folder` `editor_delete_asset` `editor_rename_asset` `editor_move_asset` `editor_duplicate_asset` `editor_reimport_asset` `editor_get_dependency_list`
+**File System:** `editor_open_asset` `editor_list_filesystem` `editor_create_folder` `editor_delete_asset` `editor_rename_asset` `editor_move_asset` `editor_duplicate_asset` `editor_reimport_asset` `editor_get_dependencies`
 
 **Project Settings:** `editor_get_project_setting` `editor_set_project_setting` `editor_get_editor_setting` `editor_set_editor_setting` `editor_get_project_directory`
 
-**Input & Autoloads:** `editor_get_input_map` `editor_add_input_action` `editor_remove_input_action` `editor_get_autoload_list` `editor_add_autoload` `editor_remove_autoload`
+**Input & Autoloads:** `editor_get_input_map` `editor_add_input_action` `editor_remove_input_action` `editor_get_autoloads` `editor_add_autoload` `editor_remove_autoload`
 
 **Assets & Baking:** `editor_bake_lightmaps` `editor_bake_navigation` `editor_take_screenshot`
 
-**Class Documentation:** `editor_get_class_list` `editor_get_method_list` `editor_get_class_property_list` `editor_get_class_signal_list` `editor_get_class_doc` `editor_search_help`
+**Class Documentation:** `editor_get_class_list` `editor_get_method_list` `editor_get_class_properties` `editor_get_class_signals` `editor_get_class_doc` `editor_search_help`
 
-**Camera & Viewport:** `editor_get_editor_camera` `editor_set_editor_camera` `editor_toggle_grid` `editor_toggle_snap`
+**Camera & Viewport:** `editor_get_camera` `editor_set_camera` `editor_toggle_grid` `editor_toggle_snap`
 
-**Other:** `editor_get_recent_scenes` `editor_simulate_key` `editor_get_plugin_list` `editor_enable_plugin` `editor_disable_plugin` `editor_get_error_list` `editor_clear_errors` `editor_health_check`
+**Other:** `editor_get_recent_scenes` `editor_simulate_key` `editor_get_plugin_list` `editor_enable_plugin` `editor_disable_plugin` `editor_get_errors` `editor_clear_errors` `editor_health_check`
 
 ---
 
@@ -892,7 +893,7 @@ Click each category to expand and see all tools with descriptions.
 | `editor_stop` | Stop playing in editor. |
 | `editor_run_specific_scene` | Run a specific scene (not just main). |
 | `editor_get_running_scene_tree` | Get the live scene tree while the game is running. |
-| `editor_get_performance_monitors` | Get FPS, draw calls, memory usage while game is running. |
+| `editor_get_performance` | Get FPS, draw calls, memory usage while game is running. |
 | `editor_undo` | Undo last editor action. |
 | `editor_redo` | Redo last undone action. |
 | `editor_save` | Save current scene in editor. |
@@ -935,7 +936,7 @@ Click each category to expand and see all tools with descriptions.
 | `editor_move_asset` | Move a file to a new location via editor. |
 | `editor_duplicate_asset` | Duplicate a file via editor filesystem. |
 | `editor_reimport_asset` | Force reimport of an asset. |
-| `editor_get_dependency_list` | Get all resource dependencies for a file. |
+| `editor_get_dependencies` | Get all resource dependencies for a file. |
 | `editor_get_project_setting` | Read a project setting via editor API. |
 | `editor_set_project_setting` | Set a project setting via editor API (auto-saves). |
 | `editor_get_editor_setting` | Read an editor preference value. |
@@ -944,7 +945,7 @@ Click each category to expand and see all tools with descriptions.
 | `editor_get_input_map` | Read the Input Map via editor API. |
 | `editor_add_input_action` | Add an input action via editor API. |
 | `editor_remove_input_action` | Remove an input action via editor API. |
-| `editor_get_autoload_list` | List autoload singletons via editor API. |
+| `editor_get_autoloads` | List autoload singletons via editor API. |
 | `editor_add_autoload` | Add an autoload singleton via editor API. |
 | `editor_remove_autoload` | Remove an autoload singleton via editor API. |
 | `editor_bake_lightmaps` | Trigger lightmap baking. |
@@ -952,12 +953,12 @@ Click each category to expand and see all tools with descriptions.
 | `editor_take_screenshot` | Capture the editor viewport as a PNG. |
 | `editor_get_class_list` | List all Godot classes, optionally filtered. |
 | `editor_get_method_list` | List all methods of a Godot class. |
-| `editor_get_class_property_list` | List all editor-visible properties of a class. |
-| `editor_get_class_signal_list` | List all signals of a Godot class. |
+| `editor_get_class_properties` | List all editor-visible properties of a class. |
+| `editor_get_class_signals` | List all signals of a Godot class. |
 | `editor_get_class_doc` | Open Godot documentation for a class in browser. |
 | `editor_search_help` | Search Godot documentation in browser. |
-| `editor_get_editor_camera` | Get the 3D editor viewport camera position. |
-| `editor_set_editor_camera` | Set the 3D editor viewport camera position. |
+| `editor_get_camera` | Get the 3D editor viewport camera position. |
+| `editor_set_camera` | Set the 3D editor viewport camera position. |
 | `editor_toggle_grid` | Toggle 3D grid visibility. |
 | `editor_toggle_snap` | Toggle 3D snap mode. |
 | `editor_get_recent_scenes` | List recently opened scene paths. |
@@ -965,7 +966,7 @@ Click each category to expand and see all tools with descriptions.
 | `editor_get_plugin_list` | List all installed editor plugins with enabled state. |
 | `editor_enable_plugin` | Enable a named editor plugin. |
 | `editor_disable_plugin` | Disable a named editor plugin. |
-| `editor_get_error_list` | Get current editor error/log list. |
+| `editor_get_errors` | Get current editor error/log list. |
 | `editor_clear_errors` | Clear the editor error list. |
 | `editor_health_check` | Check if the Godot editor plugin is reachable. |
 
@@ -1002,7 +1003,7 @@ Click each category to expand and see all tools with descriptions.
 </details>
 
 <details>
-<summary>Project (22 tools) — Config, input map, file ops, autoloads, validation</summary>
+<summary>Project (21 tools) — Config, input map, file ops, autoloads, validation</summary>
 
 | Tool | Description |
 |---|---|
@@ -1170,7 +1171,7 @@ Click each category to expand and see all tools with descriptions.
 <details>
 <summary>Remaining Categories</summary>
 
-**Domain (11):** `read_curve`, `create_curve`, `read_gradient`, `create_gradient`, `list_paths`, `read_path`, `list_skeletons`, `read_skeleton`, `read_reflection_probe`, `read_multi_mesh`, `create_noise_texture`
+**Domain (11):** `read_curve`, `create_curve`, `read_gradient`, `create_gradient`, `list_paths`, `read_path`, `list_skeletons`, `read_skeleton`, `read_reflection_probe`, `read_multimesh`, `create_noise_texture`
 
 **Nodes (8):** `read_character_body`, `read_animated_sprite`, `read_audio_player`, `read_video_player`, `read_parallax`, `read_rich_text`, `read_container`, `read_tab_container`
 
@@ -1200,7 +1201,7 @@ Click each category to expand and see all tools with descriptions.
 
 **Diff (2):** `diff_scene`, `diff_resource`
 
-**Other (8):** `read_gdextension`, `list_csproj`, `create_world`, `read_texture_info`
+**Other (4):** `read_gdextension`, `list_csproj`, `create_world`, `read_texture_info`
 
 </details>
 
@@ -1236,7 +1237,7 @@ Click each category to expand and see all tools with descriptions.
 npm install          # Install dependencies
 npm run build        # Build TypeScript to dist/
 npm run dev          # Dev mode (tsx hot reload)
-npm test             # Run tests (167 via vitest + test_all.mjs)
+npm test             # Run vitest suite (142 tests); node test/test_all.mjs for 167 legacy checks
 npm run test:watch   # Watch mode
 ```
 
@@ -1272,13 +1273,13 @@ npm run test:watch   # Watch mode
 
 ```bash
 npm run vsix
-# Output: godot-mcp-1.3.8.vsix
+# Output: godot-mcp-1.3.9.vsix
 ```
 
 Install in VS Code:
 
 ```bash
-code --install-extension godot-mcp-1.3.8.vsix
+code --install-extension godot-mcp-1.3.9.vsix
 ```
 
 ---

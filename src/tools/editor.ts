@@ -29,6 +29,8 @@ let _lastHealthCheck = 0;
 let _lastHealthStatus = false;
 let _useTcp: boolean | null = null; // null = unknown, true = TCP, false = spawn
 let _restartAttempts = 0;
+/** Monotonic request id so concurrent commands never collide in the pending Maps. */
+let _requestIdCounter = 0;
 
 // ---- Persistent TCP connection ----
 let _tcpClient: net.Socket | null = null;
@@ -137,7 +139,7 @@ export function sendEditorCommand(method: string, params: Record<string, any> = 
 
 async function sendViaTcp(method: string, params: Record<string, any> = {}): Promise<any> {
   const client = await getTcpConnection();
-  const id = Date.now();
+  const id = ++_requestIdCounter;
   const request = JSON.stringify({ jsonrpc: '2.0', id, method, params }) + '\n';
 
   return new Promise((resolve, reject) => {
@@ -242,7 +244,7 @@ function sendViaSpawn(method: string, params: Record<string, any> = {}): Promise
   return new Promise((resolve, reject) => {
     try {
       const proc = ensureEditorProcess();
-      const id = Date.now() + Math.random();
+      const id = ++_requestIdCounter;
       const request = JSON.stringify({ jsonrpc: '2.0', id, method, params }) + '\n';
 
       _pendingRequests.set(id, { resolve, reject });

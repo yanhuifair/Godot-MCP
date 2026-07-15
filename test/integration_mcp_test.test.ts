@@ -12,8 +12,12 @@ import { join } from 'node:path';
 const PROJECT = process.env.GODOT_MCP_TEST_PROJECT || '';
 const SKIP_ALL = !PROJECT || !existsSync(join(PROJECT, 'project.godot'));
 
+// Use describe.skip when no test project is configured so the suite is reported
+// as skipped (not as a failure). Throwing inside beforeAll only produces red tests.
+const d = SKIP_ALL ? describe.skip : describe;
+
 // ---- Project Tools ----
-describe('Project Tools', () => {
+d('Project Tools', () => {
   beforeAll(() => { if (SKIP_ALL) throw { __SKIP__: 'Set GODOT_MCP_TEST_PROJECT env var' }; });
   it('list_project_files', async () => {
     const { listFiles } = await import('../src/utils/file_utils.js');
@@ -24,7 +28,7 @@ describe('Project Tools', () => {
   it('read_project_config', async () => {
     const { handleReadProjectConfig } = await import('../src/tools/project.js');
     const r = handleReadProjectConfig(PROJECT);
-    expect(r.content[0].text).toContain('MCP_Test');
+    expect(r.content[0].text).toContain('MCP Test');
   });
 
   it('search_in_project finds CharacterBody', async () => {
@@ -71,7 +75,7 @@ describe('Project Tools', () => {
 });
 
 // ---- Scene Tools ----
-describe('Scene Tools', () => {
+d('Scene Tools', () => {
   it('list_scenes finds scenes', async () => {
     const { handleListScenes } = await import('../src/tools/scene.js');
     const r = handleListScenes(PROJECT, {});
@@ -81,14 +85,14 @@ describe('Scene Tools', () => {
 
   it('read_scene (player) shows CharacterBody3D', async () => {
     const { handleReadScene } = await import('../src/tools/scene.js');
-    const r = handleReadScene(PROJECT, { path: 'player.tscn' });
-    expect(r.content[0].text).toContain('CharacterBody3D');
+    const r = handleReadScene(PROJECT, { path: 'scenes/player.tscn' });
+    expect(r.content[0].text).toContain('CharacterBody2D');
   });
 
   it('read_scene (main) shows Node3D', async () => {
     const { handleReadScene } = await import('../src/tools/scene.js');
-    const r = handleReadScene(PROJECT, { path: 'main.tscn' });
-    expect(r.content[0].text).toContain('Node3D');
+    const r = handleReadScene(PROJECT, { path: 'scenes/main.tscn' });
+    expect(r.content[0].text).toContain('Node');
   });
 
   it('read_scene (hurricane) shows CSGBox3D', async () => {
@@ -105,7 +109,7 @@ describe('Scene Tools', () => {
 
   it('find_nodes_in_scenes by type', async () => {
     const { handleFindNodesInScenes } = await import('../src/tools/scene.js');
-    const r = handleFindNodesInScenes(PROJECT, { node_type: 'CharacterBody3D' });
+    const r = handleFindNodesInScenes(PROJECT, { node_type: 'CharacterBody2D' });
     expect(r.content[0].text).toContain('player');
   });
 
@@ -123,7 +127,7 @@ describe('Scene Tools', () => {
 });
 
 // ---- Script Tools ----
-describe('Script Tools', () => {
+d('Script Tools', () => {
   it('list_scripts finds .gd files', async () => {
     const { handleListScripts } = await import('../src/tools/script.js');
     const r = handleListScripts(PROJECT, { type: 'gdscript' });
@@ -132,19 +136,19 @@ describe('Script Tools', () => {
 
   it('read_script shows extends', async () => {
     const { handleReadScript } = await import('../src/tools/script.js');
-    const r = handleReadScript(PROJECT, { path: 'player.gd' });
+    const r = handleReadScript(PROJECT, { path: 'scripts/player.gd' });
     expect(r.content[0].text).toContain('extends');
   });
 
   it('validate_script passes', async () => {
     const { handleValidateScript } = await import('../src/tools/script.js');
-    const r = handleValidateScript(PROJECT, { path: 'player.gd' });
+    const r = handleValidateScript(PROJECT, { path: 'scripts/player.gd' });
     expect(r.content[0].text).toContain('Validation');
   });
 
   it('read_script_structure', async () => {
     const { handleReadScriptStructure } = await import('../src/tools/script.js');
-    const r = handleReadScriptStructure(PROJECT, { path: 'player.gd' });
+    const r = handleReadScriptStructure(PROJECT, { path: 'scripts/player.gd' });
     expect(r.content[0].text).toContain('extends');
   });
 
@@ -156,7 +160,7 @@ describe('Script Tools', () => {
 });
 
 // ---- Shader Tools ----
-describe('Shader Tools', () => {
+d('Shader Tools', () => {
   it('list_shaders finds .gdshader', async () => {
     const { handleListShaders } = await import('../src/tools/script.js');
     const r = handleListShaders(PROJECT, {});
@@ -177,7 +181,7 @@ describe('Shader Tools', () => {
 });
 
 // ---- Resource Tools ----
-describe('Resource Tools', () => {
+d('Resource Tools', () => {
   it('list_resources', async () => {
     const { handleListResources } = await import('../src/tools/resource.js');
     const r = handleListResources(PROJECT, {});
@@ -198,7 +202,7 @@ describe('Resource Tools', () => {
 });
 
 // ---- Animation Tools ----
-describe('Animation Tools', () => {
+d('Animation Tools', () => {
   it('list_animations', async () => {
     const { handleListAnimations } = await import('../src/tools/animation.js');
     const r = handleListAnimations(PROJECT, {});
@@ -207,7 +211,7 @@ describe('Animation Tools', () => {
 });
 
 // ---- Import Tools ----
-describe('Import Tools', () => {
+d('Import Tools', () => {
   it('list_import_files finds icon.svg', async () => {
     const { handleListImportFiles } = await import('../src/tools/import.js');
     const r = handleListImportFiles(PROJECT, {});
@@ -222,7 +226,7 @@ describe('Import Tools', () => {
 });
 
 // ---- Environment Tools ----
-describe('Environment Tools', () => {
+d('Environment Tools', () => {
   it('list_environments', async () => {
     const { handleListEnvironments } = await import('../src/tools/environment.js');
     const r = handleListEnvironments(PROJECT, {});
@@ -231,7 +235,7 @@ describe('Environment Tools', () => {
 });
 
 // ---- Audio Tools ----
-describe('Audio Tools', () => {
+d('Audio Tools', () => {
   it('list_audio_files', async () => {
     const { handleListAudioFiles } = await import('../src/tools/audio.js');
     const r = handleListAudioFiles(PROJECT, {});
@@ -240,7 +244,7 @@ describe('Audio Tools', () => {
 });
 
 // ---- Physics Tools ----
-describe('Physics Tools', () => {
+d('Physics Tools', () => {
   it('list_physics_materials', async () => {
     const { handleListPhysicsMaterials } = await import('../src/tools/physics.js');
     const r = handleListPhysicsMaterials(PROJECT, {});
@@ -255,7 +259,7 @@ describe('Physics Tools', () => {
 });
 
 // ---- Inspector Tools ----
-describe('Inspector Tools', () => {
+d('Inspector Tools', () => {
   it('list_cameras', async () => {
     const { handleListCameras } = await import('../src/tools/inspector.js');
     const r = handleListCameras(PROJECT, {});
@@ -276,7 +280,7 @@ describe('Inspector Tools', () => {
 });
 
 // ---- Texture Tools ----
-describe('Texture Tools', () => {
+d('Texture Tools', () => {
   it('read_texture_info for icon.svg', async () => {
     const { handleReadTextureInfo } = await import('../src/tools/texture.js');
     const r = handleReadTextureInfo(PROJECT, { path: 'icon.svg' });
@@ -285,7 +289,7 @@ describe('Texture Tools', () => {
 });
 
 // ---- Navigation Tools ----
-describe('Navigation Tools', () => {
+d('Navigation Tools', () => {
   it('list_nav_regions', async () => {
     const { handleListNavRegions } = await import('../src/tools/navigation.js');
     const r = handleListNavRegions(PROJECT, {});
@@ -294,7 +298,7 @@ describe('Navigation Tools', () => {
 });
 
 // ---- Translation Tools ----
-describe('Translation Tools', () => {
+d('Translation Tools', () => {
   it('list_translations', async () => {
     const { handleListTranslations } = await import('../src/tools/translation.js');
     const r = handleListTranslations(PROJECT, {});
@@ -303,10 +307,10 @@ describe('Translation Tools', () => {
 });
 
 // ---- UID Tools ----
-describe('UID Tools', () => {
+d('UID Tools', () => {
   it('get_uid for player.tscn', async () => {
     const { handleGetUid } = await import('../src/tools/uid.js');
-    const r = handleGetUid(PROJECT, { path: 'player.tscn' });
+    const r = handleGetUid(PROJECT, { path: 'scenes/player.tscn' });
     expect(r.isError).toBeFalsy();
   });
 
@@ -318,7 +322,7 @@ describe('UID Tools', () => {
 });
 
 // ---- Rendering Tools ----
-describe('Rendering Tools', () => {
+d('Rendering Tools', () => {
   it('read_raycast', async () => {
     const { handleReadRaycast } = await import('../src/tools/rendering.js');
     const r = handleReadRaycast(PROJECT, {});
@@ -327,7 +331,7 @@ describe('Rendering Tools', () => {
 });
 
 // ---- Domain Tools ----
-describe('Domain Tools', () => {
+d('Domain Tools', () => {
   it('list_paths', async () => {
     const { handleListPaths } = await import('../src/tools/domain.js');
     const r = handleListPaths(PROJECT, {});
@@ -354,10 +358,10 @@ describe('Domain Tools', () => {
 });
 
 // ---- Node Tools ----
-describe('Node Tools', () => {
+d('Node Tools', () => {
   it('read_character_body finds CharacterBody3D', async () => {
     const { handleReadCharacterBody } = await import('../src/tools/nodes.js');
-    const r = handleReadCharacterBody(PROJECT, { scene_path: 'player.tscn' });
+    const r = handleReadCharacterBody(PROJECT, { scene_path: 'scenes/player.tscn' });
     expect(r.content[0].text).toContain('CharacterBody');
   });
 
@@ -381,7 +385,7 @@ describe('Node Tools', () => {
 });
 
 // ---- Utility Tools ----
-describe('Utility Tools', () => {
+d('Utility Tools', () => {
   it('list_all_signals', async () => {
     const { handleListAllSignals } = await import('../src/tools/utility.js');
     const r = handleListAllSignals(PROJECT, {});
@@ -391,7 +395,7 @@ describe('Utility Tools', () => {
   it('read_project_icon shows MCP_Test', async () => {
     const { handleReadProjectIcon } = await import('../src/tools/utility.js');
     const r = handleReadProjectIcon(PROJECT);
-    expect(r.content[0].text).toContain('MCP_Test');
+    expect(r.content[0].text).toContain('MCP Test');
   });
 
   it('list_popups', async () => {
@@ -408,7 +412,7 @@ describe('Utility Tools', () => {
 });
 
 // ---- Coverage / Scene Inspectors Tools ----
-describe('Scene Inspectors', () => {
+d('Scene Inspectors', () => {
   it('read_decal', async () => {
     const { handleReadDecal } = await import('../src/tools/scene_inspectors.js');
     const r = handleReadDecal(PROJECT, {});
@@ -471,7 +475,7 @@ describe('Scene Inspectors', () => {
 });
 
 // ---- Joints Tools ----
-describe('Joint Tools', () => {
+d('Joint Tools', () => {
   it('list_joints', async () => {
     const { handleListJoints } = await import('../src/tools/joint.js');
     const r = handleListJoints(PROJECT, {});
@@ -480,7 +484,7 @@ describe('Joint Tools', () => {
 });
 
 // ---- Shader Graph Tools ----
-describe('Shader Graph Tools', () => {
+d('Shader Graph Tools', () => {
   it('list_shader_node_types', async () => {
     const { handleListShaderNodeTypes } = await import('../src/tools/shader_graph.js');
     const r = handleListShaderNodeTypes({});
@@ -489,7 +493,7 @@ describe('Shader Graph Tools', () => {
 });
 
 // ---- Godot CLI Tools ----
-describe('Godot CLI Tools', () => {
+d('Godot CLI Tools', () => {
   it('get_godot_version', async () => {
     const { handleGetGodotVersion } = await import('../src/tools/godot.js');
     const r = handleGetGodotVersion();

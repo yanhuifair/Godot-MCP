@@ -103,10 +103,10 @@ export function handleReadProjectIcon(projectRoot: string): ToolResult {
     const projPath = resolveProjectPath(projectRoot, 'project.godot');
     const { content } = readTextFile(projPath);
 
-    const iconMatch = content.match(/config\/icon="([^"]+)"/);
-    const nameMatch = content.match(/config\/name="([^"]+)"/);
-    const descMatch = content.match(/config\/description="([^"]*)"/);
-    const versionMatch = content.match(/config\/version="([^"]+)"/);
+    const iconMatch = content.match(/config\/icon\s*=\s*"([^"]+)"/);
+    const nameMatch = content.match(/config\/name\s*=\s*"([^"]+)"/);
+    const descMatch = content.match(/config\/description\s*=\s*"([^"]*)"/);
+    const versionMatch = content.match(/config\/version\s*=\s*"([^"]+)"/);
 
     const lines: string[] = ['Project Identity'];
     lines.push(`  Name: ${nameMatch ? nameMatch[1] : '(not set)'}`);

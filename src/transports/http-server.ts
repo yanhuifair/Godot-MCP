@@ -8,7 +8,7 @@
 // ============================================================
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import type { Express, Request, Response } from 'express';
+import type { Express, Request, Response, NextFunction } from 'express';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { createMcpExpressApp } from '@modelcontextprotocol/sdk/server/express.js';
@@ -59,6 +59,28 @@ export async function runHttpTransport(options: HttpTransportOptions = {}): Prom
   // 创建 Express 应用（自带 DNS rebinding 防护）
   const app = createMcpExpressApp({ host });
 
+  // ---- 可选鉴权（GODOT_MCP_TOKEN） ----
+  // 若设置了 GODOT_MCP_TOKEN，则 /mcp 与 /sse 的每个请求都必须携带令牌：
+  //   Authorization: Bearer <token>   或   ?token=<token>
+  // 未设置该环境变量时服务器保持开放（与改动前行为一致，向后兼容）。
+  const mcpToken = process.env.GODOT_MCP_TOKEN;
+  if (mcpToken) {
+    console.error('[Godot MCP] HTTP auth ENABLED (GODOT_MCP_TOKEN is set)');
+    const authMiddleware = (req: Request, res: Response, next: NextFunction) => {
+      const header = req.headers['authorization'];
+      const fromHeader = typeof header === 'string' && header.startsWith('Bearer ')
+        ? header.slice(7)
+        : undefined;
+      const fromQuery = typeof req.query.token === 'string' ? req.query.token : undefined;
+      const provided = fromHeader ?? fromQuery;
+      if (provided && provided === mcpToken) return next();
+      res.status(401).json({ error: 'Unauthorized: invalid or missing token' });
+    };
+    app.use(['/mcp', '/sse'], authMiddleware);
+  } else {
+    console.error('[Godot MCP] HTTP auth DISABLED (set GODOT_MCP_TOKEN to enable)');
+  }
+
   // ---- Streamable HTTP 端点 (/mcp) ----
   if (enableStreamableHttp) {
     setupStreamableHttpEndpoint(app);
@@ -73,7 +95,7 @@ export async function runHttpTransport(options: HttpTransportOptions = {}): Prom
   app.get('/health', (_req: Request, res: Response) => {
     res.json({
       status: 'ok',
-      version: '1.3.8',
+      version: '1.3.9',
       projectRoot: getProjectRoot(),
       endpoints: {
         ...(enableSse ? { sse: `http://${host}:${port}/sse` } : {}),
@@ -107,29 +129,38 @@ export async function runHttpTransport(options: HttpTransportOptions = {}): Prom
 
 // ---- Streamable HTTP 端点 ----
 
+// Streamable HTTP 会话管理（sessionId -> transport）
+const mcpTransports = new Map<string, StreamableHTTPServerTransport>();
+
 function setupStreamableHttpEndpoint(app: Express): void {
-  // 使用有状态模式：自动生成 sessionId
-  const transport = new StreamableHTTPServerTransport({
-    sessionIdGenerator: () => randomUUID(),
-    onsessioninitialized: (sessionId) => {
-      console.error(`[Godot MCP] Streamable HTTP session started: ${sessionId}`);
-    },
-    onsessionclosed: (sessionId) => {
-      console.error(`[Godot MCP] Streamable HTTP session closed: ${sessionId}`);
-    },
-  });
-
-  // 每个会话使用独立的 Server 实例
-  const server = createMcpServer();
-  transport.onclose = undefined; // 由 transport 自身管理生命周期
-
-  // 连接 Server 到 Transport
-  server.connect(transport).then(() => {
-    console.error('[Godot MCP] Streamable HTTP transport ready');
-  });
-
-  // 处理所有 MCP 请求（GET / POST / DELETE）
+  // 有状态模式：每个会话（Mcp-Session-Id）使用独立的 Server + Transport 实例，
+  // 避免多客户端 / 并发时共享同一 transport 导致的会话错乱。
   app.all('/mcp', async (req: Request, res: Response) => {
+    const sessionId = req.headers['mcp-session-id'] as string | undefined;
+    let transport = sessionId ? mcpTransports.get(sessionId) : undefined;
+
+    if (!transport) {
+      if (sessionId) {
+        // 提供了 sessionId 但服务端找不到对应会话
+        res.status(404).json({ error: 'Session not found' });
+        return;
+      }
+      // 新会话：为该连接创建专用的 transport 与 server
+      transport = new StreamableHTTPServerTransport({
+        sessionIdGenerator: () => randomUUID(),
+        onsessioninitialized: (sid) => {
+          mcpTransports.set(sid, transport!);
+        },
+        onsessionclosed: (sid) => {
+          mcpTransports.delete(sid);
+          console.error(`[Godot MCP] Streamable HTTP session closed: ${sid}`);
+        },
+      });
+      const server = createMcpServer();
+      // 必须等 server 与 transport 连接完成后再处理首条请求（通常是 initialize）
+      await server.connect(transport);
+    }
+
     try {
       await transport.handleRequest(
         req as unknown as IncomingMessage,

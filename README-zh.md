@@ -1,7 +1,7 @@
 # <div align="center">Godot MCP</div>
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-167%20passed-brightgreen)](.)
+[![Tests](https://img.shields.io/badge/tests-142%20passed-brightgreen)](.)
 [![npm](https://img.shields.io/npm/v/@yanhuifair/godot-mcp)](https://www.npmjs.com/package/@yanhuifair/godot-mcp)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-green)](.)
 [![Godot](https://img.shields.io/badge/godot-4.x-blue)](https://godotengine.org)
@@ -102,7 +102,7 @@ npx @yanhuifair/godot-mcp --enable-plugin -p .
 |---|---|---|
 | Editor | 89 | 实时编辑器控制——选择、播放、撤销、保存、断点、文件操作、性能 |
 | Scene | 22 | 场景 CRUD——节点、信号、变换、碰撞、精灵 |
-| Project | 22 | 配置文件、输入映射、文件操作、自动加载、验证、无用资源检测 |
+| Project | 21 | 配置文件、输入映射、文件操作、自动加载、验证、无用资源检测 |
 | Script | 21 | GDScript/Shader CRUD、结构分析、代码注入、验证 |
 | Domain | 11 | 曲线、渐变、路径、骨骼、反射探针、MultiMesh、噪声纹理 |
 | Animation | 10 | AnimationPlayer/AnimationTree——轨道、关键帧、参数 |
@@ -125,7 +125,7 @@ npx @yanhuifair/godot-mcp --enable-plugin -p .
 | UID | 3 | 文件 UID 查询、批量更新、缺失检测 |
 | 2D Geometry | 2 | CollisionPolygon2D、形状点编辑 |
 | Diff | 2 | 场景与资源对比 |
-| Other | 8 | GDExtension、C#、World3D、CameraAttributes、SpriteFrames、Texture |
+| Other | 4 | GDExtension、C#、World3D、Texture |
 
 **总计：282 个工具，26 个分类**
 
@@ -250,8 +250,8 @@ godot-mcp/
 │   └── godot-mcp/            # Godot 编辑器插件
 │       ├── plugin.cfg         # 插件元数据
 │       └── plugin.gd          # stdin 读取器、TCP 服务器、97 个命令处理器
-├── test/                     # 167 个测试，分布在 7 个测试文件中
-│   ├── test_all.mjs          # 167 项全量工具测试套件
+├── test/                     # Vitest 套件（142 个测试）+ 旧版 .mjs 套件
+│   ├── test_all.mjs          # 旧版独立套件（167 项工具检查）
 │   ├── test_editor.mjs       # Editor 桥 TCP 测试
 │   ├── test_runner.mjs       # 早期集成测试
 │   ├── tools.test.ts         # Vitest 工具处理测试
@@ -302,7 +302,7 @@ godot-mcp/
 
 ### 参数规范化
 
-为适应 AI 客户端可能使用 `snake_case` 或 `camelCase` 参数命名，服务器会自动将 30+ 个常见参数名（`project_path` -> `projectPath`、`scene_path` -> `scenePath` 等）规范化，之后再进行 Zod schema 验证。
+为适应 AI 客户端可能使用 `snake_case` 或 `camelCase` 参数命名，服务器会自动将 30+ 个常见参数名规范化为其 Zod schema 所使用的 `snake_case` 键（`projectPath` -> `project_path`、`scenePath` -> `scene_path` 等），再进行验证。对外公布的 `inputSchema` 始终使用 `snake_case`，因此 `snake_case` 入参原样通过。
 
 ### 安全保障
 
@@ -396,7 +396,7 @@ npx @yanhuifair/godot-mcp -t all --port 3000 -p /path/to/your/godot/project
 
 ```bash
 curl http://127.0.0.1:3000/health
-# {"status":"ok","version":"1.3.8","projectRoot":"/path/to/project","endpoints":{...}}
+# {"status":"ok","version":"1.3.9","projectRoot":"/path/to/project","endpoints":{...}}
 ```
 
 ---
@@ -853,7 +853,7 @@ npx @yanhuifair/godot-mcp --enable-plugin -p /path/to/your/godot/project
 
 **视图和选择：** `editor_get_selection` `editor_set_selection` `editor_get_open_scene` `editor_read_current_scene` `editor_get_info` `editor_get_rect` `editor_focus` `editor_show_in_filesystem` `editor_open_dock`
 
-**播放控制：** `editor_play` `editor_stop` `editor_run_specific_scene` `editor_get_running_scene_tree` `editor_get_performance_monitors`
+**播放控制：** `editor_play` `editor_stop` `editor_run_specific_scene` `editor_get_running_scene_tree` `editor_get_performance`
 
 **编辑操作：** `editor_undo` `editor_redo` `editor_save` `editor_save_all` `editor_reload_scene` `editor_delete_selected`
 
@@ -867,19 +867,19 @@ npx @yanhuifair/godot-mcp --enable-plugin -p /path/to/your/godot/project
 
 **信号：** `editor_connect_signal` `editor_disconnect_signal` `editor_list_node_signals`
 
-**文件系统：** `editor_open_asset` `editor_list_filesystem` `editor_create_folder` `editor_delete_asset` `editor_rename_asset` `editor_move_asset` `editor_duplicate_asset` `editor_reimport_asset` `editor_get_dependency_list`
+**文件系统：** `editor_open_asset` `editor_list_filesystem` `editor_create_folder` `editor_delete_asset` `editor_rename_asset` `editor_move_asset` `editor_duplicate_asset` `editor_reimport_asset` `editor_get_dependencies`
 
 **项目设置：** `editor_get_project_setting` `editor_set_project_setting` `editor_get_editor_setting` `editor_set_editor_setting` `editor_get_project_directory`
 
-**输入和自动加载：** `editor_get_input_map` `editor_add_input_action` `editor_remove_input_action` `editor_get_autoload_list` `editor_add_autoload` `editor_remove_autoload`
+**输入和自动加载：** `editor_get_input_map` `editor_add_input_action` `editor_remove_input_action` `editor_get_autoloads` `editor_add_autoload` `editor_remove_autoload`
 
 **资源和烘焙：** `editor_bake_lightmaps` `editor_bake_navigation` `editor_take_screenshot`
 
-**类文档：** `editor_get_class_list` `editor_get_method_list` `editor_get_class_property_list` `editor_get_class_signal_list` `editor_get_class_doc` `editor_search_help`
+**类文档：** `editor_get_class_list` `editor_get_method_list` `editor_get_class_properties` `editor_get_class_signals` `editor_get_class_doc` `editor_search_help`
 
-**相机和视口：** `editor_get_editor_camera` `editor_set_editor_camera` `editor_toggle_grid` `editor_toggle_snap`
+**相机和视口：** `editor_get_camera` `editor_set_camera` `editor_toggle_grid` `editor_toggle_snap`
 
-**其他：** `editor_get_recent_scenes` `editor_simulate_key` `editor_get_plugin_list` `editor_enable_plugin` `editor_disable_plugin` `editor_get_error_list` `editor_clear_errors` `editor_health_check`
+**其他：** `editor_get_recent_scenes` `editor_simulate_key` `editor_get_plugin_list` `editor_enable_plugin` `editor_disable_plugin` `editor_get_errors` `editor_clear_errors` `editor_health_check`
 
 ---
 
@@ -905,7 +905,7 @@ npx @yanhuifair/godot-mcp --enable-plugin -p /path/to/your/godot/project
 | `editor_stop` | 在编辑器中停止运行 |
 | `editor_run_specific_scene` | 运行特定场景（非主场景） |
 | `editor_get_running_scene_tree` | 游戏运行时获取实时场景树 |
-| `editor_get_performance_monitors` | 游戏运行时获取 FPS、绘制调用、内存使用 |
+| `editor_get_performance` | 游戏运行时获取 FPS、绘制调用、内存使用 |
 | `editor_undo` | 撤销上一步编辑器操作 |
 | `editor_redo` | 重做上一步撤销的操作 |
 | `editor_save` | 保存编辑器中的当前场景 |
@@ -915,6 +915,7 @@ npx @yanhuifair/godot-mcp --enable-plugin -p /path/to/your/godot/project
 | `editor_create_scene` | 在编辑器中创建并打开新场景 |
 | `editor_instantiate_scene` | 将 PackedScene 实例化到当前场景中 |
 | `editor_set_main_scene` | 设置项目主场景 |
+| `editor_get_scene_changes` | 检查当前场景是否有未保存的更改 |
 | `editor_add_node` | 向编辑器中当前打开的场景添加节点 |
 | `editor_remove_node` | 从当前打开的场景中删除节点 |
 | `editor_duplicate_node` | 复制节点及其子节点、脚本和信号 |
@@ -947,7 +948,7 @@ npx @yanhuifair/godot-mcp --enable-plugin -p /path/to/your/godot/project
 | `editor_move_asset` | 通过编辑器将文件移动到新位置 |
 | `editor_duplicate_asset` | 通过编辑器文件系统复制文件 |
 | `editor_reimport_asset` | 强制重新导入资源 |
-| `editor_get_dependency_list` | 获取文件的所有资源依赖 |
+| `editor_get_dependencies` | 获取文件的所有资源依赖 |
 | `editor_get_project_setting` | 通过编辑器 API 读取项目设置 |
 | `editor_set_project_setting` | 通过编辑器 API 设置项目设置（自动保存） |
 | `editor_get_editor_setting` | 读取编辑器偏好值 |
@@ -956,7 +957,7 @@ npx @yanhuifair/godot-mcp --enable-plugin -p /path/to/your/godot/project
 | `editor_get_input_map` | 通过编辑器 API 读取输入映射 |
 | `editor_add_input_action` | 通过编辑器 API 添加输入动作 |
 | `editor_remove_input_action` | 通过编辑器 API 删除输入动作 |
-| `editor_get_autoload_list` | 通过编辑器 API 列出自动加载单例 |
+| `editor_get_autoloads` | 通过编辑器 API 列出自动加载单例 |
 | `editor_add_autoload` | 通过编辑器 API 添加自动加载单例 |
 | `editor_remove_autoload` | 通过编辑器 API 删除自动加载单例 |
 | `editor_bake_lightmaps` | 触发光照贴图烘焙 |
@@ -964,12 +965,12 @@ npx @yanhuifair/godot-mcp --enable-plugin -p /path/to/your/godot/project
 | `editor_take_screenshot` | 将编辑器视口截图保存为 PNG |
 | `editor_get_class_list` | 列出所有 Godot 类，可选过滤 |
 | `editor_get_method_list` | 列出 Godot 类的所有方法 |
-| `editor_get_class_property_list` | 列出类的所有编辑器可见属性 |
-| `editor_get_class_signal_list` | 列出 Godot 类的所有信号 |
+| `editor_get_class_properties` | 列出类的所有编辑器可见属性 |
+| `editor_get_class_signals` | 列出 Godot 类的所有信号 |
 | `editor_get_class_doc` | 在浏览器中打开 Godot 类文档 |
 | `editor_search_help` | 在浏览器中搜索 Godot 文档 |
-| `editor_get_editor_camera` | 获取 3D 编辑器视口相机位置 |
-| `editor_set_editor_camera` | 设置 3D 编辑器视口相机位置 |
+| `editor_get_camera` | 获取 3D 编辑器视口相机位置 |
+| `editor_set_camera` | 设置 3D 编辑器视口相机位置 |
 | `editor_toggle_grid` | 切换 3D 网格可见性 |
 | `editor_toggle_snap` | 切换 3D 吸附模式 |
 | `editor_get_recent_scenes` | 列出最近打开的场景路径 |
@@ -977,7 +978,7 @@ npx @yanhuifair/godot-mcp --enable-plugin -p /path/to/your/godot/project
 | `editor_get_plugin_list` | 列出所有已安装的编辑器插件及其启用状态 |
 | `editor_enable_plugin` | 启用指定名称的编辑器插件 |
 | `editor_disable_plugin` | 禁用指定名称的编辑器插件 |
-| `editor_get_error_list` | 获取当前编辑器错误/日志列表 |
+| `editor_get_errors` | 获取当前编辑器错误/日志列表 |
 | `editor_clear_errors` | 清除编辑器错误列表 |
 | `editor_health_check` | 检查 Godot 编辑器插件是否可达 |
 
@@ -1014,7 +1015,7 @@ npx @yanhuifair/godot-mcp --enable-plugin -p /path/to/your/godot/project
 </details>
 
 <details>
-<summary>Project（22 个工具）— 配置、输入映射、文件操作、自动加载、验证</summary>
+<summary>Project（21 个工具）— 配置、输入映射、文件操作、自动加载、验证</summary>
 
 | 工具 | 描述 |
 |---|---|
@@ -1182,7 +1183,7 @@ npx @yanhuifair/godot-mcp --enable-plugin -p /path/to/your/godot/project
 <details>
 <summary>其他分类</summary>
 
-**Domain（11）：** `read_curve`、`create_curve`、`read_gradient`、`create_gradient`、`list_paths`、`read_path`、`list_skeletons`、`read_skeleton`、`read_reflection_probe`、`read_multi_mesh`、`create_noise_texture`
+**Domain（11）：** `read_curve`、`create_curve`、`read_gradient`、`create_gradient`、`list_paths`、`read_path`、`list_skeletons`、`read_skeleton`、`read_reflection_probe`、`read_multimesh`、`create_noise_texture`
 
 **Nodes（8）：** `read_character_body`、`read_animated_sprite`、`read_audio_player`、`read_video_player`、`read_parallax`、`read_rich_text`、`read_container`、`read_tab_container`
 
@@ -1212,7 +1213,7 @@ npx @yanhuifair/godot-mcp --enable-plugin -p /path/to/your/godot/project
 
 **Diff（2）：** `diff_scene`、`diff_resource`
 
-**Other（8）：** `read_gdextension`、`list_csproj`、`create_world`、`read_texture_info`
+**Other（4）：** `read_gdextension`、`list_csproj`、`create_world`、`read_texture_info`
 
 </details>
 
@@ -1248,7 +1249,7 @@ npx @yanhuifair/godot-mcp --enable-plugin -p /path/to/your/godot/project
 npm install          # 安装依赖
 npm run build        # 构建 TypeScript 到 dist/
 npm run dev          # 开发模式（tsx 热重载）
-npm test             # 运行 167 个测试（vitest + test_all.mjs）
+npm test             # 运行 vitest 套件（142 个测试）；node test/test_all.mjs 运行 167 项旧版检查
 npm run test:watch   # 监听模式
 ```
 
@@ -1284,13 +1285,13 @@ npm run test:watch   # 监听模式
 
 ```bash
 npm run vsix
-# 输出: godot-mcp-1.3.8.vsix
+# 输出: godot-mcp-1.3.9.vsix
 ```
 
 在 VS Code 中安装：
 
 ```bash
-code --install-extension godot-mcp-1.3.8.vsix
+code --install-extension godot-mcp-1.3.9.vsix
 ```
 
 ---

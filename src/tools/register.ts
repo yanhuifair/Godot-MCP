@@ -248,7 +248,7 @@ import {
   readCurveSchema, createCurveSchema, readGradientSchema,
   createGradientSchema, listPathsSchema, readPathSchema,
   listSkeletonsSchema, readSkeletonSchema,
-  readReflectionProbeSchema, createNoiseTextureSchema,
+  readReflectionProbeSchema, readMultiMeshSchema, createNoiseTextureSchema,
 } from './domain.js';
 
 // Nodes, Utility
@@ -328,7 +328,7 @@ export function registerAllTools(registry: ToolRegistry): void {
   registry.register({ name: 'remove_input_action', description: 'Remove an input action.', schema: removeInputActionSchema, handler: handleRemoveInputAction });
   registry.register({ name: 'add_input_binding', description: 'Add key/mouse/joypad binding to action.', schema: addInputBindingSchema, handler: handleAddInputBinding });
 
-  // Scene (21)
+  // Scene (22)
   registry.register({ name: 'read_scene', description: 'Read a .tscn scene file.', schema: readSceneSchema, handler: handleReadScene });
   registry.register({ name: 'create_scene', description: 'Create a new scene from template.', schema: createSceneSchema, handler: handleCreateScene });
   registry.register({ name: 'edit_scene', description: 'Apply batch operations to a scene.', schema: editSceneSchema, handler: handleEditScene });
@@ -352,7 +352,7 @@ export function registerAllTools(registry: ToolRegistry): void {
   registry.register({ name: 'set_collision_shape', description: 'Set collision shape for CollisionShape node.', schema: setCollisionShapeSchema, handler: handleSetCollisionShape });
   registry.register({ name: 'load_sprite', description: 'Load a texture onto a Sprite2D node.', schema: loadSpriteSchema, handler: handleLoadSprite });
 
-  // Script + Shader (19)
+  // Script + Shader (21)
   registry.register({ name: 'read_script', description: 'Read a script file with line numbers.', schema: readScriptSchema, handler: handleReadScript });
   registry.register({ name: 'write_script', description: 'Write content to a script file.', schema: writeScriptSchema, handler: handleWriteScript });
   registry.register({ name: 'create_script', description: 'Create a new script from template.', schema: createScriptSchema, handler: handleCreateScript });
@@ -396,7 +396,7 @@ export function registerAllTools(registry: ToolRegistry): void {
   registry.register({ name: 'is_editor_running', description: 'Check if Godot editor is running.', schema: isEditorRunningSchema, handler: () => handleIsEditorRunning() });
   registry.register({ name: 'list_projects', description: 'Scan directory for Godot projects.', schema: listProjectsSchema, handler: handleListProjects });
 
-  // Editor (12)
+  // Editor (89)
   registry.register({ name: 'editor_get_selection', description: 'Get selected nodes in editor.', schema: editorGetSelectionSchema, handler: () => handleEditorGetSelection() });
   registry.register({ name: 'editor_set_selection', description: 'Select node in editor.', schema: editorSetSelectionSchema, handler: (_, args) => handleEditorSetSelection(args) });
   registry.register({ name: 'editor_play', description: 'Play project from editor.', schema: editorPlaySchema, handler: () => handleEditorPlay() });
@@ -487,7 +487,7 @@ export function registerAllTools(registry: ToolRegistry): void {
   registry.register({ name: 'editor_get_performance', description: 'Get FPS, draw calls, memory usage while game is running.', schema: editorGetPerformanceMonitorsSchema, handler: () => handleEditorGetPerformanceMonitors() });
   registry.register({ name: 'editor_get_dependencies', description: 'Get all resource dependencies for a file.', schema: editorGetDependencyListSchema, handler: (_, args) => handleEditorGetDependencyList(args) });
 
-  // Visual Shader Graph Tools
+  // Shader Graph (8)
   registry.register({ name: 'create_visual_shader', description: 'Create a new VisualShader .tres graph file.', schema: createVisualShaderSchema, handler: handleCreateVisualShader });
   registry.register({ name: 'add_shader_graph_node', description: 'Add a node to a VisualShader graph. 40+ node types available (constants, math, textures, effects).', schema: addShaderGraphNodeSchema, handler: handleAddShaderGraphNode });
   registry.register({ name: 'remove_shader_graph_node', description: 'Remove a node from a VisualShader graph by index.', schema: removeShaderGraphNodeSchema, handler: handleRemoveShaderGraphNode });
@@ -497,7 +497,7 @@ export function registerAllTools(registry: ToolRegistry): void {
   registry.register({ name: 'list_shader_node_types', description: 'List all VisualShader node types organized by category with input/output counts.', schema: listShaderNodeTypesSchema, handler: (_, args) => handleListShaderNodeTypes(args) });
   registry.register({ name: 'get_shader_node_defaults', description: 'Get default ports and parameters for a specific VisualShader node type.', schema: getShaderNodeDefaultsSchema, handler: (root, args) => handleGetShaderNodeDefaults(root, args) });
 
-  // Mesh Primitives & Physics Types
+  // Coverage (18)
   registry.register({ name: 'create_mesh_primitive', description: 'Create 3D mesh resource: Box, Capsule, Cylinder, Plane, Sphere, Torus, etc. (11 types).', schema: createMeshPrimitiveSchema, handler: handleCreateMeshPrimitive });
   registry.register({ name: 'create_vehicle_body', description: 'Create a VehicleBody3D with VehicleWheel nodes for car physics.', schema: createVehicleBodySchema, handler: handleCreateVehicleBody });
   registry.register({ name: 'read_vehicle_body', description: 'List VehicleBody3D nodes with wheel counts.', schema: readVehicleBodySchema, handler: handleReadVehicleBody });
@@ -632,7 +632,7 @@ export function registerAllTools(registry: ToolRegistry): void {
   registry.register({ name: 'list_skeletons', description: 'List Skeleton nodes.', schema: listSkeletonsSchema, handler: handleListSkeletons });
   registry.register({ name: 'read_skeleton', description: 'Read Skeleton bone hierarchy.', schema: readSkeletonSchema, handler: handleReadSkeleton });
   registry.register({ name: 'read_reflection_probe', description: 'List GI probes.', schema: readReflectionProbeSchema, handler: handleReadReflectionProbe });
-  registry.register({ name: 'read_multimesh', description: 'List MultiMeshInstance nodes.', schema: { scene_path: z.string().optional().describe('Filter to scene') }, handler: handleReadMultiMesh });
+  registry.register({ name: 'read_multimesh', description: 'List MultiMeshInstance nodes.', schema: readMultiMeshSchema, handler: handleReadMultiMesh });
   registry.register({ name: 'create_noise_texture', description: 'Create NoiseTexture2D.', schema: createNoiseTextureSchema, handler: handleCreateNoiseTexture });
 
   // Node Inspectors (8)
