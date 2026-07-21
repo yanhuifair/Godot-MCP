@@ -1,3 +1,5 @@
+// Copyright (c) 2026 FairYan
+// SPDX-License-Identifier: MIT
 // ============================================================
 // Godot MCP Server — Live Editor Bridge v1.3.3 (dual-mode)
 // ============================================================
@@ -15,7 +17,8 @@ import { ErrorCode, toolError, wrapError } from '../utils/errors.js';
 import { findGodotBinary } from '../utils/godot_cli.js';
 
 const EDITOR_PORT = 9876;
-const TCP_TIMEOUT = 800;  // quick check for existing editor (reduced from 3000ms)
+const TCP_CONNECT_TIMEOUT = 800;   // quick probe for an existing editor on 127.0.0.1
+const TCP_RESPONSE_TIMEOUT = 30000; // per-request response wait (heavy ops: bake, reimport, run_gdscript)
 const SPAWN_TIMEOUT = 15000;
 const HEALTH_CACHE_MS = 60000;  // 60s health cache (was 30s)
 const MAX_RESTART_ATTEMPTS = 3;
@@ -36,16 +39,19 @@ let _requestIdCounter = 0;
 let _tcpClient: net.Socket | null = null;
 let _tcpBuf = '';
 let _tcpPending: Map<number, { resolve: (value: any) => void; reject: (err: Error) => void }> = new Map();
-let _tcpReconnecting = false;
+/** In-progress connect promise — shared by concurrent callers so only one socket is opened. */
+let _tcpConnecting: Promise<net.Socket> | null = null;
 
 function getTcpConnection(): Promise<net.Socket> {
-  return new Promise((resolve, reject) => {
-    // Return existing healthy connection
-    if (_tcpClient && !_tcpClient.destroyed && _tcpClient.readyState === 'open') {
-      resolve(_tcpClient);
-      return;
-    }
+  // Return existing healthy connection
+  if (_tcpClient && !_tcpClient.destroyed && _tcpClient.readyState === 'open') {
+    return Promise.resolve(_tcpClient);
+  }
 
+  // Share an in-progress connect so concurrent callers don't open multiple sockets
+  if (_tcpConnecting) return _tcpConnecting;
+
+  _tcpConnecting = new Promise((resolve, reject) => {
     // Close stale connection
     if (_tcpClient) {
       try { _tcpClient.destroy(); } catch {}
@@ -53,7 +59,7 @@ function getTcpConnection(): Promise<net.Socket> {
     }
 
     // Reject all pending
-    for (const [id, p] of _tcpPending) {
+    for (const [, p] of _tcpPending) {
       p.reject(new Error('Connection lost'));
     }
     _tcpPending.clear();
@@ -62,12 +68,25 @@ function getTcpConnection(): Promise<net.Socket> {
     const client = new net.Socket();
     const timer = setTimeout(() => {
       client.destroy();
+      _tcpConnecting = null;
+      _useTcp = null; // allow re-probe / spawn fallback on next call
       reject(new Error('TCP connection timed out'));
-    }, TCP_TIMEOUT);
+    }, TCP_CONNECT_TIMEOUT);
+
+    // Connect-phase error handler (auto-removed once connected)
+    const onConnectError = (err: Error) => {
+      clearTimeout(timer);
+      _tcpConnecting = null;
+      _useTcp = null;
+      reject(new Error(`TCP connection failed: ${err.message}`));
+    };
+    client.once('error', onConnectError);
 
     client.connect(EDITOR_PORT, '127.0.0.1', () => {
       clearTimeout(timer);
+      client.removeListener('error', onConnectError);
       _tcpClient = client;
+      _tcpConnecting = null;
       _lastHealthCheck = Date.now();
       _lastHealthStatus = true;
       _useTcp = true;
@@ -98,6 +117,7 @@ function getTcpConnection(): Promise<net.Socket> {
       client.on('error', () => {
         _lastHealthStatus = false;
         _tcpClient = null;
+        _useTcp = null; // connection lost → re-probe / spawn fallback on next call
         for (const [, p] of _tcpPending) {
           p.reject(new Error('TCP connection error'));
         }
@@ -106,6 +126,7 @@ function getTcpConnection(): Promise<net.Socket> {
 
       client.on('close', () => {
         _tcpClient = null;
+        _useTcp = null; // connection lost → re-probe / spawn fallback on next call
         for (const [, p] of _tcpPending) {
           p.reject(new Error('TCP connection closed'));
         }
@@ -114,12 +135,9 @@ function getTcpConnection(): Promise<net.Socket> {
 
       resolve(client);
     });
-
-    client.on('error', () => {
-      clearTimeout(timer);
-      reject(new Error('TCP connection failed'));
-    });
   });
+
+  return _tcpConnecting;
 }
 
 // ---- Dual-mode send ----
@@ -146,7 +164,7 @@ async function sendViaTcp(method: string, params: Record<string, any> = {}): Pro
     const timer = setTimeout(() => {
       _tcpPending.delete(id);
       reject(new Error('TCP request timed out'));
-    }, TCP_TIMEOUT);
+    }, TCP_RESPONSE_TIMEOUT);
 
     _tcpPending.set(id, {
       resolve: (result) => { clearTimeout(timer); resolve(result); },
@@ -235,6 +253,10 @@ function ensureEditorProcess(): ChildProcess {
     console.error(`[Godot MCP] Failed to spawn editor: ${err.message}`);
     _lastHealthStatus = false;
     _editorProcess = null;
+    for (const [, resolver] of _pendingRequests) {
+      resolver.reject(new Error(`Editor spawn error: ${err.message}`));
+    }
+    _pendingRequests.clear();
   });
 
   return _editorProcess;
@@ -247,11 +269,15 @@ function sendViaSpawn(method: string, params: Record<string, any> = {}): Promise
       const id = ++_requestIdCounter;
       const request = JSON.stringify({ jsonrpc: '2.0', id, method, params }) + '\n';
 
-      _pendingRequests.set(id, { resolve, reject });
+      let timer: NodeJS.Timeout;
+      _pendingRequests.set(id, {
+        resolve: (result) => { clearTimeout(timer); resolve(result); },
+        reject: (err) => { clearTimeout(timer); reject(err); },
+      });
       _useTcp = false;
       proc.stdin!.write(request);
 
-      setTimeout(() => {
+      timer = setTimeout(() => {
         if (_pendingRequests.has(id)) {
           _pendingRequests.delete(id);
           reject(new Error(`Editor command timed out: ${method}`));
@@ -283,7 +309,22 @@ export function shutdownEditorBridge(): void {
     _editorProcess.kill();
   }
   _editorProcess = null;
+  for (const [, resolver] of _pendingRequests) {
+    resolver.reject(new Error('Server shutting down'));
+  }
   _pendingRequests.clear();
+
+  // Tear down the persistent TCP connection too
+  for (const [, p] of _tcpPending) {
+    p.reject(new Error('Server shutting down'));
+  }
+  _tcpPending.clear();
+  if (_tcpClient) {
+    try { _tcpClient.destroy(); } catch {}
+    _tcpClient = null;
+  }
+  _tcpConnecting = null;
+  _useTcp = null;
 }
 
 // ---- Tool Schemas ----

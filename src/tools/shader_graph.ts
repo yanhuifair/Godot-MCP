@@ -1,3 +1,5 @@
+// Copyright (c) 2026 FairYan
+// SPDX-License-Identifier: MIT
 // ============================================================
 // Godot MCP Server - Visual Shader Graph Tools
 // ============================================================

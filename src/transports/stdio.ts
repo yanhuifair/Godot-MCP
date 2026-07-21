@@ -1,3 +1,5 @@
+// Copyright (c) 2026 FairYan
+// SPDX-License-Identifier: MIT
 // ============================================================
 // Stdio Transport - 标准输入输出通信
 // ============================================================
@@ -36,7 +38,10 @@ export async function runStdioTransport(options: StdioTransportOptions = {}): Pr
   console.error('[Godot MCP] Stdio transport connected. Waiting for messages...');
 
   // 优雅关闭
+  let shuttingDown = false;
   const shutdown = async () => {
+    if (shuttingDown) return;
+    shuttingDown = true;
     console.error('[Godot MCP] Shutting down Stdio transport...');
     shutdownEditorBridge();
     cleanupProcesses();

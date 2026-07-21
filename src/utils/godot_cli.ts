@@ -1,8 +1,10 @@
+// Copyright (c) 2026 FairYan
+// SPDX-License-Identifier: MIT
 // ============================================================
 // Godot MCP Server - Godot CLI Detection and Execution
 // ============================================================
 
-import { execSync, spawn, ChildProcess } from 'node:child_process';
+import { execSync, spawn, spawnSync, ChildProcess } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -117,12 +119,14 @@ export function findGodotBinary(godotPath?: string): string | null {
  */
 export function getGodotVersion(godotPath: string): GodotVersionInfo {
   try {
-    const version = execSync(`"${godotPath}" --version 2>/dev/null`, {
+    const result = spawnSync(godotPath, ['--version'], {
       encoding: 'utf-8',
-    }).trim();
+      timeout: 5000,
+    });
+    const version = (result.stdout || '').trim();
 
     return {
-      version,
+      version: version || 'unknown',
       path: godotPath,
       platform: os.platform(),
     };
@@ -395,11 +399,11 @@ export function captureScreenshot(
       }
 
       if (windowID) {
-        // Capture by window ID
-        execSync(`screencapture -T ${delay} -l ${windowID} "${absPath}" 2>/dev/null`, { timeout: 15000 });
+        // Capture by window ID — args passed literally (no shell) to prevent injection
+        spawnSync('screencapture', ['-T', String(delay), '-l', windowID, absPath], { timeout: 15000 });
       } else {
-        // Fallback: capture all windows matching the title pattern, or capture interactive selection
-        execSync(`screencapture -T ${delay} -w "${absPath}" 2>/dev/null`, { timeout: 15000 });
+        // Fallback: capture active window
+        spawnSync('screencapture', ['-T', String(delay), '-w', absPath], { timeout: 15000 });
       }
 
       if (fs.existsSync(absPath)) {
@@ -411,10 +415,10 @@ export function captureScreenshot(
     if (platform === 'linux') {
       const absPath = path.resolve(outputPath);
       try {
-        execSync(`import -window root -delay 100 "${absPath}" 2>/dev/null`, { timeout: 8000 });
+        spawnSync('import', ['-window', 'root', '-delay', '100', absPath], { timeout: 8000 });
       } catch {
         // fallback: try gnome-screenshot
-        execSync(`gnome-screenshot -f "${absPath}" 2>/dev/null`, { timeout: 8000 });
+        spawnSync('gnome-screenshot', ['-f', absPath], { timeout: 8000 });
       }
       if (fs.existsSync(absPath)) {
         return { success: true, message: `Screenshot saved to ${absPath}`, path: absPath };
@@ -426,7 +430,7 @@ export function captureScreenshot(
       // Windows: use PowerShell to capture screen
       const absPath = path.resolve(outputPath);
       const psCmd = `Add-Type -AssemblyName System.Windows.Forms; $s=[System.Windows.Forms.Screen]::AllScreens[0]; $b=new-object Drawing.Bitmap($s.Bounds.Width,$s.Bounds.Height); $g=[Drawing.Graphics]::FromImage($b); $g.CopyFromScreen($s.Bounds.Location, [Drawing.Point]::Empty, $s.Bounds.Size); $b.Save('${absPath.replace(/'/g, "''")}'); $g.Dispose(); $b.Dispose()`;
-      execSync(`powershell -Command "${psCmd}"`, { timeout: 10000 });
+      spawnSync('powershell', ['-Command', psCmd], { timeout: 10000 });
       if (fs.existsSync(absPath)) {
         return { success: true, message: `Screenshot saved to ${absPath}`, path: absPath };
       }

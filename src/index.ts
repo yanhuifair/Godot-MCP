@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// Copyright (c) 2026 FairYan
+// SPDX-License-Identifier: MIT
 // ============================================================
 // Godot MCP Server - Entry Point (v1.2.0)
 // ============================================================
@@ -17,6 +19,14 @@ import { runStdioTransport } from './transports/stdio.js';
 import { runHttpTransport } from './transports/http-server.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// ---- 全局异常兜底：防止未捕获的 rejection/异常导致进程崩溃 ----
+process.on('unhandledRejection', (reason) => {
+  console.error('[Godot MCP] Unhandled rejection:', reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('[Godot MCP] Uncaught exception:', err);
+});
 
 // ---- Transport 类型 ----
 

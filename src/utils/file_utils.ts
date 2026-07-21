@@ -1,3 +1,5 @@
+// Copyright (c) 2026 FairYan
+// SPDX-License-Identifier: MIT
 // ============================================================
 // Godot MCP Server - File System Utilities
 // ============================================================
@@ -91,7 +93,7 @@ export function listFiles(
   pattern?: string,
   recursive: boolean = true
 ): FileEntry[] {
-  const dirPath = path.resolve(projectRoot, subPath);
+  const dirPath = resolveProjectPath(projectRoot, subPath || '');
   if (!fs.existsSync(dirPath)) {
     throw new Error(`Directory not found: ${subPath}`);
   }
@@ -278,7 +280,16 @@ export function writeTextFile(absolutePath: string, content: string, createBacku
     fs.copyFileSync(absolutePath, backupPath);
   }
 
-  fs.writeFileSync(absolutePath, content, 'utf-8');
+  // Atomic write: write to a temp file in the same directory, then rename.
+  // Prevents leaving a partially-written (corrupted) file if the process crashes mid-write.
+  const tmpPath = `${absolutePath}.tmp.${process.pid}`;
+  fs.writeFileSync(tmpPath, content, 'utf-8');
+  try {
+    fs.renameSync(tmpPath, absolutePath);
+  } catch (err) {
+    try { fs.unlinkSync(tmpPath); } catch { /* best-effort cleanup */ }
+    throw err;
+  }
 }
 
 /**
@@ -318,7 +329,8 @@ export function findFilesByExtension(
     }
   }
 
-  walk(path.resolve(projectRoot, subPath), subPath || '');
+  const startDir = resolveProjectPath(projectRoot, subPath || '');
+  walk(startDir, subPath || '');
   return results;
 }
 

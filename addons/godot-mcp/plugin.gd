@@ -1,6 +1,9 @@
 @tool
 extends EditorPlugin
 
+# Copyright (c) 2026 FairYan
+# SPDX-License-Identifier: MIT
+
 # ============================================================
 # Godot MCP Editor Plugin v1.3.9
 # ============================================================

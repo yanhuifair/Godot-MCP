@@ -1,3 +1,5 @@
+// Copyright (c) 2026 FairYan
+// SPDX-License-Identifier: MIT
 // ============================================================
 // HTTP Transport - SSE + Streamable HTTP 双协议支持
 // ============================================================
@@ -9,12 +11,14 @@
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Express, Request, Response, NextFunction } from 'express';
+import { timingSafeEqual } from 'node:crypto';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { createMcpExpressApp } from '@modelcontextprotocol/sdk/server/express.js';
 import { randomUUID } from 'node:crypto';
 import { createMcpServer, initSharedResources, getProjectRoot } from '../server.js';
 import { initEditorBridge, shutdownEditorBridge } from '../tools/editor.js';
+import { cleanupProcesses } from '../utils/godot_cli.js';
 
 export interface HttpTransportOptions {
   /** HTTP 监听端口，默认 3000 */
@@ -27,6 +31,16 @@ export interface HttpTransportOptions {
   enableSse?: boolean;
   /** 是否启用 Streamable HTTP 端点，默认 true */
   enableStreamableHttp?: boolean;
+}
+
+/** Constant-time string comparison to avoid timing side-channels on token checks. */
+function safeTokenEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  try {
+    return timingSafeEqual(Buffer.from(a), Buffer.from(b));
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -73,7 +87,7 @@ export async function runHttpTransport(options: HttpTransportOptions = {}): Prom
         : undefined;
       const fromQuery = typeof req.query.token === 'string' ? req.query.token : undefined;
       const provided = fromHeader ?? fromQuery;
-      if (provided && provided === mcpToken) return next();
+      if (provided && safeTokenEqual(provided, mcpToken)) return next();
       res.status(401).json({ error: 'Unauthorized: invalid or missing token' });
     };
     app.use(['/mcp', '/sse'], authMiddleware);
@@ -117,9 +131,13 @@ export async function runHttpTransport(options: HttpTransportOptions = {}): Prom
   });
 
   // 优雅关闭
+  let shuttingDown = false;
   const shutdown = async () => {
+    if (shuttingDown) return;
+    shuttingDown = true;
     console.error('[Godot MCP] Shutting down HTTP server...');
     shutdownEditorBridge();
+    cleanupProcesses(); // kill any spawned Godot editor/game/export processes
     server.close();
     process.exit(0);
   };
@@ -187,18 +205,19 @@ function setupSseEndpoint(app: Express): void {
     const server = createMcpServer();
     const transport = new SSEServerTransport('/sse', res as unknown as ServerResponse);
 
-    transport.onclose = () => {
-      console.error('[Godot MCP] SSE connection closed');
-    };
-
     await server.connect(transport);
     await transport.start();
 
     // 存储 transport 引用以便 POST 请求能找到对应的会话
-    // 使用 query param 或 header 中的 sessionId
     const sessionId = transport.sessionId;
     res.setHeader('Mcp-Session-Id', sessionId);
     sseTransports.set(sessionId, { server, transport });
+
+    transport.onclose = () => {
+      console.error(`[Godot MCP] SSE connection closed: ${sessionId}`);
+      sseTransports.delete(sessionId);
+      try { (server as any).close?.(); } catch { /* best-effort disposal */ }
+    };
   });
 
   // POST /sse — 接收客户端消息

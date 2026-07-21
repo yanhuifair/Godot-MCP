@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// Copyright (c) 2026 FairYan
+// SPDX-License-Identifier: MIT
 // ============================================================
 // sync-addons.js — 构建后将 addons 复制到目标 Godot 工程
 // ============================================================

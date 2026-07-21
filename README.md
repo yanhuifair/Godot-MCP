@@ -1296,3 +1296,6 @@ code --install-extension godot-mcp-1.3.9.vsix
 ## License
 
 MIT
+
+## Tip
+![alt text](tip.JPG)
