@@ -1,7 +1,7 @@
 # <div align="center">Godot MCP</div>
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-142%20passed-brightgreen)](.)
+[![Tests](https://img.shields.io/badge/tests-140%20passed-brightgreen)](.)
 [![npm](https://img.shields.io/npm/v/@yanhuifair/godot-mcp)](https://www.npmjs.com/package/@yanhuifair/godot-mcp)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-green)](.)
 [![Godot](https://img.shields.io/badge/godot-4.x-blue)](https://godotengine.org)
@@ -217,7 +217,7 @@ godot-mcp/
 │   └── godot-mcp/            # Godot editor plugin
 │       ├── plugin.cfg         # Plugin metadata
 │       └── plugin.gd          # stdin reader, TCP server, 97 command handlers
-├── test/                     # Vitest suite (142 tests) + legacy .mjs suites
+├── test/                     # Vitest suite (140 tests) + legacy .mjs suites
 │   ├── test_all.mjs          # Legacy standalone suite (167 tool checks)
 │   ├── test_editor.mjs       # Legacy editor bridge TCP tests
 │   ├── test_runner.mjs       # Early integration test runner
@@ -364,7 +364,7 @@ Starts: Stdio + SSE (`/sse`) + Streamable HTTP (`/mcp`) + Health Check (`/health
 
 ```bash
 curl http://127.0.0.1:3000/health
-# {"status":"ok","version":"1.3.9","projectRoot":"/path/to/project","endpoints":{...}}
+# {"status":"ok","version":"1.4.0","projectRoot":"/path/to/project","endpoints":{...}}
 ```
 
 ---
@@ -1237,7 +1237,7 @@ Click each category to expand and see all tools with descriptions.
 npm install          # Install dependencies
 npm run build        # Build TypeScript to dist/
 npm run dev          # Dev mode (tsx hot reload)
-npm test             # Run vitest suite (142 tests); node test/test_all.mjs for 167 legacy checks
+npm test             # Run vitest suite (140 tests); node test/test_all.mjs for 167 legacy checks
 npm run test:watch   # Watch mode
 ```
 
@@ -1273,13 +1273,13 @@ npm run test:watch   # Watch mode
 
 ```bash
 npm run vsix
-# Output: godot-mcp-1.3.9.vsix
+# Output: godot-mcp-1.4.0.vsix
 ```
 
 Install in VS Code:
 
 ```bash
-code --install-extension godot-mcp-1.3.9.vsix
+code --install-extension godot-mcp-1.4.0.vsix
 ```
 
 ---

@@ -113,41 +113,6 @@ describe('Error System', () => {
   });
 });
 
-// ---- File Cache Tests ----
-
-describe('FileCache', () => {
-  it('caches parsed values', async () => {
-    const { FileCache } = await import('../src/utils/cache.js');
-    const cache = new FileCache<string>();
-
-    let calls = 0;
-    const loader = (absPath: string) => { calls++; return `loaded:${absPath}`; };
-
-    const fp = path.join(testDir, 'project.godot');
-    const v1 = cache.get(fp, loader);
-    const v2 = cache.get(fp, loader);
-
-    expect(v1).toBe(v2);
-    expect(calls).toBe(1); // loader only called once
-    expect(cache.size).toBe(1);
-  });
-
-  it('invalidates single entry', async () => {
-    const { FileCache } = await import('../src/utils/cache.js');
-    const cache = new FileCache<string>();
-
-    let calls = 0;
-    const loader = (absPath: string) => { calls++; return absPath; };
-
-    const fp = path.join(testDir, 'project.godot');
-    cache.get(fp, loader);
-    cache.invalidate(fp);
-    cache.get(fp, loader);
-
-    expect(calls).toBe(2);
-  });
-});
-
 // ---- Input Map Writer Tests ----
 
 describe('Input Map Writer', () => {

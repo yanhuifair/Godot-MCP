@@ -5,7 +5,7 @@ extends EditorPlugin
 # SPDX-License-Identifier: MIT
 
 # ============================================================
-# Godot MCP Editor Plugin v1.3.9
+# Godot MCP Editor Plugin v1.4.0
 # ============================================================
 # ⚠️  Godot 4.x only. Godot 3 is NOT supported.
 # Dual-mode communication with the MCP server:
@@ -46,7 +46,7 @@ func _enter_tree() -> void:
 
 	if _stdio_mode:
 		_start_stdin_reader()
-		_send_stdout({"jsonrpc": "2.0", "id": 0, "result": {"ready": true, "version": "1.3.9"}})
+		_send_stdout({"jsonrpc": "2.0", "id": 0, "result": {"ready": true, "version": "1.4.0"}})
 	else:
 		_start_tcp_server()
 
@@ -54,9 +54,9 @@ func _enter_tree() -> void:
 	set_process(true)
 
 	if _stdio_mode:
-		print("[Godot MCP] Plugin v1.3.9 loaded — stdio mode")
+		print("[Godot MCP] Plugin v1.4.0 loaded — stdio mode")
 	else:
-		print("[Godot MCP] Plugin v1.3.9 loaded — TCP on port ", DEFAULT_PORT)
+		print("[Godot MCP] Plugin v1.4.0 loaded — TCP on port ", DEFAULT_PORT)
 
 
 func _exit_tree() -> void:

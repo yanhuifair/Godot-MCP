@@ -1,7 +1,7 @@
 # <div align="center">Godot MCP</div>
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-142%20passed-brightgreen)](.)
+[![Tests](https://img.shields.io/badge/tests-140%20passed-brightgreen)](.)
 [![npm](https://img.shields.io/npm/v/@yanhuifair/godot-mcp)](https://www.npmjs.com/package/@yanhuifair/godot-mcp)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-green)](.)
 [![Godot](https://img.shields.io/badge/godot-4.x-blue)](https://godotengine.org)
@@ -250,7 +250,7 @@ godot-mcp/
 │   └── godot-mcp/            # Godot 编辑器插件
 │       ├── plugin.cfg         # 插件元数据
 │       └── plugin.gd          # stdin 读取器、TCP 服务器、97 个命令处理器
-├── test/                     # Vitest 套件（142 个测试）+ 旧版 .mjs 套件
+├── test/                     # Vitest 套件（140 个测试）+ 旧版 .mjs 套件
 │   ├── test_all.mjs          # 旧版独立套件（167 项工具检查）
 │   ├── test_editor.mjs       # Editor 桥 TCP 测试
 │   ├── test_runner.mjs       # 早期集成测试
@@ -396,7 +396,7 @@ npx @yanhuifair/godot-mcp -t all --port 3000 -p /path/to/your/godot/project
 
 ```bash
 curl http://127.0.0.1:3000/health
-# {"status":"ok","version":"1.3.9","projectRoot":"/path/to/project","endpoints":{...}}
+# {"status":"ok","version":"1.4.0","projectRoot":"/path/to/project","endpoints":{...}}
 ```
 
 ---
@@ -1249,7 +1249,7 @@ npx @yanhuifair/godot-mcp --enable-plugin -p /path/to/your/godot/project
 npm install          # 安装依赖
 npm run build        # 构建 TypeScript 到 dist/
 npm run dev          # 开发模式（tsx 热重载）
-npm test             # 运行 vitest 套件（142 个测试）；node test/test_all.mjs 运行 167 项旧版检查
+npm test             # 运行 vitest 套件（140 个测试）；node test/test_all.mjs 运行 167 项旧版检查
 npm run test:watch   # 监听模式
 ```
 
@@ -1285,13 +1285,13 @@ npm run test:watch   # 监听模式
 
 ```bash
 npm run vsix
-# 输出: godot-mcp-1.3.9.vsix
+# 输出: godot-mcp-1.4.0.vsix
 ```
 
 在 VS Code 中安装：
 
 ```bash
-code --install-extension godot-mcp-1.3.9.vsix
+code --install-extension godot-mcp-1.4.0.vsix
 ```
 
 ---

@@ -375,37 +375,3 @@ export function moveFile(projectRoot: string, sourcePath: string, destPath: stri
 
   fs.renameSync(absSource, absDest);
 }
-
-// ============================================================
-// File Lock — 防止并发写入同一场景文件
-// ============================================================
-
-const fileLocks = new Map<string, Promise<void>>();
-
-/**
- * 获取文件写入锁，防止并发修改同一文件导致数据损坏。
- * 用法：await withFileLock(absPath, async () => { ... write ... })
- */
-export async function withFileLock<T>(
-  absolutePath: string,
-  fn: () => Promise<T>
-): Promise<T> {
-  const key = path.resolve(absolutePath);
-
-  // 等待当前锁释放
-  while (fileLocks.has(key)) {
-    await fileLocks.get(key)!.catch(() => {});
-  }
-
-  // 创建新锁
-  let release: () => void;
-  const lock = new Promise<void>((resolve) => { release = resolve; });
-  fileLocks.set(key, lock);
-
-  try {
-    return await fn();
-  } finally {
-    fileLocks.delete(key);
-    release!();
-  }
-}

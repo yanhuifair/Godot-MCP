@@ -853,10 +853,8 @@ export function handleSetCollisionShape(
 function doSceneOp(projectRoot: string, scenePath: string, op: SceneOperation, label: string): ToolResult {
   try {
     const absPath = resolveProjectPath(projectRoot, scenePath);
-    // 注意：此函数是同步的（被同步 handler 调用），但 withFileLock 是异步的。
-    // 由于 Node.js 是单线程事件循环，同步文件操作天然串行——只要不在同一事件循环
-    // tick 内并发调用即可。MCP 工具调用是串行的，所以实际不存在并发问题。
-    // 但如果未来改为异步，请在调用链上升级为 async/await + withFileLock。
+    // 注意：此函数是同步的，被同步 handler 调用。Node.js 是单线程事件循环，
+    // 同步文件操作天然串行——MCP 工具调用是串行的，所以实际不存在并发问题。
     const { content } = readTextFile(absPath);
     const modified = editScene(content, [op]);
     writeTextFile(absPath, modified, true);

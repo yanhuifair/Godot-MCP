@@ -15,6 +15,23 @@ import {
 } from '../utils/file_utils.js';
 import { parseResource } from '../parsers/resource_parser.js';
 
+// ---- GDScript identifier validation ----
+// Names fed into generated GDScript must be valid identifiers so a caller (or
+// prompt-injection) cannot smuggle statements/code into the target file.
+const GD_SCRIPT_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
+/** A single-line value with no control chars, statement separators, or comments. Optional fields pass `undefined`, which is valid (no value). */
+function isSingleLineSafe(s: string | undefined): boolean {
+  if (s === undefined) return true;
+  return !/[\x00-\x1f\x7f;#]/.test(s);
+}
+/** Validate one GDScript parameter entry: `name[: type[= default]]`. */
+function isValidGdParam(p: string): boolean {
+  const t = p.trim();
+  if (!isSingleLineSafe(t)) return false;
+  if (/[()]/.test(t)) return false; // reject grouping/paren tricks
+  return /^([A-Za-z_]\w*)(?::\s*(.+))?$/.test(t);
+}
+
 // ---- Tool Schemas ----
 
 export const readScriptSchema = {
@@ -839,25 +856,25 @@ export function handleListShaderIncludes(
 
 export const addScriptFunctionSchema = {
   path: z.string().describe('Path to .gd script file'),
-  func_name: z.string().min(1).describe('Function name'),
-  params: z.array(z.string()).optional().default([]).describe('Parameter names (e.g. ["delta: float"])'),
-  return_type: z.string().optional().describe('Return type hint'),
+  func_name: z.string().min(1).refine(v => GD_SCRIPT_IDENTIFIER.test(v), 'func_name must be a valid GDScript identifier (e.g. "my_func")').describe('Function name'),
+  params: z.array(z.string()).optional().default([]).refine(arr => arr.every(isValidGdParam), 'Each param must be a valid GDScript parameter (e.g. "delta: float")').describe('Parameter names (e.g. ["delta: float"])'),
+  return_type: z.string().optional().refine(v => isSingleLineSafe(v), 'return_type must be a single line').describe('Return type hint'),
   body: z.string().optional().default('pass').describe('Function body'),
   after_func: z.string().optional().describe('Insert after this function'),
 };
 
 export const addScriptSignalSchema = {
   path: z.string().describe('Path to .gd script file'),
-  signal_name: z.string().min(1).describe('Signal name'),
-  params: z.array(z.string()).optional().default([]).describe('Signal parameters'),
+  signal_name: z.string().min(1).refine(v => GD_SCRIPT_IDENTIFIER.test(v), 'signal_name must be a valid GDScript identifier').describe('Signal name'),
+  params: z.array(z.string()).optional().default([]).refine(arr => arr.every(isValidGdParam), 'Each param must be a valid GDScript parameter').describe('Signal parameters'),
 };
 
 export const addScriptExportSchema = {
   path: z.string().describe('Path to .gd script file'),
-  var_name: z.string().min(1).describe('Variable name'),
-  var_type: z.string().optional().describe('Type hint'),
+  var_name: z.string().min(1).refine(v => GD_SCRIPT_IDENTIFIER.test(v), 'var_name must be a valid GDScript identifier').describe('Variable name'),
+  var_type: z.string().optional().refine(v => isSingleLineSafe(v), 'var_type must be a single line').describe('Type hint'),
   default_value: z.string().optional().describe('Default value'),
-  export_hint: z.string().optional().describe('Export hint (e.g. "int, 0, 100")'),
+  export_hint: z.string().optional().refine(v => isSingleLineSafe(v), 'export_hint must be a single line').describe('Export hint (e.g. "int, 0, 100")'),
 };
 
 export function handleAddScriptFunction(

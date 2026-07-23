@@ -1,7 +1,7 @@
 // Copyright (c) 2026 FairYan
 // SPDX-License-Identifier: MIT
 // ============================================================
-// Godot MCP Server - Server Factory & Handlers (v1.3.9)
+// Godot MCP Server - Server Factory & Handlers (v1.4.0)
 // ============================================================
 // 将 MCP Server 创建、工具注册、请求处理抽离为独立工厂函数，
 // 供 Stdio、SSE、Streamable HTTP 三种传输层共用。
@@ -65,7 +65,7 @@ export function createMcpServer(options: CreateServerOptions = {}): Server {
   const { registry } = initSharedResources();
 
   const server = new Server(
-    { name: 'godot-mcp', version: '1.3.9' },
+    { name: 'godot-mcp', version: '1.4.0' },
     { capabilities: { tools: {} } }
   );
 

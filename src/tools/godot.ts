@@ -18,6 +18,7 @@ import {
   detectRunningGodot,
 } from '../utils/godot_cli.js';
 import { sendEditorCommand } from './editor.js';
+import { resolveProjectPath } from '../utils/file_utils.js';
 import fs from 'node:fs';
 import pathMod from 'node:path';
 
@@ -227,15 +228,15 @@ export function handleExportProject(
 }
 
 export function handleCaptureScreenshot(
-  _projectRoot: string,
+  projectRoot: string,
   args: { output_path?: string; window_title?: string; delay?: number }
 ): ToolResult {
   try {
-    const result = captureScreenshot(
-      args.output_path || 'screenshot.png',
-      args.window_title,
-      args.delay
-    );
+    // Keep the screenshot inside the project sandbox like every other write tool.
+    const outputPath = args.output_path
+      ? resolveProjectPath(projectRoot, args.output_path)
+      : pathMod.join(projectRoot, 'screenshot.png');
+    const result = captureScreenshot(outputPath, args.window_title, args.delay);
 
     if (result.success) {
       return { content: [{ type: 'text', text: result.message }] };

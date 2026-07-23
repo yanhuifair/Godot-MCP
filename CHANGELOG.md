@@ -1,4 +1,11 @@
 # Changelog
+## v1.4.0 (2026-07-23)
+
+### Security & Hardening
+- **script.ts** — GDScript identifier validation for `add_script_function` / `add_script_signal` / `add_script_export`. `func_name`, `signal_name`, `var_name` must now be valid GDScript identifiers, and `params` / `return_type` / `var_type` / `export_hint` are rejected if they contain control chars, statement separators, or comment markers — preventing crafted input from smuggling code into generated `.gd` files.
+- **godot.ts** — `capture_screenshot` output path is now constrained to the project root via `resolveProjectPath` (was `path.resolve`, which allowed writing the screenshot anywhere on disk, bypassing the project sandbox every other write tool respects).
+- **cleanup** — Removed dead code: `src/utils/cache.ts` (`FileCache` / `sceneCache` / `resourceCache` / `configCache`) and the unused `withFileLock` helper in `src/utils/file_utils.ts`.
+
 ## v1.3.9 (2026-07-16)
 
 ### Bug Fixes
