@@ -8,7 +8,7 @@
 // Collision layer names are in project.godot [physics] section.
 
 import { z } from 'zod';
-import { plainError } from '../utils/errors.js';
+import { toolError, ErrorCode } from '../utils/errors.js';
 import { ToolResult } from '../utils/types.js';
 import { readTextFile, resolveProjectPath, findFilesByExtension, writeTextFile } from '../utils/file_utils.js';
 import { parseResource } from '../parsers/resource_parser.js';
@@ -73,7 +73,7 @@ export function handleListPhysicsMaterials(
 
     return { content: [{ type: 'text', text: lines.join('\n') }] };
   } catch (err: any) {
-    return plainError(`Error: ${err.message}`);
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
   }
 }
 
@@ -87,7 +87,7 @@ export function handleReadPhysicsMaterial(
     const doc = parseResource(content);
 
     if (doc.header.type !== 'PhysicsMaterial') {
-            return plainError(`File is not a PhysicsMaterial (found: ${doc.header.type})`);
+            return toolError(ErrorCode.INTERNAL_ERROR, `File is not a PhysicsMaterial (found: ${doc.header.type})`);
     }
 
     const lines: string[] = [];
@@ -108,7 +108,7 @@ export function handleReadPhysicsMaterial(
 
     return { content: [{ type: 'text', text: lines.join('\n') }] };
   } catch (err: any) {
-    return plainError(`Error: ${err.message}`);
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
   }
 }
 
@@ -133,7 +133,7 @@ rough = ${args.rough ?? false}
       content: [{ type: 'text', text: `PhysicsMaterial created: ${args.path}\n  friction=${args.friction ?? 0.5}  bounce=${args.bounce ?? 0.0}` }],
     };
   } catch (err: any) {
-    return plainError(`Error: ${err.message}`);
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
   }
 }
 
@@ -193,6 +193,6 @@ export function handleReadCollisionLayers(projectRoot: string): ToolResult {
 
     return { content: [{ type: 'text', text: lines.join('\n') }] };
   } catch (err: any) {
-    return plainError(`Error: ${err.message}`);
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
   }
 }

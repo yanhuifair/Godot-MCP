@@ -7,7 +7,7 @@
 // Specialized readers for Camera, Light, Particle nodes across scenes.
 
 import { z } from 'zod';
-import { plainError } from '../utils/errors.js';
+import { toolError, ErrorCode } from '../utils/errors.js';
 import { ToolResult } from '../utils/types.js';
 import { resolveProjectPath, findFilesByExtension, readTextFile, writeTextFile } from '../utils/file_utils.js';
 import { parseScene, serializeScene } from '../parsers/scene_parser.js';
@@ -138,7 +138,7 @@ export function handleListCameras(
 
     return { content: [{ type: 'text', text: lines.join('\n') }] };
   } catch (err: any) {
-    return plainError(`Error: ${err.message}`);
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
   }
 }
 
@@ -159,7 +159,7 @@ export function handleReadCamera(
     if (args.camera_name) {
       camera = allCameras.find(c => c.name === args.camera_name);
       if (!camera) {
-        return plainError(`Camera "${args.camera_name}" not found in ${args.scene_path}`);
+        return toolError(ErrorCode.FILE_NOT_FOUND, `Camera "${args.camera_name}" not found in ${args.scene_path}`);
       }
     } else {
       camera = allCameras[0];
@@ -198,7 +198,7 @@ export function handleReadCamera(
 
     return { content: [{ type: 'text', text: lines.join('\n') }] };
   } catch (err: any) {
-    return plainError(`Error: ${err.message}`);
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
   }
 }
 
@@ -252,7 +252,7 @@ export function handleListLights(
 
     return { content: [{ type: 'text', text: lines.join('\n') }] };
   } catch (err: any) {
-    return plainError(`Error: ${err.message}`);
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
   }
 }
 
@@ -271,7 +271,7 @@ export function handleSetLightParam(
     const light = allLights.find(l => l.name === args.light_name);
 
     if (!light) {
-    return plainError(`Light "${args.light_name}" not found in ${args.scene_path}`);
+    return toolError(ErrorCode.FILE_NOT_FOUND, `Light "${args.light_name}" not found in ${args.scene_path}`);
     }
 
     light.properties[args.param] = args.value;
@@ -281,7 +281,7 @@ export function handleSetLightParam(
 
     return { content: [{ type: 'text', text: `Light "${args.light_name}" updated: ${args.param} = ${args.value}` }] };
   } catch (err: any) {
-    return plainError(`Error: ${err.message}`);
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
   }
 }
 
@@ -335,6 +335,6 @@ export function handleReadParticles(
 
     return { content: [{ type: 'text', text: lines.join('\n') }] };
   } catch (err: any) {
-    return plainError(`Error: ${err.message}`);
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
   }
 }

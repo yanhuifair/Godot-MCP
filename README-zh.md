@@ -1,7 +1,7 @@
 # <div align="center">Godot MCP</div>
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-72%20passed-brightgreen)](.)
+[![CI](https://github.com/yanhuifair/Godot-MCP/actions/workflows/ci.yml/badge.svg)](https://github.com/yanhuifair/Godot-MCP/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/@yanhuifair/godot-mcp)](https://www.npmjs.com/package/@yanhuifair/godot-mcp)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-green)](.)
 [![Godot](https://img.shields.io/badge/godot-4.x-blue)](https://godotengine.org)

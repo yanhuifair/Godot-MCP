@@ -5,7 +5,7 @@
 // ============================================================
 
 import { z } from 'zod';
-import { plainError } from '../utils/errors.js';
+import { toolError, ErrorCode } from '../utils/errors.js';
 import { ToolResult } from '../utils/types.js';
 import { readTextFile, resolveProjectPath, findFilesByExtension, writeTextFile } from '../utils/file_utils.js';
 import { parseScene, serializeScene } from '../parsers/scene_parser.js';
@@ -105,7 +105,7 @@ export function handleReadMeshInstance(
 
     return { content: [{ type: 'text', text: lines.join('\n') }] };
   } catch (err: any) {
-    return plainError(`Error: ${err.message}`);
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
   }
 }
 
@@ -120,7 +120,7 @@ export function handleSetMeshSurfaceMaterial(
 
     const node = findNodeByName(doc.nodes, args.node_name);
     if (!node || !['MeshInstance3D', 'MeshInstance2D'].includes(node.type)) {
-    return plainError(`MeshInstance "${args.node_name}" not found`);
+    return toolError(ErrorCode.FILE_NOT_FOUND, `MeshInstance "${args.node_name}" not found`);
     }
 
     // Add ExtResource for the material if not already present
@@ -150,7 +150,7 @@ export function handleSetMeshSurfaceMaterial(
 
     return { content: [{ type: 'text', text: `Surface ${si} material set: ${args.material_path} on ${args.node_name}` }] };
   } catch (err: any) {
-    return plainError(`Error: ${err.message}`);
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
   }
 }
 
@@ -208,7 +208,7 @@ export function handleReadViewport(
 
     return { content: [{ type: 'text', text: lines.join('\n') }] };
   } catch (err: any) {
-    return plainError(`Error: ${err.message}`);
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
   }
 }
 
@@ -265,7 +265,7 @@ export function handleReadArea(
 
     return { content: [{ type: 'text', text: lines.join('\n') }] };
   } catch (err: any) {
-    return plainError(`Error: ${err.message}`);
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
   }
 }
 
@@ -316,6 +316,6 @@ export function handleReadRaycast(
 
     return { content: [{ type: 'text', text: lines.join('\n') }] };
   } catch (err: any) {
-    return plainError(`Error: ${err.message}`);
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
   }
 }

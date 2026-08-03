@@ -496,13 +496,13 @@ d('Shader Graph Tools', () => {
 d('Godot CLI Tools', () => {
   it('get_godot_version', async () => {
     const { handleGetGodotVersion } = await import('../src/tools/godot.js');
-    const r = handleGetGodotVersion();
+    const r = await handleGetGodotVersion();
     expect(r.content[0].text).toContain('Godot');
   });
 
   it('is_editor_running', async () => {
     const { handleIsEditorRunning } = await import('../src/tools/godot.js');
-    const r = handleIsEditorRunning();
+    const r = await handleIsEditorRunning();
     expect(r.isError).toBeFalsy();
   });
 });

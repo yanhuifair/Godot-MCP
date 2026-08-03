@@ -5,7 +5,7 @@
 // ============================================================
 
 import { z } from 'zod';
-import { plainError } from '../utils/errors.js';
+import { toolError, ErrorCode } from '../utils/errors.js';
 import { ToolResult, ResourceTemplateType } from '../utils/types.js';
 import fs from 'node:fs';
 import { readTextFile, findFilesByExtension, resolveProjectPath, writeTextFile } from '../utils/file_utils.js';
@@ -154,7 +154,7 @@ export function handleReadResource(
     if (absPath.endsWith('.res')) {
       const buffer = fs.readFileSync(absPath);
       if (isBinaryResource(buffer)) {
-                return plainError(`Cannot read "${args.path}": .res (binary) format is not supported. Only .tres (text) resources are readable.`);
+                return toolError(ErrorCode.INTERNAL_ERROR, `Cannot read "${args.path}": .res (binary) format is not supported. Only .tres (text) resources are readable.`);
       }
     }
 
@@ -197,7 +197,7 @@ export function handleReadResource(
       content: [{ type: 'text', text: lines.join('\n') }],
     };
   } catch (err: any) {
-        return plainError(`Error reading resource: ${err.message}`);
+        return toolError(ErrorCode.INTERNAL_ERROR, `Error reading resource: ${err.message}`);
   }
 }
 
@@ -261,7 +261,7 @@ export function handleListResources(
       content: [{ type: 'text', text: lines.join('\n') }],
     };
   } catch (err: any) {
-        return plainError(`Error listing resources: ${err.message}`);
+        return toolError(ErrorCode.INTERNAL_ERROR, `Error listing resources: ${err.message}`);
   }
 }
 
@@ -272,7 +272,7 @@ export function handleCreateResource(
   try {
     const template = RESOURCE_TEMPLATES[args.type];
     if (!template) {
-            return plainError(`Unknown resource type: ${args.type}. Available: ${Object.keys(RESOURCE_TEMPLATES).join(', ')}`);
+            return toolError(ErrorCode.INVALID_ARGUMENT, `Unknown resource type: ${args.type}. Available: ${Object.keys(RESOURCE_TEMPLATES).join(', ')}`);
     }
 
     let content = template;
@@ -289,7 +289,7 @@ export function handleCreateResource(
       content: [{ type: 'text', text: `Resource created: ${args.path} (type: ${args.type})` }],
     };
   } catch (err: any) {
-        return plainError(`Error creating resource: ${err.message}`);
+        return toolError(ErrorCode.INTERNAL_ERROR, `Error creating resource: ${err.message}`);
   }
 }
 
@@ -322,7 +322,7 @@ export function handleWriteResource(
       content: [{ type: 'text', text: `Resource updated: ${args.path} (${Object.keys(args.properties).length} properties changed)` }],
     };
   } catch (err: any) {
-        return plainError(`Error writing resource: ${err.message}`);
+        return toolError(ErrorCode.INTERNAL_ERROR, `Error writing resource: ${err.message}`);
   }
 }
 
@@ -411,7 +411,7 @@ export function handleListMaterials(
 
     return { content: [{ type: 'text', text: lines.join('\n') }] };
   } catch (err: any) {
-    return plainError(`Error listing materials: ${err.message}`);
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error listing materials: ${err.message}`);
   }
 }
 
@@ -461,7 +461,7 @@ export function handleReadMaterial(
 
     return { content: [{ type: 'text', text: lines.join('\n') }] };
   } catch (err: any) {
-    return plainError(`Error reading material: ${err.message}`);
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error reading material: ${err.message}`);
   }
 }
 
@@ -535,6 +535,6 @@ export function handleReadTheme(
 
     return { content: [{ type: 'text', text: lines.join('\n') }] };
   } catch (err: any) {
-    return plainError(`Error: ${err.message}`);
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
   }
 }

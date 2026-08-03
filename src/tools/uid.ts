@@ -5,7 +5,7 @@
 // ============================================================
 
 import { z } from 'zod';
-import { plainError } from '../utils/errors.js';
+import { toolError, ErrorCode } from '../utils/errors.js';
 import { ToolResult } from '../utils/types.js';
 import fs from 'node:fs';
 import { readTextFile, findFilesByExtension, resolveProjectPath, writeTextFile } from '../utils/file_utils.js';
@@ -31,7 +31,7 @@ export function handleGetUid(
   try {
     const absPath = resolveProjectPath(projectRoot, args.path);
     if (!fs.existsSync(absPath)) {
-    return plainError(`File not found: ${args.path}`);
+    return toolError(ErrorCode.FILE_NOT_FOUND, `File not found: ${args.path}`);
     }
 
     const ext = args.path.split('.').pop()?.toLowerCase();
@@ -68,7 +68,7 @@ export function handleGetUid(
     // For other files — check .godot/uid_cache.bin (binary, limited)
     return { content: [{ type: 'text', text: `UID lookup not supported for file type: .${ext}. Only .tscn, .tres, and .gd files store UIDs inline.` }] };
   } catch (err: any) {
-    return plainError(`Error: ${err.message}`);
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
   }
 }
 
@@ -139,7 +139,7 @@ export function handleUpdateProjectUids(
 
     return { content: [{ type: 'text', text: lines.join('\n') }] };
   } catch (err: any) {
-    return plainError(`Error: ${err.message}`);
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
   }
 }
 

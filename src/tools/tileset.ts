@@ -8,7 +8,7 @@
 // TileMap nodes reference a TileSet resource in .tscn scenes.
 
 import { z } from 'zod';
-import { plainError } from '../utils/errors.js';
+import { toolError, ErrorCode } from '../utils/errors.js';
 import { ToolResult } from '../utils/types.js';
 import fs from 'node:fs';
 import { readTextFile, resolveProjectPath, findFilesByExtension } from '../utils/file_utils.js';
@@ -66,7 +66,7 @@ export function handleListTilesets(
 
     return { content: [{ type: 'text', text: lines.join('\n') }] };
   } catch (err: any) {
-    return plainError(`Error: ${err.message}`);
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
   }
 }
 
@@ -80,7 +80,7 @@ export function handleReadTileset(
     const doc = parseResource(content);
 
     if (doc.header.type !== 'TileSet') {
-            return plainError(`File is not a TileSet (found: ${doc.header.type})`);
+            return toolError(ErrorCode.INTERNAL_ERROR, `File is not a TileSet (found: ${doc.header.type})`);
     }
 
     const lines: string[] = [];
@@ -131,7 +131,7 @@ export function handleReadTileset(
 
     return { content: [{ type: 'text', text: lines.join('\n') }] };
   } catch (err: any) {
-    return plainError(`Error: ${err.message}`);
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
   }
 }
 
@@ -190,7 +190,7 @@ export function handleReadTilemap(
 
     return { content: [{ type: 'text', text: lines.join('\n') }] };
   } catch (err: any) {
-    return plainError(`Error: ${err.message}`);
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
   }
 }
 

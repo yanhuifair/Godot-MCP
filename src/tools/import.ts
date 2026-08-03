@@ -8,7 +8,7 @@
 // They control import settings (compression, sampling, etc.)
 
 import { z } from 'zod';
-import { plainError } from '../utils/errors.js';
+import { toolError, ErrorCode } from '../utils/errors.js';
 import { ToolResult } from '../utils/types.js';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -47,7 +47,7 @@ export function handleReadImportConfig(
     const absPath = resolveProjectPath(projectRoot, importFilePath);
 
     if (!fs.existsSync(absPath)) {
-            return plainError(`No .import file found for "${args.asset_path}". The asset may not be imported yet — open it in the Godot editor first.`);
+            return toolError(ErrorCode.INTERNAL_ERROR, `No .import file found for "${args.asset_path}". The asset may not be imported yet — open it in the Godot editor first.`);
     }
 
     const content = fs.readFileSync(absPath, 'utf-8');
@@ -80,7 +80,7 @@ export function handleReadImportConfig(
 
     return { content: [{ type: 'text', text: lines.join('\n') }] };
   } catch (err: any) {
-    return plainError(`Error: ${err.message}`);
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
   }
 }
 
@@ -125,7 +125,7 @@ export function handleListImportFiles(
     const prefix = `Import files: ${total} asset(s) across ${Object.keys(byType).length} type(s)`;
     return { content: [{ type: 'text', text: prefix + lines.join('\n') }] };
   } catch (err: any) {
-    return plainError(`Error: ${err.message}`);
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
   }
 }
 
@@ -169,7 +169,7 @@ export function handleWriteImportConfig(
       content: [{ type: 'text', text: `Import config updated: ${args.asset_path} (${Object.keys(args.settings).length} settings)` }],
     };
   } catch (err: any) {
-    return plainError(`Error: ${err.message}`);
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
   }
 }
 

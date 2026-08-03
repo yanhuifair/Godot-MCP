@@ -8,7 +8,7 @@
 // Stored as .tres files of type "Environment" or embedded in scenes.
 
 import { z } from 'zod';
-import { plainError } from '../utils/errors.js';
+import { toolError, ErrorCode } from '../utils/errors.js';
 import { ToolResult } from '../utils/types.js';
 import { readTextFile, resolveProjectPath, findFilesByExtension, writeTextFile } from '../utils/file_utils.js';
 import { parseResource } from '../parsers/resource_parser.js';
@@ -152,7 +152,7 @@ export function handleReadEnvironment(
 
     return { content: [{ type: 'text', text: lines.join('\n') }] };
   } catch (err: any) {
-    return plainError(`Error: ${err.message}`);
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
   }
 }
 
@@ -186,7 +186,7 @@ export function handleListEnvironments(
 
     return { content: [{ type: 'text', text: lines.join('\n') }] };
   } catch (err: any) {
-    return plainError(`Error: ${err.message}`);
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
   }
 }
 
@@ -197,7 +197,7 @@ export function handleCreateEnvironment(
   try {
     const preset = ENV_PRESETS[args.preset || 'default'];
     if (!preset) {
-            return plainError(`Unknown preset: ${args.preset}. Available: ${Object.keys(ENV_PRESETS).join(', ')}`);
+            return toolError(ErrorCode.INVALID_ARGUMENT, `Unknown preset: ${args.preset}. Available: ${Object.keys(ENV_PRESETS).join(', ')}`);
     }
 
     let content = '[gd_resource type="Environment" format=3 uid=""]\n\n[resource]\n';
@@ -212,7 +212,7 @@ export function handleCreateEnvironment(
       content: [{ type: 'text', text: `Environment created: ${args.path} (preset: ${args.preset || 'default'})` }],
     };
   } catch (err: any) {
-    return plainError(`Error: ${err.message}`);
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
   }
 }
 
@@ -226,7 +226,7 @@ export function handleSetEnvironmentParam(
     const doc = parseResource(content);
 
     if (doc.header.type !== 'Environment') {
-            return plainError(`File is not an Environment resource (found: ${doc.header.type})`);
+            return toolError(ErrorCode.INTERNAL_ERROR, `File is not an Environment resource (found: ${doc.header.type})`);
     }
 
     doc.resource[args.param] = args.value;
@@ -244,7 +244,7 @@ export function handleSetEnvironmentParam(
       content: [{ type: 'text', text: `Environment updated: ${args.param} = ${args.value}` }],
     };
   } catch (err: any) {
-    return plainError(`Error: ${err.message}`);
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
   }
 }
 
@@ -323,6 +323,6 @@ function readWorldEnvFromScene(absPath: string, relPath: string): ToolResult {
 
     return { content: [{ type: 'text', text: envLines.join('\n') }] };
   } catch (err: any) {
-    return plainError(`Error: ${err.message}`);
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
   }
 }

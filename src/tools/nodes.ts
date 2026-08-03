@@ -7,7 +7,7 @@
 // Parallax, RichText, Container, TabContainer, ScrollContainer
 
 import { z } from 'zod';
-import { plainError } from '../utils/errors.js';
+import { toolError, ErrorCode } from '../utils/errors.js';
 import { ToolResult } from '../utils/types.js';
 import { readTextFile, resolveProjectPath, findFilesByExtension } from '../utils/file_utils.js';
 import { parseScene } from '../parsers/scene_parser.js';
@@ -116,7 +116,7 @@ export function handleReadCharacterBody(
 
     return { content: [{ type: 'text', text: lines.join('\n') }] };
   } catch (err: any) {
-    return plainError(`Error: ${err.message}`);
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
   }
 }
 
@@ -151,7 +151,7 @@ export function handleReadAnimatedSprite(
     // If specific name, show details
     if (args.name) {
       const match = sprites.find(s => s.name === args.name);
-      if (!match) return plainError(`AnimatedSprite "${args.name}" not found`);
+      if (!match) return toolError(ErrorCode.FILE_NOT_FOUND, `AnimatedSprite "${args.name}" not found`);
 
       // Find the actual scene data
       for (const relPath of sceneFiles) {
@@ -190,7 +190,7 @@ export function handleReadAnimatedSprite(
 
     return { content: [{ type: 'text', text: lines.join('\n') }] };
   } catch (err: any) {
-    return plainError(`Error: ${err.message}`);
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
   }
 }
 
@@ -234,7 +234,7 @@ export function handleReadAudioPlayer(
 
     return { content: [{ type: 'text', text: lines.join('\n') }] };
   } catch (err: any) {
-    return plainError(`Error: ${err.message}`);
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
   }
 }
 
@@ -266,7 +266,7 @@ export function handleReadVideoPlayer(
 
     return { content: [{ type: 'text', text: lines.join('\n') }] };
   } catch (err: any) {
-    return plainError(`Error: ${err.message}`);
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
   }
 }
 
@@ -320,7 +320,7 @@ export function handleReadParallax(
 
     return { content: [{ type: 'text', text: lines.join('\n') }] };
   } catch (err: any) {
-    return plainError(`Error: ${err.message}`);
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
   }
 }
 
@@ -354,7 +354,7 @@ export function handleReadRichText(
 
     return { content: [{ type: 'text', text: lines.join('\n') }] };
   } catch (err: any) {
-    return plainError(`Error: ${err.message}`);
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
   }
 }
 
@@ -411,7 +411,7 @@ export function handleReadContainer(
 
     return { content: [{ type: 'text', text: lines.join('\n') }] };
   } catch (err: any) {
-    return plainError(`Error: ${err.message}`);
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
   }
 }
 
@@ -449,6 +449,6 @@ export function handleReadTabContainer(
 
     return { content: [{ type: 'text', text: lines.join('\n') }] };
   } catch (err: any) {
-    return plainError(`Error: ${err.message}`);
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
   }
 }

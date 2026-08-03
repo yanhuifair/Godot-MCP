@@ -8,7 +8,7 @@
 // Audio .import files control import settings for audio assets.
 
 import { z } from 'zod';
-import { plainError } from '../utils/errors.js';
+import { toolError, ErrorCode } from '../utils/errors.js';
 import { ToolResult } from '../utils/types.js';
 import fs from 'node:fs';
 import { readTextFile, resolveProjectPath, findFilesByExtension, writeTextFile } from '../utils/file_utils.js';
@@ -40,7 +40,7 @@ export function handleReadAudioBusLayout(
     const absPath = resolveProjectPath(projectRoot, layoutPath);
 
     if (!fs.existsSync(absPath)) {
-            return plainError(`AudioBusLayout file not found: ${layoutPath}. Create one in the Godot editor (Audio tab → Add Bus) or use create_audio_bus_layout.`);
+            return toolError(ErrorCode.FILE_NOT_FOUND, `AudioBusLayout file not found: ${layoutPath}. Create one in the Godot editor (Audio tab → Add Bus) or use create_audio_bus_layout.`);
     }
 
     const { content } = readTextFile(absPath);
@@ -72,7 +72,7 @@ export function handleReadAudioBusLayout(
 
     return { content: [{ type: 'text', text: lines.join('\n') }] };
   } catch (err: any) {
-    return plainError(`Error: ${err.message}`);
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
   }
 }
 
@@ -112,7 +112,7 @@ export function handleListAudioFiles(
     const prefix = `Audio Files: ${total} file(s) across ${Object.keys(byExt).length} format(s)`;
     return { content: [{ type: 'text', text: prefix + lines.join('\n') }] };
   } catch (err: any) {
-    return plainError(`Error: ${err.message}`);
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
   }
 }
 
@@ -141,7 +141,7 @@ bus/0/send = "Master"
       content: [{ type: 'text', text: `AudioBusLayout created: ${layoutPath} (${Object.keys(template.split('\n').filter(l => l.includes('='))).length} bus properties)` }],
     };
   } catch (err: any) {
-    return plainError(`Error: ${err.message}`);
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
   }
 }
 
@@ -181,7 +181,7 @@ export function handleAddAudioBus(
     const absPath = resolveProjectPath(projectRoot, layoutPath);
 
     if (!fs.existsSync(absPath)) {
-    return plainError(`AudioBusLayout not found: ${layoutPath}. Use create_audio_bus_layout first.`);
+    return toolError(ErrorCode.FILE_NOT_FOUND, `AudioBusLayout not found: ${layoutPath}. Use create_audio_bus_layout first.`);
     }
 
     const { content } = readTextFile(absPath);
@@ -218,7 +218,7 @@ export function handleAddAudioBus(
 
     return { content: [{ type: 'text', text: `Bus "${args.bus_name}" added at index ${nextIdx} (send → ${sendTo})` }] };
   } catch (err: any) {
-    return plainError(`Error: ${err.message}`);
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
   }
 }
 
@@ -228,7 +228,7 @@ export function handleRemoveAudioBus(
 ): ToolResult {
   try {
     if (args.bus_index === 0) {
-    return plainError('Cannot remove Master bus (index 0).');
+    return toolError(ErrorCode.INTERNAL_ERROR, 'Cannot remove Master bus (index 0).');
     }
 
     const layoutPath = args.layout_path || 'default_bus_layout.tres';
@@ -256,7 +256,7 @@ export function handleRemoveAudioBus(
 
     return { content: [{ type: 'text', text: `Bus index ${args.bus_index} removed (${keysToRemove.length} properties)` }] };
   } catch (err: any) {
-    return plainError(`Error: ${err.message}`);
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
   }
 }
 
@@ -300,7 +300,7 @@ export function handleAddBusEffect(
 
     return { content: [{ type: 'text', text: `Effect "${args.effect_type}" added to bus ${args.bus_index} (effect index: ${nextIdx})` }] };
   } catch (err: any) {
-    return plainError(`Error: ${err.message}`);
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
   }
 }
 
@@ -330,7 +330,7 @@ export function handleSetBusVolume(
 
     return { content: [{ type: 'text', text: `Bus ${args.bus_index} volume set to ${args.volume_db} dB` }] };
   } catch (err: any) {
-    return plainError(`Error: ${err.message}`);
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
   }
 }
 

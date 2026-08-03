@@ -5,7 +5,7 @@
 // ============================================================
 
 import { z } from 'zod';
-import { plainError } from '../utils/errors.js';
+import { plainError, toolError, ErrorCode } from '../utils/errors.js';
 import { ToolResult } from '../utils/types.js';
 import {
   findGodotBinary,
@@ -66,7 +66,7 @@ export async function handleGetGodotVersion(): Promise<ToolResult> {
   try {
     const binaryPath = findGodotBinary();
     if (!binaryPath) {
-            return plainError('Godot binary not found. Set GODOT_PATH environment variable or install Godot in /Applications/.');
+            return toolError(ErrorCode.GODOT_NOT_FOUND, 'Godot binary not found. Set GODOT_PATH environment variable or install Godot in /Applications/.');
     }
 
     const info = await getGodotVersion(binaryPath);
@@ -88,7 +88,7 @@ export async function handleGetGodotVersion(): Promise<ToolResult> {
       content: [{ type: 'text', text: lines.join('\n') }],
     };
   } catch (err: any) {
-        return plainError(`Error getting Godot version: ${err.message}`);
+        return toolError(ErrorCode.INTERNAL_ERROR, `Error getting Godot version: ${err.message}`);
   }
 }
 
@@ -99,7 +99,7 @@ export function handleLaunchEditor(
   try {
     const binaryPath = findGodotBinary();
     if (!binaryPath) {
-            return plainError('Godot binary not found. Set GODOT_PATH or install Godot.');
+            return toolError(ErrorCode.GODOT_NOT_FOUND, 'Godot binary not found. Set GODOT_PATH or install Godot.');
     }
 
     const projectPath = args.project_path || projectRoot;
@@ -109,7 +109,7 @@ export function handleLaunchEditor(
       content: [{ type: 'text', text: `Godot editor launched. PID: ${result.pid}\nCommand: ${result.command}` }],
     };
   } catch (err: any) {
-        return plainError(`Error launching editor: ${err.message}`);
+        return toolError(ErrorCode.INTERNAL_ERROR, `Error launching editor: ${err.message}`);
   }
 }
 
@@ -120,7 +120,7 @@ export function handleRunProject(
   try {
     const binaryPath = findGodotBinary();
     if (!binaryPath) {
-            return plainError('Godot binary not found. Set GODOT_PATH or install Godot.');
+            return toolError(ErrorCode.GODOT_NOT_FOUND, 'Godot binary not found. Set GODOT_PATH or install Godot.');
     }
 
     const projectPath = args.project_path || projectRoot;
@@ -138,7 +138,7 @@ export function handleRunProject(
       content: [{ type: 'text', text: details.join('\n') }],
     };
   } catch (err: any) {
-        return plainError(`Error running project: ${err.message}`);
+        return toolError(ErrorCode.INTERNAL_ERROR, `Error running project: ${err.message}`);
   }
 }
 
@@ -176,7 +176,7 @@ export async function handleMonitorOutput(args: { clear?: boolean }): Promise<To
       content: [{ type: 'text', text: lines.join('\n') }],
     };
   } catch (err: any) {
-        return plainError(`Error reading output: ${err.message}`);
+        return toolError(ErrorCode.INTERNAL_ERROR, `Error reading output: ${err.message}`);
   }
 }
 
@@ -187,7 +187,7 @@ export function handleExportProject(
   try {
     const binaryPath = findGodotBinary();
     if (!binaryPath) {
-            return plainError('Godot binary not found. Set GODOT_PATH or install Godot.');
+            return toolError(ErrorCode.GODOT_NOT_FOUND, 'Godot binary not found. Set GODOT_PATH or install Godot.');
     }
 
     const projectPath = args.project_path || projectRoot;
@@ -197,7 +197,7 @@ export function handleExportProject(
       content: [{ type: 'text', text: `Export started. PID: ${result.pid}\nPreset: ${args.preset}\nOutput: ${args.output_path}\nCommand: ${result.command}\n\nUse monitor_output to check build progress.` }],
     };
   } catch (err: any) {
-        return plainError(`Error exporting project: ${err.message}`);
+        return toolError(ErrorCode.INTERNAL_ERROR, `Error exporting project: ${err.message}`);
   }
 }
 
@@ -217,7 +217,7 @@ export async function handleCaptureScreenshot(
     }
     return plainError(result.message);
   } catch (err: any) {
-    return plainError(`Screenshot error: ${err.message}`);
+    return toolError(ErrorCode.INTERNAL_ERROR, `Screenshot error: ${err.message}`);
   }
 }
 
@@ -226,7 +226,7 @@ export function handleStopProject(): ToolResult {
     cleanupProcesses();
     return { content: [{ type: 'text', text: 'All running Godot processes stopped.' }] };
   } catch (err: any) {
-    return plainError(`Error: ${err.message}`);
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
   }
 }
 
@@ -245,7 +245,7 @@ export async function handleIsEditorRunning(): Promise<ToolResult> {
 
     return { content: [{ type: 'text', text: lines.join('\n') }] };
   } catch (err: any) {
-    return plainError(`Error: ${err.message}`);
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
   }
 }
 
@@ -301,6 +301,6 @@ export function handleListProjects(
 
     return { content: [{ type: 'text', text: lines.join('\n') }] };
   } catch (err: any) {
-    return plainError(`Error: ${err.message}`);
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
   }
 }

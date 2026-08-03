@@ -392,3 +392,57 @@ describe('WRITE_TOOLS 名单完整性', () => {
     expect(missing).toEqual([]);
   });
 });
+
+// ---- 版本一致性与分类计数 ----
+// 版本号分布在 package.json（npm）、plugin.cfg（Godot 插件清单）、
+// plugin.gd（PLUGIN_VERSION 常量）三处，必须同步，否则 sync-addons 会误判。
+
+describe('版本一致性', () => {
+  it('package.json / plugin.cfg / plugin.gd 版本号一致', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const root = path.resolve(import.meta.dirname ?? process.cwd(), '..');
+
+    const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf-8'));
+    const cfg = fs.readFileSync(path.join(root, 'addons', 'godot-mcp', 'plugin.cfg'), 'utf-8');
+    const gd = fs.readFileSync(path.join(root, 'addons', 'godot-mcp', 'plugin.gd'), 'utf-8');
+
+    const cfgVersion = cfg.match(/^version\s*=\s*"([^"]+)"/m)?.[1];
+    const gdVersion = gd.match(/const PLUGIN_VERSION = "([^"]+)"/)?.[1];
+
+    expect(cfgVersion).toBe(pkg.version);
+    expect(gdVersion).toBe(pkg.version);
+  });
+});
+
+describe('register.ts 分类计数注释', () => {
+  it('每个分类注释声称的工具数与实际注册数一致', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const root = path.resolve(import.meta.dirname ?? process.cwd(), '..');
+    const lines = fs.readFileSync(path.join(root, 'src', 'tools', 'register.ts'), 'utf-8').split('\n');
+
+    const positions = [];
+    for (let i = 0; i < lines.length; i++) {
+      const m = lines[i].match(/^  \/\/ (.+?) \((\d+)\)$/);
+      if (m) positions.push({ line: i, name: m[1], claim: parseInt(m[2], 10) });
+    }
+
+    const mismatches = [];
+    let total = 0;
+    for (let i = 0; i < positions.length; i++) {
+      const start = positions[i].line + 1;
+      const end = i + 1 < positions.length ? positions[i + 1].line : lines.length;
+      let cnt = 0;
+      for (let j = start; j < end; j++) {
+        if (/registry\.register\(\{ name:/.test(lines[j])) cnt++;
+      }
+      total += cnt;
+      if (cnt !== positions[i].claim) {
+        mismatches.push(`${positions[i].name}: 声称 ${positions[i].claim} 实际 ${cnt}`);
+      }
+    }
+    expect(mismatches).toEqual([]);
+    expect(total).toBe(282);
+  });
+});

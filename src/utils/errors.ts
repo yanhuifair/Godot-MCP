@@ -32,6 +32,51 @@ export interface StructuredError {
 }
 
 /**
+ * 常见错误码 → 修复建议。toolError 输出时自动附加，让 AI 客户端
+ * 拿到错误后能直接看到如何解决（对齐 Coding-Solo/godot-mcp 的
+ * `possibleSolutions` 特性）。
+ */
+const SOLUTION_MAP: Partial<Record<ErrorCode, string[]>> = {
+  [ErrorCode.READ_ONLY]: [
+    'Remove the --read-only flag (or unset GODOT_MCP_READ_ONLY) to allow write operations.',
+  ],
+  [ErrorCode.EDITOR_NOT_REACHABLE]: [
+    'Open the Godot editor with the MCP plugin installed, or run: npx @yanhuifair/godot-mcp --enable-plugin -p <project>',
+    'The editor bridge probes TCP on 127.0.0.1:9876 first, then falls back to spawning Godot — verify the plugin is present in the target project.',
+  ],
+  [ErrorCode.GODOT_NOT_FOUND]: [
+    'Set GODOT_PATH to your Godot 4.x binary, or install Godot from https://godotengine.org/download',
+  ],
+  [ErrorCode.GODOT_CLI_ERROR]: [
+    'Run the same Godot command manually to see its stderr output.',
+  ],
+  [ErrorCode.FILE_NOT_FOUND]: [
+    'Verify the path exists and is project-relative (e.g. "scenes/main.tscn", not an absolute path).',
+  ],
+  [ErrorCode.PATH_TRAVERSAL]: [
+    'Use a path inside the project root — absolute paths and "../" escapes are rejected.',
+  ],
+  [ErrorCode.PARSE_ERROR]: [
+    'The file content could not be parsed — check for syntax errors, or use the text format (.tres instead of binary .res).',
+  ],
+  [ErrorCode.ALREADY_EXISTS]: [
+    'Use a different name, or remove the existing entry first.',
+  ],
+  [ErrorCode.INVALID_ARGUMENT]: [
+    'Check the argument value against the tool input schema description.',
+  ],
+  [ErrorCode.NOT_FOUND]: [
+    'Run tools/list to see the available tool names.',
+  ],
+  [ErrorCode.VALIDATION_ERROR]: [
+    'Check parameter names and types against the tool input schema (snake_case keys).',
+  ],
+  [ErrorCode.PERMISSION_DENIED]: [
+    'Check file permissions on the target path.',
+  ],
+};
+
+/**
  * Create a structured ToolResult error.
  */
 export function toolError(
@@ -42,6 +87,11 @@ export function toolError(
   const lines: string[] = [];
   lines.push(`[${code}] ${message}`);
   if (detail) lines.push(`Detail: ${detail}`);
+  const solutions = SOLUTION_MAP[code];
+  if (solutions && solutions.length > 0) {
+    lines.push('Possible solutions:');
+    for (const s of solutions) lines.push(`  - ${s}`);
+  }
   return {
     content: [{ type: 'text', text: lines.join('\n') }],
     isError: true,

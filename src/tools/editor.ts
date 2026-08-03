@@ -685,7 +685,7 @@ export async function handleEditorHealthCheck(): Promise<ToolResult> {
     await sendEditorCommand('get_editor_version');
     return { content: [{ type: 'text', text: 'Editor is reachable.' }] };
   } catch (err: any) {
-    return plainError('Editor is NOT reachable.' + '\n' + err.message);
+    return toolError(ErrorCode.EDITOR_NOT_REACHABLE, 'Editor is NOT reachable.', err.message);
   }
 }
 
