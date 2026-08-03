@@ -2,7 +2,7 @@
 // Copyright (c) 2026 FairYan
 // SPDX-License-Identifier: MIT
 // ============================================================
-// Godot MCP Server - Entry Point (v1.5.0)
+// Godot MCP Server - Entry Point (v1.6.0)
 // ============================================================
 // 同时支持三种 MCP 通信协议：
 //   - Stdio（标准输入输出，默认）

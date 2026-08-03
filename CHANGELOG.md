@@ -1,4 +1,18 @@
 # Changelog
+## v1.6.0 (2026-08-04)
+
+### Refactor
+- **Error codes everywhere** — ~240 `plainError` calls upgraded to `toolError(ErrorCode.*)` (FILE_NOT_FOUND / ALREADY_EXISTS / GODOT_NOT_FOUND / PARSE_ERROR / INVALID_ARGUMENT / INTERNAL_ERROR); only raw editor-bridge passthroughs stay uncoded.
+- **Error suggestions** — `toolError` now appends "Possible solutions" mapped per `ErrorCode` (e.g. READ_ONLY → how to disable, EDITOR_NOT_REACHABLE → `--enable-plugin` install hint), mirroring Coding-Solo's `possibleSolutions`.
+
+### Testing & CI
+- **New GitHub Actions CI** (`.github/workflows/ci.yml`): unit job (Node 18/20) + integration job that installs Godot 4.4 Linux headless and runs the 70 integration tests against `test/test-project`.
+- **Fixed `handleGetGodotVersion` / `handleIsEditorRunning` await** in integration tests (async migration leftover) — full suite now **144/144 green with real Godot**.
+- **Structural asserts**: package.json/plugin.cfg/plugin.gd version consistency, and register.ts category-count comments vs actual registrations.
+
+### Documentation
+- README badges now point to the live GitHub Actions CI badge.
+
 ## v1.5.0 (2026-08-04)
 
 ### Security & Hardening
@@ -22,13 +36,6 @@
 - **`.import` parsing** merged into shared `src/utils/import_parser.ts` (import.ts / texture.ts each had a near-identical copy).
 - **Plugin `_key_name_to_code`** — 85-line if-chain replaced with a `const` dictionary; dead output-capture code and `_build_runtime_tree` removed.
 - **`src/index.ts` header** — version comment synchronized (was v1.2.0).
-- **Error codes everywhere** — ~240 `plainError` calls upgraded to `toolError(ErrorCode.*)` (FILE_NOT_FOUND / ALREADY_EXISTS / GODOT_NOT_FOUND / PARSE_ERROR / INVALID_ARGUMENT / INTERNAL_ERROR); only raw editor-bridge passthroughs stay uncoded.
-- **Error suggestions** — `toolError` now appends "Possible solutions" mapped per `ErrorCode` (e.g. READ_ONLY → how to disable, EDITOR_NOT_REACHABLE → `--enable-plugin` install hint), mirroring Coding-Solo's `possibleSolutions`.
-
-### Testing & CI
-- **New GitHub Actions CI** (`.github/workflows/ci.yml`): unit job (Node 18/20) + integration job that installs Godot 4.4 Linux headless and runs the 70 integration tests against `test/test-project`.
-- **Fixed `handleGetGodotVersion` / `handleIsEditorRunning` await** in integration tests (async migration leftover) — full suite now **144/144 green with real Godot**.
-- **Structural asserts**: package.json/plugin.cfg/plugin.gd version consistency, and register.ts category-count comments vs actual registrations.
 
 ### Documentation
 - READMEs corrected to match reality: read-only semantics, structured-error scope, tests badge 140→72 passed, plugin command count 97→102, and added the previously undocumented `GODOT_MCP_TOKEN` / `GODOT_MCP_READ_ONLY` / `MCP_STDIO` / `GODOT_PROJECT` env vars plus a security note.

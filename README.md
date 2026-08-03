@@ -366,7 +366,7 @@ Starts: Stdio + SSE (`/sse`) + Streamable HTTP (`/mcp`) + Health Check (`/health
 
 ```bash
 curl http://127.0.0.1:3000/health
-# {"status":"ok","version":"1.5.0","projectRoot":"/path/to/project","endpoints":{...}}
+# {"status":"ok","version":"1.6.0","projectRoot":"/path/to/project","endpoints":{...}}
 ```
 
 ---
@@ -1284,13 +1284,13 @@ npm run test:watch   # Watch mode
 
 ```bash
 npm run vsix
-# Output: godot-mcp-1.5.0.vsix
+# Output: godot-mcp-1.6.0.vsix
 ```
 
 Install in VS Code:
 
 ```bash
-code --install-extension godot-mcp-1.5.0.vsix
+code --install-extension godot-mcp-1.6.0.vsix
 ```
 
 ---
