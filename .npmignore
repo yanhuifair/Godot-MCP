@@ -7,3 +7,9 @@ vitest.config.ts
 scripts/
 .workbuddy/
 *.vsix
+
+# 本机/工具配置，不进发布包
+.mcp.json
+.reasonix/
+reasonix.toml
+tip.JPG
