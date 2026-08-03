@@ -1,7 +1,7 @@
 # <div align="center">Godot MCP</div>
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-140%20passed-brightgreen)](.)
+[![Tests](https://img.shields.io/badge/tests-72%20passed-brightgreen)](.)
 [![npm](https://img.shields.io/npm/v/@yanhuifair/godot-mcp)](https://www.npmjs.com/package/@yanhuifair/godot-mcp)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-green)](.)
 [![Godot](https://img.shields.io/badge/godot-4.x-blue)](https://godotengine.org)
@@ -161,7 +161,7 @@ npx @yanhuifair/godot-mcp --enable-plugin -p .
   |   Godot Editor    |                                       |  +-------------+ |
   |  (GDScript addon) |                                       +------------------+
   |  TCP port 9876    |
-  |  97 commands      |
+  |  102 commands     |
   +------------------+
 ```
 
@@ -216,7 +216,7 @@ godot-mcp/
 ├── addons/
 │   └── godot-mcp/            # Godot editor plugin
 │       ├── plugin.cfg         # Plugin metadata
-│       └── plugin.gd          # stdin reader, TCP server, 97 command handlers
+│       └── plugin.gd          # stdin reader, TCP server, 102 command handlers
 ├── test/                     # Vitest suite (140 tests) + legacy .mjs suites
 │   ├── test_all.mjs          # Legacy standalone suite (167 tool checks)
 │   ├── test_editor.mjs       # Legacy editor bridge TCP tests
@@ -260,9 +260,9 @@ All Godot file formats (.tscn, .tres, project.godot) are parsed directly in Type
 
 ### Dual-Mode Editor Bridge
 
-The editor plugin (`addons/godot-mcp/plugin.gd`) implements 97 command handlers that wrap Godot's `EditorInterface` API. Communication uses JSON-RPC 2.0 over two channels:
+The editor plugin (`addons/godot-mcp/plugin.gd`) implements 102 command handlers that wrap Godot's `EditorInterface` API. Communication uses JSON-RPC 2.0 over two channels:
 
-- **TCP mode** (port 9876): When Godot is running independently, the plugin accepts TCP connections and processes commands. This is the preferred mode for interactive development.
+- **TCP mode** (port 9876): When Godot is running independently, the plugin accepts TCP connections on `127.0.0.1` only (never the LAN). This is the preferred mode for interactive development. Set `GODOT_MCP_TOKEN` (or the project setting `godot_mcp/auth_token`) to require an `auth` handshake per connection.
 
 - **Stdio mode**: When the MCP server spawns Godot as a child process (`godot --editor --path <project>`), the plugin reads JSON-RPC requests from stdin and writes responses to stdout with a `__MCP__:` prefix marker. The server filters for these markers to distinguish JSON-RPC from Godot's standard output.
 
@@ -276,8 +276,10 @@ To accommodate AI clients that may use either `snake_case` or `camelCase` parame
 
 - **Path traversal protection**: All file operations validate that resolved paths stay within the project root
 - **Automatic backups**: Write operations on script and scene files create `.bak` backup copies
-- **Read-only mode**: `--read-only` flag rejects all write and delete operations
-- **Structured errors**: All errors use typed error codes (`FILE_NOT_FOUND`, `PARSE_ERROR`, `VALIDATION_ERROR`, etc.) with actionable suggestions
+- **Read-only mode**: `--read-only` (or `GODOT_MCP_READ_ONLY=true`) rejects the ~140 write/side-effect tools (write_, create_, delete_, move_, set_, edit_, editor_* mutations, run/export/launch, …) via a maintained whitelist — they are hidden from `tools/list` and blocked with a `READ_ONLY` error if called directly
+- **TCP only on loopback**: The editor plugin's TCP bridge binds `127.0.0.1` only, never the LAN
+- **Optional token auth**: Set `GODOT_MCP_TOKEN` to require a bearer token on HTTP (`/mcp`, `/sse`) and an `auth` handshake on the plugin TCP bridge; non-loopback HTTP binds are refused without it
+- **Structured errors**: Tool failures return structured `{ content, isError: true }` responses; privileged paths (read-only, editor unreachable) carry typed error codes (`READ_ONLY`, `EDITOR_NOT_REACHABLE`, `NOT_FOUND`, …)
 
 ---
 
@@ -364,7 +366,7 @@ Starts: Stdio + SSE (`/sse`) + Streamable HTTP (`/mcp`) + Health Check (`/health
 
 ```bash
 curl http://127.0.0.1:3000/health
-# {"status":"ok","version":"1.4.0","projectRoot":"/path/to/project","endpoints":{...}}
+# {"status":"ok","version":"1.5.0","projectRoot":"/path/to/project","endpoints":{...}}
 ```
 
 ---
@@ -397,9 +399,15 @@ npm run build
 | Variable | Description |
 |---|---|
 | `GODOT_PATH` | Path to Godot binary (optional, auto-detected) |
+| `GODOT_MCP_READ_ONLY` | `true` — enable read-only mode (rejects ~140 write/side-effect tools) |
+| `GODOT_MCP_TOKEN` | Auth token. HTTP: required when binding a non-loopback host. Plugin TCP bridge: enables the `auth` handshake on port 9876 |
 | `GODOT_MCP_TEST_PROJECT` | Path to test project for integration tests |
+| `GODOT_PROJECT` | Target project for the `sync-addons` build hook |
+| `MCP_STDIO` | `true` — run the editor plugin in stdio mode (set automatically when MCP spawns Godot) |
 
 Godot auto-detection order: `GODOT_PATH` -> `/Applications/Godot.app` -> `PATH` -> snap/flatpak -> Windows Program Files
+
+> **Security note**: The MCP server can read/write your project files, run GDScript, and export builds. When using HTTP transports, always set `GODOT_MCP_TOKEN` — the server refuses to bind a non-loopback address without it, and loopback-only access is strongly recommended anyway.
 
 ---
 
@@ -827,7 +835,10 @@ The following examples show what you can ask your AI assistant. Each maps to one
 
 ## Editor Plugin
 
-The editor plugin enables real-time interaction with the Godot editor. MCP spawns Godot as a child process when editor tools are invoked, communicating via stdin/stdout with JSON-RPC 2.0.
+The editor plugin enables real-time interaction with the Godot editor through two modes:
+
+- **stdio mode** — when MCP spawns Godot as a child process (JSON-RPC 2.0 over stdin/stdout)
+- **TCP mode** — when Godot is opened manually, the plugin listens on `127.0.0.1:9876` (loopback only). If `GODOT_MCP_TOKEN` or the project setting `godot_mcp/auth_token` is set, every connection must complete an `auth` handshake first. The port can be changed via the `godot_mcp/editor_port` project setting.
 
 ### Install
 
@@ -1252,7 +1263,7 @@ npm run test:watch   # Watch mode
 | `--host` | HTTP bind address (default: 127.0.0.1) |
 | `--install-addons` | Copy editor plugin to target Godot project |
 | `--enable-plugin` | Install and auto-enable the editor plugin |
-| `--read-only` | Reject all write and delete operations |
+| `--read-only` | Reject ~140 write/side-effect tools (security mode) |
 | `--no-sse` | Disable SSE endpoint |
 | `--no-streamable-http` | Disable Streamable HTTP endpoint |
 | `-h, --help` | Show help |
@@ -1273,13 +1284,13 @@ npm run test:watch   # Watch mode
 
 ```bash
 npm run vsix
-# Output: godot-mcp-1.4.0.vsix
+# Output: godot-mcp-1.5.0.vsix
 ```
 
 Install in VS Code:
 
 ```bash
-code --install-extension godot-mcp-1.4.0.vsix
+code --install-extension godot-mcp-1.5.0.vsix
 ```
 
 ---

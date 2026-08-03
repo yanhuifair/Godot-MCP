@@ -1,6 +1,6 @@
 {
   "name": "@yanhuifair/godot-mcp",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "Godot MCP — Model Context Protocol server for Godot Engine (4.x, Godot 3 not supported). 282 tools, 26 categories. Supports Stdio, SSE, and Streamable HTTP transports.",
   "type": "module",
   "main": "dist/index.js",
@@ -18,7 +18,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "prepublish": "npm run build",
+    "prepublishOnly": "npm run build",
     "vsix": "npm run build && vsce package"
   },
   "keywords": [

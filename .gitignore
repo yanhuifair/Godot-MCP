@@ -4,6 +4,12 @@ dist/
 .reasonix/
 .workbuddy/
 .mcp.json
+.DS_Store
+*.bak
 
 # Test directory
 test/
+
+# Godot editor caches (never commit these)
+test/test-project/.godot/
+.godot/

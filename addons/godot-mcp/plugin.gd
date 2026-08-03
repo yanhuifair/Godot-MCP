@@ -5,7 +5,7 @@ extends EditorPlugin
 # SPDX-License-Identifier: MIT
 
 # ============================================================
-# Godot MCP Editor Plugin v1.4.0
+# Godot MCP Editor Plugin v1.5.0
 # ============================================================
 # ⚠️  Godot 4.x only. Godot 3 is NOT supported.
 # Dual-mode communication with the MCP server:
@@ -20,6 +20,10 @@ const DEFAULT_PORT = 9876
 const MAX_OUTPUT_LINES = 500
 const BUFFER_SIZE = 65536
 const RESPONSE_MARKER = "__MCP__:"
+const PLUGIN_VERSION = "1.5.0"
+
+# TCP 接收缓冲上限：超过且无完整行时丢弃，防止恶意客户端灌数据撑爆内存
+const TCP_BUFFER_LIMIT = 1024 * 1024
 
 var _output_buffer: PackedStringArray = []
 var _output_signal_connected: bool = false
@@ -35,6 +39,11 @@ var _stdio_mode: bool = false
 var _tcp_server: TCPServer = null
 var _peer: StreamPeerTCP = null
 var _tcp_connections: Array[StreamPeerTCP] = []
+var _tcp_buffer: String = ""
+var _peer_authenticated: bool = false
+# 从 ProjectSettings godot_mcp/auth_token 或环境变量 GODOT_MCP_TOKEN 读取；
+# 未设置时不要求鉴权（仅本机 loopback 可连，风险可控）。
+var _auth_token: String = ""
 
 
 # ---- Lifecycle ----
@@ -43,31 +52,41 @@ func _enter_tree() -> void:
 	_stdio_mode = OS.get_environment("MCP_STDIO") == "true"
 	_command_mutex = Mutex.new()
 	_running = true
+	_auth_token = ProjectSettings.get_setting("godot_mcp/auth_token", "")
+	if _auth_token == "":
+		_auth_token = OS.get_environment("GODOT_MCP_TOKEN")
 
 	if _stdio_mode:
 		_start_stdin_reader()
-		_send_stdout({"jsonrpc": "2.0", "id": 0, "result": {"ready": true, "version": "1.4.0"}})
+		_send_stdout({"jsonrpc": "2.0", "id": 0, "result": {"ready": true, "version": PLUGIN_VERSION}})
 	else:
 		_start_tcp_server()
 
-	_setup_output_capture()
 	set_process(true)
 
 	if _stdio_mode:
-		print("[Godot MCP] Plugin v1.4.0 loaded — stdio mode")
+		print("[Godot MCP] Plugin v" + PLUGIN_VERSION + " loaded — stdio mode")
 	else:
-		print("[Godot MCP] Plugin v1.4.0 loaded — TCP on port ", DEFAULT_PORT)
+		print("[Godot MCP] Plugin v" + PLUGIN_VERSION + " loaded — TCP on 127.0.0.1:", _get_port(), " (auth: ", "on" if _auth_token != "" else "off", ")")
 
 
 func _exit_tree() -> void:
 	_running = false
 	set_process(false)
-	_teardown_output_capture()
 
 	if _stdio_mode:
 		if _stdin_thread:
-			_stdin_thread.wait_to_finish()
-			_stdin_thread = null
+			# reader 线程阻塞在 OS.read_string_from_stdin() 上，无法被直接唤醒。
+			# 等待有限时间后放弃，避免编辑器退出被永久卡死。
+			var deadline := Time.get_ticks_msec() + 1500
+			while _stdin_thread.is_alive() and Time.get_ticks_msec() < deadline:
+				OS.delay_msec(10)
+			if _stdin_thread.is_alive():
+				# 线程仍阻塞在 stdin 读取上：分离并释放引用，进程退出时由 OS 回收
+				_stdin_thread = null
+			else:
+				_stdin_thread.wait_to_finish()
+				_stdin_thread = null
 		_send_stdout({"jsonrpc": "2.0", "id": 0, "result": {"shutdown": true}})
 	else:
 		_stop_tcp_server()
@@ -86,11 +105,14 @@ func _get_port() -> int:
 func _start_tcp_server() -> void:
 	_tcp_server = TCPServer.new()
 	var port = _get_port()
-	var err = _tcp_server.listen(port)
+	# 只绑定 loopback —— 9876 端口可执行任意 GDScript/文件操作，
+	# 暴露到局域网等于无鉴权 RCE（除非显式配置了 auth_token）。
+	var err = _tcp_server.listen(port, "127.0.0.1")
 	if err != OK:
-		printerr("[Godot MCP] Failed to start TCP server on port ", port)
+		printerr("[Godot MCP] Failed to start TCP server on port ", port, " (", error_string(err), ")")
+		_tcp_server = null
 		return
-	print("[Godot MCP] TCP server listening on port ", port)
+	print("[Godot MCP] TCP server listening on 127.0.0.1:", port)
 
 
 func _stop_tcp_server() -> void:
@@ -131,8 +153,6 @@ func _process(_delta: float) -> void:
 	else:
 		_process_tcp()
 
-	_capture_editor_output()
-
 
 func _process_stdio() -> void:
 	_command_mutex.lock()
@@ -152,6 +172,9 @@ func _process_tcp() -> void:
 		if _tcp_server.is_connection_available():
 			_peer = _tcp_server.take_connection()
 			_tcp_connections.append(_peer)
+			_tcp_buffer = ""
+			_peer_authenticated = _auth_token == ""
+			print("[Godot MCP] TCP client connected (auth: ", "on" if _auth_token != "" else "off", ")")
 
 	# Read and handle messages
 	if _peer:
@@ -159,43 +182,34 @@ func _process_tcp() -> void:
 		if status == StreamPeerTCP.STATUS_CONNECTED:
 			var available = _peer.get_available_bytes()
 			if available > 0:
-				var data = _peer.get_string(min(available, BUFFER_SIZE))
-				if data:
-					_handle_message(data)
+				_tcp_buffer += _peer.get_string(min(available, BUFFER_SIZE))
+				if _tcp_buffer.length() > TCP_BUFFER_LIMIT:
+					# 无完整行的超长缓冲 = 损坏/恶意连接，断开防止内存膨胀
+					_disconnect_peer()
+					return
+				# 按 \n 切分完整消息，处理粘包/半包（JSON.stringify 不产生裸换行）
+				while "\n" in _tcp_buffer:
+					var idx = _tcp_buffer.find("\n")
+					var line = _tcp_buffer.substr(0, idx).strip_edges()
+					_tcp_buffer = _tcp_buffer.substr(idx + 1)
+					if line != "":
+						_handle_message(line)
 			elif available < 0:
-				_peer = null
+				_disconnect_peer()
 		else:
-			_peer = null
+			_disconnect_peer()
+
+
+func _disconnect_peer() -> void:
+	if _peer:
+		_peer.disconnect_from_host()
+		_tcp_connections.erase(_peer)
+	_peer = null
+	_tcp_buffer = ""
+	_peer_authenticated = false
 
 
 # ---- Output Capture ----
-
-var _last_output_line_count: int = 0
-
-func _capture_editor_output() -> void:
-	# Navigate to output panel via editor main screen
-	var editor_main = EditorInterface.get_editor_main_screen()
-	if not editor_main:
-		return
-	# For now, rely on print() forwarding which already works
-	pass
-
-
-func capture_output_line(line: String) -> void:
-	_output_buffer.append(line)
-	while _output_buffer.size() > MAX_OUTPUT_LINES:
-		_output_buffer.remove_at(0)
-
-
-func _setup_output_capture() -> void:
-	if _output_signal_connected:
-		return
-	# Output capture relies on _capture_editor_output() polling
-	_output_signal_connected = true
-
-
-func _teardown_output_capture() -> void:
-	_output_signal_connected = false
 
 
 # ---- stdout Response ----
@@ -226,7 +240,23 @@ func _handle_message(raw: String) -> void:
 	if method == "":
 		method = msg.get("command", "")
 	var params = msg.get("params", {})
+	if params == null:
+		params = {}
+	# JSON-RPC id 可以是字符串或数字，保留原值
 	var id = msg.get("id", 0)
+
+	# ---- 鉴权（仅 TCP 模式；配置了 auth_token 时未鉴权连接只能执行 auth）----
+	if not _stdio_mode and _auth_token != "" and not _peer_authenticated:
+		if method != "auth":
+			_send_error("Unauthorized: auth required", id)
+			return
+		var token = params.get("token", "")
+		if typeof(token) == TYPE_STRING and token == _auth_token:
+			_peer_authenticated = true
+			_send_response(id, {"ok": true, "authenticated": true})
+		else:
+			_send_error("Unauthorized: invalid token", id)
+		return
 
 	var result = _execute_command(method, params)
 	_send_response(id, result)
@@ -235,7 +265,7 @@ func _handle_message(raw: String) -> void:
 func _execute_command(method: String, params: Dictionary) -> Dictionary:
 	match method:
 		# ---- Health Check ----
-		"health_check": return {"ok": true, "version": "3.0", "commands": 97}
+		"health_check": return {"ok": true, "version": PLUGIN_VERSION, "commands": 102}
 
 		# ---- Editor State ----
 		"get_open_scene": return _cmd_get_open_scene()
@@ -398,45 +428,55 @@ func _execute_command(method: String, params: Dictionary) -> Dictionary:
 # ============================================================
 
 func _parse_value(raw: String):
+	# 解析形如 "Vector2(1, 2)" / "Color(1,0,0,1)" 的字符串为原生类型。
+	# 所有分支都做元素个数检查，防止越界访问导致 push_error 刷屏。
 	if raw.begins_with("Vector2("):
 		var s = raw.trim_prefix("Vector2(").trim_suffix(")")
 		var p = s.split(",", false)
-		return Vector2(float(p[0]), float(p[1]))
+		if p.size() >= 2: return Vector2(float(p[0]), float(p[1]))
+		return raw
 
 	if raw.begins_with("Vector3("):
 		var s = raw.trim_prefix("Vector3(").trim_suffix(")")
 		var p = s.split(",", false)
-		return Vector3(float(p[0]), float(p[1]), float(p[2]))
+		if p.size() >= 3: return Vector3(float(p[0]), float(p[1]), float(p[2]))
+		return raw
 
 	if raw.begins_with("Vector4("):
 		var s = raw.trim_prefix("Vector4(").trim_suffix(")")
 		var p = s.split(",", false)
-		return Vector4(float(p[0]), float(p[1]), float(p[2]), float(p[3]))
+		if p.size() >= 4: return Vector4(float(p[0]), float(p[1]), float(p[2]), float(p[3]))
+		return raw
 
 	if raw.begins_with("Vector2i("):
 		var s = raw.trim_prefix("Vector2i(").trim_suffix(")")
 		var p = s.split(",", false)
-		return Vector2i(int(p[0]), int(p[1]))
+		if p.size() >= 2: return Vector2i(int(p[0]), int(p[1]))
+		return raw
 
 	if raw.begins_with("Color("):
 		var s = raw.trim_prefix("Color(").trim_suffix(")")
 		var p = s.split(",", false)
-		return Color(float(p[0]), float(p[1]), float(p[2]), float(p[3]))
+		if p.size() >= 4: return Color(float(p[0]), float(p[1]), float(p[2]), float(p[3]))
+		return raw
 
 	if raw.begins_with("Rect2("):
 		var s = raw.trim_prefix("Rect2(").trim_suffix(")")
 		var p = s.split(",", false)
-		return Rect2(float(p[0]), float(p[1]), float(p[2]), float(p[3]))
+		if p.size() >= 4: return Rect2(float(p[0]), float(p[1]), float(p[2]), float(p[3]))
+		return raw
 
 	if raw.begins_with("Vector3i("):
 		var s = raw.trim_prefix("Vector3i(").trim_suffix(")")
 		var p = s.split(",", false)
-		return Vector3i(int(p[0]), int(p[1]), int(p[2]))
+		if p.size() >= 3: return Vector3i(int(p[0]), int(p[1]), int(p[2]))
+		return raw
 
 	if raw.begins_with("Vector4i("):
 		var s = raw.trim_prefix("Vector4i(").trim_suffix(")")
 		var p = s.split(",", false)
-		return Vector4i(int(p[0]), int(p[1]), int(p[2]), int(p[3]))
+		if p.size() >= 4: return Vector4i(int(p[0]), int(p[1]), int(p[2]), int(p[3]))
+		return raw
 
 	if raw.begins_with("Quaternion("):
 		var s = raw.trim_prefix("Quaternion(").trim_suffix(")")
@@ -506,19 +546,30 @@ func _node_set_property(node: Node, key: String, raw_value: String) -> void:
 		node.set(key, value)
 
 
-func _value_to_json_string(val) -> String:
-	# Convert a Godot value to a string suitable for JSON serialization.
+func _value_to_jsonable(val, _depth := 0):
+	# Convert a Godot value into something JSON.stringify can serialize directly.
+	# Vector/Color/Rect2/Transform etc. become their string form; strings and
+	# primitives pass through as-is so JSON.stringify does the quoting/escaping —
+	# this avoids the double-escaping and invalid-JSON bugs of the old hand-rolled
+	# string builder.
+	# _depth 上限防止自引用结构（如 metadata 里 d["self"]=d）导致无限递归栈溢出。
+	if _depth > 20:
+		return str(val)
 	match typeof(val):
-		TYPE_VECTOR2, TYPE_VECTOR2I: return str(val)
-		TYPE_VECTOR3, TYPE_VECTOR3I: return str(val)
-		TYPE_VECTOR4, TYPE_VECTOR4I: return str(val)
-		TYPE_COLOR: return str(val)
-		TYPE_RECT2: return str(val)
-		TYPE_BOOL: return "true" if val else "false"
-		TYPE_INT, TYPE_FLOAT: return str(val)
-		TYPE_STRING, TYPE_STRING_NAME: return '"' + str(val).replace('"', '\\"') + '"'
-		TYPE_NODE_PATH: return '"' + str(val) + '"'
-		_: return '"' + str(val) + '"'
+		TYPE_VECTOR2, TYPE_VECTOR2I, TYPE_VECTOR3, TYPE_VECTOR3I, TYPE_VECTOR4, TYPE_VECTOR4I, TYPE_COLOR, TYPE_RECT2, TYPE_TRANSFORM2D, TYPE_TRANSFORM3D, TYPE_PLANE, TYPE_QUATERNION, TYPE_AABB, TYPE_NODE_PATH, TYPE_RID, TYPE_OBJECT:
+			return str(val)
+		TYPE_DICTIONARY:
+			var d := {}
+			for k in val:
+				d[str(k)] = _value_to_jsonable(val[k], _depth + 1)
+			return d
+		TYPE_ARRAY, TYPE_PACKED_BYTE_ARRAY, TYPE_PACKED_INT32_ARRAY, TYPE_PACKED_INT64_ARRAY, TYPE_PACKED_FLOAT32_ARRAY, TYPE_PACKED_FLOAT64_ARRAY, TYPE_PACKED_STRING_ARRAY, TYPE_PACKED_VECTOR2_ARRAY, TYPE_PACKED_VECTOR3_ARRAY, TYPE_PACKED_COLOR_ARRAY:
+			var a := []
+			for item in val:
+				a.append(_value_to_jsonable(item, _depth + 1))
+			return a
+		_:
+			return val
 
 
 # ============================================================
@@ -623,12 +674,9 @@ func _cmd_save_all_scenes() -> Dictionary:
 
 
 func _cmd_close_scene() -> Dictionary:
-	# Close the current scene by saving and then clearing it.
-	# EditorInterface doesn't have a direct "close" method, but we can
-	# save first, then clear the edited scene.
+	# Godot 4 没有公开的"关闭当前场景"API；保存场景并如实说明。
 	EditorInterface.save_scene()
-	EditorInterface.reload_scene_from_path("")
-	return {"ok": true, "message": "Scene closed (saved and cleared)"}
+	return {"ok": true, "message": "Scene saved. Note: Godot 4 has no public 'close scene' API; the scene remains open."}
 
 
 func _cmd_reload_scene() -> Dictionary:
@@ -656,13 +704,14 @@ func _cmd_stop_project() -> Dictionary:
 
 
 func _cmd_pause_project() -> Dictionary:
-	# Godot 4.x exposes get_scene_tree().paused to toggle pause state.
-	# We toggle the pause state of the running scene tree.
+	# 注意：插件运行在编辑器进程内，get_tree() 是编辑器的 SceneTree，
+	# 无法暂停正在运行的游戏（运行中的游戏是独立进程/树）。
+	# 这里只切换编辑器树的 paused 状态，避免误导调用方。
 	var tree = get_tree()
 	if tree:
 		tree.paused = not tree.paused
 		var is_paused = tree.paused
-		return {"ok": true, "paused": is_paused, "message": "Project paused" if is_paused else "Project resumed"}
+		return {"ok": true, "paused": is_paused, "scope": "editor", "message": ("Editor tree paused" if is_paused else "Editor tree resumed") + " (running game is a separate process and is unaffected)"}
 	return {"error": "No scene tree available"}
 
 
@@ -924,7 +973,7 @@ func _cmd_get_node_properties(params: Dictionary) -> Dictionary:
 		if not (usage & PROPERTY_USAGE_EDITOR): continue
 
 		var val = node.get(name)
-		props[name] = _value_to_json_string(val)
+		props[name] = _value_to_jsonable(val)
 
 	return {
 		"node": node.name,
@@ -1068,7 +1117,7 @@ func _cmd_run_gdscript(params: Dictionary) -> Dictionary:
 	if expression.has_execute_failed():
 		return {"error": "Execution error: " + expression.get_error_text()}
 
-	return {"ok": true, "result": _value_to_json_string(result)}
+	return {"ok": true, "result": _value_to_jsonable(result)}
 
 
 func _build_script_template(extends_type: String, template: String) -> String:
@@ -1087,7 +1136,9 @@ func _build_script_template(extends_type: String, template: String) -> String:
 # ============================================================
 
 func _cmd_get_editor_output() -> Dictionary:
-	return {"output": Array(_output_buffer)}
+	# 编辑器 stdout/stderr 由 MCP 服务器从子进程捕获（monitor_output），
+	# 插件内不再维护输出缓冲。保留空数组以兼容旧客户端。
+	return {"output": Array(_output_buffer), "note": "Editor output is captured by the MCP server via process stdout; this buffer is legacy and empty."}
 
 
 func _cmd_get_editor_version() -> Dictionary:
@@ -1112,8 +1163,9 @@ func _cmd_get_breakpoints() -> Dictionary:
 	var script_editor = EditorInterface.get_script_editor()
 	var breakpoints: Array = []
 	# Breakpoints are per-script, iterate open scripts
-	for i in script_editor.get_open_script_editors().size():
-		var se = script_editor.get_open_script_editors()[i]
+	var open_editors = script_editor.get_open_script_editors()
+	for i in open_editors.size():
+		var se = open_editors[i]
 		if not se: continue
 		var base = se.get_base_editor()
 		if base and base.has_method("get_breakpoints"):
@@ -1235,14 +1287,12 @@ func _cmd_open_dock(params: Dictionary) -> Dictionary:
 	match dock_name.to_lower():
 		"filesystem", "files":
 			EditorInterface.set_main_screen_editor("Filesystem")
-		"inspector", "inspector":
+		"inspector":
 			EditorInterface.set_main_screen_editor("Inspector")
 		"node", "scene":
 			EditorInterface.set_main_screen_editor("Node")
 		"output", "console":
 			# Show the bottom panel via editor main screen
-			var editor_node = EditorInterface.get_editor_main_screen()
-			# Try to find and activate the output panel
 			EditorInterface.set_main_screen_editor("Script")
 		_:
 			return {"error": "Unknown dock: " + dock_name + ". Valid: filesystem, inspector, scene, output"}
@@ -1485,91 +1535,30 @@ func _cmd_simulate_key_press(params: Dictionary) -> Dictionary:
 func _release_key(rel: InputEventKey) -> void:
 	Input.parse_input_event(rel)
 
+const KEY_NAME_TO_CODE := {
+	"a": KEY_A, "b": KEY_B, "c": KEY_C, "d": KEY_D, "e": KEY_E, "f": KEY_F,
+	"g": KEY_G, "h": KEY_H, "i": KEY_I, "j": KEY_J, "k": KEY_K, "l": KEY_L,
+	"m": KEY_M, "n": KEY_N, "o": KEY_O, "p": KEY_P, "q": KEY_Q, "r": KEY_R,
+	"s": KEY_S, "t": KEY_T, "u": KEY_U, "v": KEY_V, "w": KEY_W, "x": KEY_X,
+	"y": KEY_Y, "z": KEY_Z,
+	"0": KEY_0, "1": KEY_1, "2": KEY_2, "3": KEY_3, "4": KEY_4,
+	"5": KEY_5, "6": KEY_6, "7": KEY_7, "8": KEY_8, "9": KEY_9,
+	"space": KEY_SPACE, "enter": KEY_ENTER, "return": KEY_ENTER,
+	"escape": KEY_ESCAPE, "esc": KEY_ESCAPE, "tab": KEY_TAB,
+	"backspace": KEY_BACKSPACE, "delete": KEY_DELETE, "del": KEY_DELETE,
+	"up": KEY_UP, "down": KEY_DOWN, "left": KEY_LEFT, "right": KEY_RIGHT,
+	"home": KEY_HOME, "end": KEY_END, "pageup": KEY_PAGEUP, "pagedown": KEY_PAGEDOWN,
+	"f1": KEY_F1, "f2": KEY_F2, "f3": KEY_F3, "f4": KEY_F4, "f5": KEY_F5,
+	"f6": KEY_F6, "f7": KEY_F7, "f8": KEY_F8, "f9": KEY_F9, "f10": KEY_F10,
+	"f11": KEY_F11, "f12": KEY_F12,
+	"ctrl": KEY_CTRL, "shift": KEY_SHIFT, "alt": KEY_ALT,
+	"ui_save": KEY_S, "ui_undo": KEY_Z, "ui_redo": KEY_Y, "ui_copy": KEY_C,
+	"ui_cut": KEY_X, "ui_paste": KEY_V, "ui_select_all": KEY_A,
+	"ui_play": KEY_F5, "ui_stop": KEY_F8,
+}
+
 func _key_name_to_code(n: String) -> int:
-	var k = n.to_lower()
-	# Letters
-	if k == "a": return KEY_A
-	if k == "b": return KEY_B
-	if k == "c": return KEY_C
-	if k == "d": return KEY_D
-	if k == "e": return KEY_E
-	if k == "f": return KEY_F
-	if k == "g": return KEY_G
-	if k == "h": return KEY_H
-	if k == "i": return KEY_I
-	if k == "j": return KEY_J
-	if k == "k": return KEY_K
-	if k == "l": return KEY_L
-	if k == "m": return KEY_M
-	if k == "n": return KEY_N
-	if k == "o": return KEY_O
-	if k == "p": return KEY_P
-	if k == "q": return KEY_Q
-	if k == "r": return KEY_R
-	if k == "s": return KEY_S
-	if k == "t": return KEY_T
-	if k == "u": return KEY_U
-	if k == "v": return KEY_V
-	if k == "w": return KEY_W
-	if k == "x": return KEY_X
-	if k == "y": return KEY_Y
-	if k == "z": return KEY_Z
-	# Numbers
-	if k == "0": return KEY_0
-	if k == "1": return KEY_1
-	if k == "2": return KEY_2
-	if k == "3": return KEY_3
-	if k == "4": return KEY_4
-	if k == "5": return KEY_5
-	if k == "6": return KEY_6
-	if k == "7": return KEY_7
-	if k == "8": return KEY_8
-	if k == "9": return KEY_9
-	# Special keys
-	if k == "space": return KEY_SPACE
-	if k == "enter" or k == "return": return KEY_ENTER
-	if k == "escape" or k == "esc": return KEY_ESCAPE
-	if k == "tab": return KEY_TAB
-	if k == "backspace": return KEY_BACKSPACE
-	if k == "delete" or k == "del": return KEY_DELETE
-	# Arrow keys
-	if k == "up": return KEY_UP
-	if k == "down": return KEY_DOWN
-	if k == "left": return KEY_LEFT
-	if k == "right": return KEY_RIGHT
-	# Navigation
-	if k == "home": return KEY_HOME
-	if k == "end": return KEY_END
-	if k == "pageup": return KEY_PAGEUP
-	if k == "pagedown": return KEY_PAGEDOWN
-	# Function keys
-	if k == "f1": return KEY_F1
-	if k == "f2": return KEY_F2
-	if k == "f3": return KEY_F3
-	if k == "f4": return KEY_F4
-	if k == "f5": return KEY_F5
-	if k == "f6": return KEY_F6
-	if k == "f7": return KEY_F7
-	if k == "f8": return KEY_F8
-	if k == "f9": return KEY_F9
-	if k == "f10": return KEY_F10
-	if k == "f11": return KEY_F11
-	if k == "f12": return KEY_F12
-	# Modifiers
-	if k == "ctrl": return KEY_CTRL
-	if k == "shift": return KEY_SHIFT
-	if k == "alt": return KEY_ALT
-	# Common UI actions (map to key combinations)
-	if k == "ui_save": return KEY_S
-	if k == "ui_undo": return KEY_Z
-	if k == "ui_redo": return KEY_Y
-	if k == "ui_copy": return KEY_C
-	if k == "ui_cut": return KEY_X
-	if k == "ui_paste": return KEY_V
-	if k == "ui_select_all": return KEY_A
-	if k == "ui_play": return KEY_F5
-	if k == "ui_stop": return KEY_F8
-	return 0
+	return KEY_NAME_TO_CODE.get(n.to_lower(), 0)
 
 func _cmd_get_plugin_list() -> Dictionary:
 	var dir = DirAccess.open("res://addons/"); var plugins: Array = []
@@ -1772,8 +1761,8 @@ func _cmd_add_autoload(params: Dictionary) -> Dictionary:
 	var cfg = ConfigFile.new(); cfg.load("res://project.godot")
 	cfg.set_value("autoload", name, str(path))
 	cfg.save("res://project.godot")
-	EditorInterface.call_deferred("set_plugin_enabled", "reload_current_project", true)
-	return {"ok": true, "name": name, "path": path}
+	# 修改 autoload 需要重启编辑器才会生效；没有公开的即时刷新 API
+	return {"ok": true, "name": name, "path": path, "note": "Restart the editor for autoload changes to take effect"}
 
 func _cmd_remove_autoload(params: Dictionary) -> Dictionary:
 	var name = params.get("name", "")
@@ -1880,19 +1869,10 @@ func _find_recursive(node: Node, type_name: String, out: Array) -> void:
 
 func _cmd_get_running_scene_tree() -> Dictionary:
 	if not EditorInterface.is_playing_scene(): return {"error": "Project not running"}
-	# Access the running scene via the editor's play window
-	var running = get_tree().root
-	if running:
-		var nodes: Array = []
-		_build_runtime_tree(running, nodes, 0)
-		return {"running": true, "node_count": nodes.size(), "tree": nodes}
-	return {"error": "Cannot access running scene tree"}
-
-func _build_runtime_tree(node: Node, out: Array, depth: int) -> void:
-	if depth > 10: return
-	out.append({"name": node.name, "type": node.get_class(), "depth": depth})
-	for c in node.get_children():
-		_build_runtime_tree(c, out, depth + 1)
+	# 运行中的游戏是独立进程（或调试子进程），编辑器插件无法直接访问其 SceneTree。
+	# 需要 Godot 的远程调试器协议才能读取；当前实现只能给出编辑器自身树，容易误导，
+	# 因此明确返回错误并提示可用能力。
+	return {"error": "Running game scene tree is not accessible from the editor plugin (requires remote debugger protocol). Use get_current_scene_tree to inspect the editor scene."}
 
 func _cmd_get_performance_monitors() -> Dictionary:
 	# Godot 4.x Performance monitors — use enum values directly
@@ -1960,22 +1940,22 @@ func _serialize_node_properties(node: Node) -> Dictionary:
 		var usage = prop.get("usage", 0)
 		if not (usage & PROPERTY_USAGE_EDITOR): continue
 		var val = node.get(pname)
-		props[pname] = _value_to_json_string(val)
+		props[pname] = _value_to_jsonable(val)
 	return props
 
 
-func _send_response(id: int, result: Dictionary) -> void:
+func _send_response(id, result: Dictionary) -> void:
 	if _stdio_mode:
 		_send_stdout({"jsonrpc": "2.0", "id": id, "result": result})
 	else:
 		_send_tcp({"jsonrpc": "2.0", "id": id, "result": result})
 
 
-func _send_error(message: String) -> void:
+func _send_error(message: String, id = 0) -> void:
 	if _stdio_mode:
-		_send_stdout({"jsonrpc": "2.0", "id": 0, "error": {"message": message}})
+		_send_stdout({"jsonrpc": "2.0", "id": id, "error": {"message": message}})
 	else:
-		_send_tcp({"jsonrpc": "2.0", "id": 0, "error": {"message": message}})
+		_send_tcp({"jsonrpc": "2.0", "id": id, "error": {"message": message}})
 
 
 func _send_tcp(data: Dictionary) -> void:

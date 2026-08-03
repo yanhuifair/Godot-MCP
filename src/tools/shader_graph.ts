@@ -8,6 +8,7 @@
 // node types with their default ports and parameter labels.
 
 import { z } from 'zod';
+import { plainError } from '../utils/errors.js';
 import { ToolResult } from '../utils/types.js';
 import { readTextFile, resolveProjectPath, writeTextFile } from '../utils/file_utils.js';
 import { parseResource } from '../parsers/resource_parser.js';
@@ -166,7 +167,7 @@ shader_type = "${mode}"
     writeTextFile(absPath, template, false);
     return { content: [{ type: 'text', text: `Visual Shader created: ${args.path} (mode: ${mode})` }] };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    return plainError(`Error: ${err.message}`);
   }
 }
 
@@ -181,7 +182,7 @@ export function handleAddShaderGraphNode(
 
     const nodeInfo = SHADER_NODE_CATALOG[args.node_type];
     if (!nodeInfo) {
-      return { content: [{ type: 'text', text: `Unknown node type: ${args.node_type}. Use list_shader_node_types to see options.` }], isError: true };
+    return plainError(`Unknown node type: ${args.node_type}. Use list_shader_node_types to see options.`);
     }
 
     // Find next node index
@@ -230,7 +231,7 @@ export function handleAddShaderGraphNode(
     writeTextFile(absPath, newContent, true);
     return { content: [{ type: 'text', text: `Node added [#${nextIdx}] ${args.node_type} (${nodeInfo.category}) at (${x}, ${y})` }] };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    return plainError(`Error: ${err.message}`);
   }
 }
 
@@ -251,7 +252,7 @@ export function handleRemoveShaderGraphNode(
     writeTextFile(absPath, newContent, true);
     return { content: [{ type: 'text', text: `Node [#${args.node_index}] removed from graph` }] };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    return plainError(`Error: ${err.message}`);
   }
 }
 
@@ -282,7 +283,7 @@ export function handleConnectShaderGraphNodes(
     writeTextFile(absPath, newContent, true);
     return { content: [{ type: 'text', text: `Connected: node#${args.from_node}:${args.from_port} → node#${args.to_node}:${args.to_port}` }] };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    return plainError(`Error: ${err.message}`);
   }
 }
 
@@ -312,7 +313,7 @@ export function handleDisconnectShaderGraphNodes(
 
     return { content: [{ type: 'text', text: `Disconnected: node#${args.from_node}:${args.from_port}` }] };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    return plainError(`Error: ${err.message}`);
   }
 }
 
@@ -328,18 +329,18 @@ export function handleSetShaderNodeParam(
     // Find the sub_resource for this node
     const nodeRef = doc.resource[`nodes/${args.node_index}/node`];
     if (!nodeRef) {
-      return { content: [{ type: 'text', text: `Node [#${args.node_index}] not found in graph` }], isError: true };
+    return plainError(`Node [#${args.node_index}] not found in graph`);
     }
 
     const subIdMatch = typeof nodeRef === 'string' ? nodeRef.match(/SubResource\("([^"]+)"\)/) : null;
     if (!subIdMatch) {
-      return { content: [{ type: 'text', text: `Cannot resolve sub_resource for node [#${args.node_index}]` }], isError: true };
+    return plainError(`Cannot resolve sub_resource for node [#${args.node_index}]`);
     }
 
     const subId = subIdMatch[1];
     const sub = doc.subResources?.find((s: any) => unquote(s.id) === subId);
     if (!sub) {
-      return { content: [{ type: 'text', text: `Sub-resource ${subId} not found` }], isError: true };
+    return plainError(`Sub-resource ${subId} not found`);
     }
 
     sub.properties[args.param] = args.value;
@@ -365,7 +366,7 @@ export function handleSetShaderNodeParam(
     writeTextFile(absPath, result.join('\n'), true);
     return { content: [{ type: 'text', text: `Shader node [#${args.node_index}]: ${args.param} = ${args.value}` }] };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    return plainError(`Error: ${err.message}`);
   }
 }
 
@@ -392,7 +393,7 @@ export function handleListShaderNodeTypes(args: { category?: string }): ToolResu
 
     return { content: [{ type: 'text', text: lines.join('\n') }] };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    return plainError(`Error: ${err.message}`);
   }
 }
 
@@ -400,7 +401,7 @@ export function handleGetShaderNodeDefaults(_projectRoot: string, args: { node_t
   try {
     const info = SHADER_NODE_CATALOG[args.node_type];
     if (!info) {
-      return { content: [{ type: 'text', text: `Unknown node type: ${args.node_type}` }], isError: true };
+    return plainError(`Unknown node type: ${args.node_type}`);
     }
     const lines = [
       `${args.node_type} — ${info.typeName}`,
@@ -414,6 +415,6 @@ export function handleGetShaderNodeDefaults(_projectRoot: string, args: { node_t
     }
     return { content: [{ type: 'text', text: lines.join('\n') }] };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    return plainError(`Error: ${err.message}`);
   }
 }

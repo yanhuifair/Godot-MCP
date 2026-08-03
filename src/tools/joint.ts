@@ -5,6 +5,7 @@
 // ============================================================
 
 import { z } from 'zod';
+import { plainError } from '../utils/errors.js';
 import { ToolResult } from '../utils/types.js';
 import { resolveProjectPath, readTextFile, writeTextFile, findFilesByExtension } from '../utils/file_utils.js';
 import { parseScene, serializeScene } from '../parsers/scene_parser.js';
@@ -106,7 +107,7 @@ export function handleCreateJoint(
     const connections = [args.node_a, args.node_b].filter(Boolean).join(' ↔ ');
     return { content: [{ type: 'text', text: `Joint created: ${args.name} (${args.joint_type})${connections ? ` ${connections}` : ''}` }] };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    return plainError(`Error: ${err.message}`);
   }
 }
 
@@ -132,7 +133,7 @@ export function handleSetJointParam(
 
     const joint = findNode(doc.nodes, args.joint_name);
     if (!joint) {
-      return { content: [{ type: 'text', text: `Joint "${args.joint_name}" not found in ${args.scene_path}` }], isError: true };
+    return plainError(`Joint "${args.joint_name}" not found in ${args.scene_path}`);
     }
 
     joint.properties[args.param] = args.value;
@@ -142,7 +143,7 @@ export function handleSetJointParam(
 
     return { content: [{ type: 'text', text: `Joint "${args.joint_name}" updated: ${args.param} = ${args.value}` }] };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    return plainError(`Error: ${err.message}`);
   }
 }
 
@@ -197,6 +198,6 @@ export function handleListJoints(
 
     return { content: [{ type: 'text', text: lines.join('\n') }] };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    return plainError(`Error: ${err.message}`);
   }
 }

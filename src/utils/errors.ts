@@ -59,3 +59,16 @@ export function wrapError(
   const message = err instanceof Error ? err.message : String(err);
   return toolError(code, prefix ? `${prefix}: ${message}` : message);
 }
+
+/**
+ * Create a plain (unstructured) error ToolResult.
+ *
+ * Keeps the historical `{ content: [{ type: 'text', text }], isError: true }`
+ * shape but centralizes construction, so tool handlers don't hand-roll error
+ * objects. Prefer `toolError`/`wrapError` (structured, with an ErrorCode) for
+ * new code; `plainError` is the drop-in replacement for legacy bare errors.
+ */
+export function plainError(message: string, detail?: string): ToolResult {
+  const text = detail ? `${message}\nDetail: ${detail}` : message;
+  return { content: [{ type: 'text', text }], isError: true };
+}

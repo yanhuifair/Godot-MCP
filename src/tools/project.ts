@@ -5,6 +5,7 @@
 // ============================================================
 
 import { z } from 'zod';
+import { plainError } from '../utils/errors.js';
 import { ToolResult, FileEntry, SearchMatch } from '../utils/types.js';
 import {
   listFiles,
@@ -97,10 +98,7 @@ export function handleListProjectFiles(
       content: [{ type: 'text', text: JSON.stringify(entries, null, 2) }],
     };
   } catch (err: any) {
-    return {
-      content: [{ type: 'text', text: `Error listing files: ${err.message}` }],
-      isError: true,
-    };
+        return plainError(`Error listing files: ${err.message}`);
   }
 }
 
@@ -113,10 +111,7 @@ export function handleReadProjectConfig(projectRoot: string): ToolResult {
       content: [{ type: 'text', text: JSON.stringify(doc, null, 2) }],
     };
   } catch (err: any) {
-    return {
-      content: [{ type: 'text', text: `Error reading project config: ${err.message}` }],
-      isError: true,
-    };
+        return plainError(`Error reading project config: ${err.message}`);
   }
 }
 
@@ -135,10 +130,7 @@ export function handleSearchInProject(
       content: [{ type: 'text', text: JSON.stringify(results, null, 2) }],
     };
   } catch (err: any) {
-    return {
-      content: [{ type: 'text', text: `Error searching project: ${err.message}` }],
-      isError: true,
-    };
+        return plainError(`Error searching project: ${err.message}`);
   }
 }
 
@@ -189,10 +181,7 @@ export function handleReadInputMap(projectRoot: string): ToolResult {
       content: [{ type: 'text', text: lines.join('\n') }],
     };
   } catch (err: any) {
-    return {
-      content: [{ type: 'text', text: `Error reading input map: ${err.message}` }],
-      isError: true,
-    };
+        return plainError(`Error reading input map: ${err.message}`);
   }
 }
 
@@ -254,7 +243,7 @@ export function handleWriteInputAction(
 
     const inputMap = doc.sections['input_map'] || {};
     if (inputMap[args.action]) {
-      return { content: [{ type: 'text', text: `Input action "${args.action}" already exists. Use remove_input_action first or add_input_binding to extend it.` }], isError: true };
+    return plainError(`Input action "${args.action}" already exists. Use remove_input_action first or add_input_binding to extend it.`);
     }
 
     const deadzone = args.deadzone ?? 0.5;
@@ -266,7 +255,7 @@ export function handleWriteInputAction(
 
     return { content: [{ type: 'text', text: `Input action created: ${args.action} (deadzone: ${deadzone})` }] };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    return plainError(`Error: ${err.message}`);
   }
 }
 
@@ -281,7 +270,7 @@ export function handleRemoveInputAction(
 
     const inputMap = doc.sections['input_map'] || {};
     if (!inputMap[args.action]) {
-      return { content: [{ type: 'text', text: `Input action "${args.action}" not found.` }], isError: true };
+    return plainError(`Input action "${args.action}" not found.`);
     }
 
     delete inputMap[args.action];
@@ -294,7 +283,7 @@ export function handleRemoveInputAction(
 
     return { content: [{ type: 'text', text: `Input action removed: ${args.action}` }] };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    return plainError(`Error: ${err.message}`);
   }
 }
 
@@ -332,7 +321,7 @@ export function handleAddInputBinding(
       const axisValue = args.joypad_axis.includes('left') || args.joypad_axis.includes('up') ? -1.0 : 1.0;
       eventStr = `Object(InputEventJoypadMotion,"resource_local_to_scene":false,"resource_name":"","device":${device},"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"axis":${axis},"axis_value":${axisValue},"script":null)`;
     } else {
-      return { content: [{ type: 'text', text: 'Must specify at least one: key, mouse_button, joypad_button, or joypad_axis' }], isError: true };
+    return plainError('Must specify at least one: key, mouse_button, joypad_button, or joypad_axis');
     }
 
     // Insert the new event into the events array
@@ -358,7 +347,7 @@ export function handleAddInputBinding(
 
     return { content: [{ type: 'text', text: `Binding added to "${args.action}": ${bindingDesc}` }] };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    return plainError(`Error: ${err.message}`);
   }
 }
 
@@ -415,10 +404,7 @@ export function handleDeleteFile(
       content: [{ type: 'text', text: `File deleted: ${args.path} (backup saved as ${args.path}.bak)` }],
     };
   } catch (err: any) {
-    return {
-      content: [{ type: 'text', text: `Error deleting file: ${err.message}` }],
-      isError: true,
-    };
+        return plainError(`Error deleting file: ${err.message}`);
   }
 }
 
@@ -432,10 +418,7 @@ export function handleMoveFile(
       content: [{ type: 'text', text: `File moved: ${args.source} → ${args.destination}` }],
     };
   } catch (err: any) {
-    return {
-      content: [{ type: 'text', text: `Error moving file: ${err.message}` }],
-      isError: true,
-    };
+        return plainError(`Error moving file: ${err.message}`);
   }
 }
 
@@ -462,10 +445,7 @@ export function handleWriteProjectConfig(
       content: [{ type: 'text', text: `Config updated: [${args.section}] ${args.key} = ${args.value}` }],
     };
   } catch (err: any) {
-    return {
-      content: [{ type: 'text', text: `Error writing config: ${err.message}` }],
-      isError: true,
-    };
+        return plainError(`Error writing config: ${err.message}`);
   }
 }
 
@@ -512,10 +492,7 @@ export function handleReadExportPresets(projectRoot: string): ToolResult {
       content: [{ type: 'text', text: `Export Presets:\n${result.join('\n')}` }],
     };
   } catch (err: any) {
-    return {
-      content: [{ type: 'text', text: `Error reading export presets: ${err.message}` }],
-      isError: true,
-    };
+        return plainError(`Error reading export presets: ${err.message}`);
   }
 }
 
@@ -575,10 +552,7 @@ export function handleGenerateProjectReport(projectRoot: string): ToolResult {
       content: [{ type: 'text', text: report.join('\n') }],
     };
   } catch (err: any) {
-    return {
-      content: [{ type: 'text', text: `Error generating report: ${err.message}` }],
-      isError: true,
-    };
+        return plainError(`Error generating report: ${err.message}`);
   }
 }
 
@@ -601,10 +575,7 @@ export function handleListAutoloads(projectRoot: string): ToolResult {
 
     return { content: [{ type: 'text', text: lines.join('\n') }] };
   } catch (err: any) {
-    return {
-      content: [{ type: 'text', text: `Error listing autoloads: ${err.message}` }],
-      isError: true,
-    };
+        return plainError(`Error listing autoloads: ${err.message}`);
   }
 }
 
@@ -629,10 +600,7 @@ export function handleAddAutoload(
       content: [{ type: 'text', text: `Autoload added: ${args.name} = "*${args.path}"` }],
     };
   } catch (err: any) {
-    return {
-      content: [{ type: 'text', text: `Error adding autoload: ${err.message}` }],
-      isError: true,
-    };
+        return plainError(`Error adding autoload: ${err.message}`);
   }
 }
 
@@ -646,10 +614,7 @@ export function handleRemoveAutoload(
     const cfg = parseConfig(content);
 
     if (!cfg.sections['autoload'] || !cfg.sections['autoload'][args.name]) {
-      return {
-        content: [{ type: 'text', text: `Autoload '${args.name}' not found.` }],
-        isError: true,
-      };
+            return plainError(`Autoload '${args.name}' not found.`);
     }
 
     delete cfg.sections['autoload'][args.name];
@@ -660,10 +625,7 @@ export function handleRemoveAutoload(
       content: [{ type: 'text', text: `Autoload removed: ${args.name}` }],
     };
   } catch (err: any) {
-    return {
-      content: [{ type: 'text', text: `Error removing autoload: ${err.message}` }],
-      isError: true,
-    };
+        return plainError(`Error removing autoload: ${err.message}`);
   }
 }
 
@@ -723,7 +685,7 @@ export function handleFindUnusedAssets(projectRoot: string): ToolResult {
 
     return { content: [{ type: 'text', text: `Unused Assets (${unused.length}):\n\n${unused.sort().join('\n')}` }] };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    return plainError(`Error: ${err.message}`);
   }
 }
 
@@ -759,7 +721,7 @@ export function handleValidateProject(projectRoot: string): ToolResult {
     }
     return { content: [{ type: 'text', text: `Project Issues (${issues.length}):\n\n${issues.join('\n')}` }] };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    return plainError(`Error: ${err.message}`);
   }
 }
 
@@ -801,7 +763,7 @@ export function handleListGroups(projectRoot: string): ToolResult {
 
     return { content: [{ type: 'text', text: lines.join('\n') }] };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    return plainError(`Error: ${err.message}`);
   }
 }
 
@@ -818,7 +780,7 @@ export function handleDuplicateScene(
     writeTextFile(absDst, content, false);
     return { content: [{ type: 'text', text: `Scene duplicated: ${args.source} → ${args.destination}` }] };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    return plainError(`Error: ${err.message}`);
   }
 }
 
@@ -833,7 +795,7 @@ export function handleDuplicateResource(
     writeTextFile(absDst, content, false);
     return { content: [{ type: 'text', text: `Resource duplicated: ${args.source} → ${args.destination}` }] };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    return plainError(`Error: ${err.message}`);
   }
 }
 
@@ -855,6 +817,6 @@ export function handleCreateDirectory(
     fs.mkdirSync(absPath, { recursive: true });
     return { content: [{ type: 'text', text: `Directory created: ${args.path}` }] };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    return plainError(`Error: ${err.message}`);
   }
 }

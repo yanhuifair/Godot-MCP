@@ -5,6 +5,7 @@
 // ============================================================
 
 import { z } from 'zod';
+import { plainError } from '../utils/errors.js';
 import { ToolResult } from '../utils/types.js';
 import { resolveProjectPath, readTextFile, writeTextFile } from '../utils/file_utils.js';
 import { parseScene, serializeScene } from '../parsers/scene_parser.js';
@@ -76,7 +77,7 @@ export function handleCreateCollisionPolygon(
 
     return { content: [{ type: 'text', text: `CollisionPolygon2D created: ${newNode.name} (${args.points.length} points)` }] };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    return plainError(`Error: ${err.message}`);
   }
 }
 
@@ -109,7 +110,7 @@ export function handleSetShapePoints(
 
     const node = findNode(doc.nodes, pathParts, 0);
     if (!node) {
-      return { content: [{ type: 'text', text: `Node "${args.node_path}" not found` }], isError: true };
+    return plainError(`Node "${args.node_path}" not found`);
     }
 
     if (args.shape_type) {
@@ -170,6 +171,6 @@ export function handleSetShapePoints(
 
     return { content: [{ type: 'text', text: `Shape updated: ${args.node_path}` }] };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    return plainError(`Error: ${err.message}`);
   }
 }

@@ -8,6 +8,7 @@
 // .csv is the most common format: keys,source,target separated by commas.
 
 import { z } from 'zod';
+import { plainError } from '../utils/errors.js';
 import { ToolResult } from '../utils/types.js';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -90,7 +91,7 @@ export function handleListTranslations(
 
     return { content: [{ type: 'text', text: lines.join('\n') }] };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    return plainError(`Error: ${err.message}`);
   }
 }
 
@@ -106,10 +107,7 @@ export function handleReadTranslation(
     }
 
     if (!args.path.endsWith('.csv')) {
-      return {
-        content: [{ type: 'text', text: `Unsupported format: ${path.extname(args.path)}. Use .csv or .po files.` }],
-        isError: true,
-      };
+            return plainError(`Unsupported format: ${path.extname(args.path)}. Use .csv or .po files.`);
     }
 
     // Parse CSV translation
@@ -150,7 +148,7 @@ export function handleReadTranslation(
 
     return { content: [{ type: 'text', text: lines.join('\n') }] };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    return plainError(`Error: ${err.message}`);
   }
 }
 
@@ -181,7 +179,7 @@ export function handleCreateTranslation(
       content: [{ type: 'text', text: `Translation file created: ${args.path}\nLanguages: en → ${lang} | Entries: ${entryCount}` }],
     };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    return plainError(`Error: ${err.message}`);
   }
 }
 
@@ -326,7 +324,7 @@ function readGettextPo(absPath: string, args: { path: string; filter?: string })
 
     return { content: [{ type: 'text', text: lines.join('\n') }] };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    return plainError(`Error: ${err.message}`);
   }
 }
 

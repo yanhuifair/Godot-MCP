@@ -10,6 +10,7 @@
 //   2. [node name="X" type="AnimationPlayer"] with library references
 
 import { z } from 'zod';
+import { plainError } from '../utils/errors.js';
 import { ToolResult } from '../utils/types.js';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -128,7 +129,7 @@ export function handleListAnimations(
 
     return { content: [{ type: 'text', text: lines.join('\n') }] };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    return plainError(`Error: ${err.message}`);
   }
 }
 
@@ -217,7 +218,7 @@ export function handleReadAnimation(
 
     return { content: [{ type: 'text', text: lines.join('\n') }] };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error reading animation: ${err.message}` }], isError: true };
+    return plainError(`Error reading animation: ${err.message}`);
   }
 }
 
@@ -247,7 +248,7 @@ step = 0.1
       content: [{ type: 'text', text: `Animation resource created: ${args.path}\nLength: ${length}s | Loop: ${args.loop_mode || 'none'}` }],
     };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    return plainError(`Error: ${err.message}`);
   }
 }
 
@@ -277,19 +278,13 @@ export function handleSetAnimationParam(
     }
 
     if (!foundSubId) {
-      return {
-        content: [{ type: 'text', text: `Animation "${args.animation_name}" not found in ${args.scene_path}` }],
-        isError: true,
-      };
+            return plainError(`Animation "${args.animation_name}" not found in ${args.scene_path}`);
     }
 
     // Update the sub-resource
     const sub = doc.subResources.find(s => s.id === foundSubId);
     if (!sub) {
-      return {
-        content: [{ type: 'text', text: `Sub-resource ${foundSubId} not found (corrupt scene?)` }],
-        isError: true,
-      };
+            return plainError(`Sub-resource ${foundSubId} not found (corrupt scene?)`);
     }
 
     sub.properties[args.param] = args.value;
@@ -302,7 +297,7 @@ export function handleSetAnimationParam(
       content: [{ type: 'text', text: `Animation "${args.animation_name}" updated: ${args.param} = ${args.value}` }],
     };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    return plainError(`Error: ${err.message}`);
   }
 }
 
@@ -321,10 +316,7 @@ export function handleAddAnimationLibrary(
     const animPlayers = getAllAnimationPlayers(doc);
 
     if (animPlayers.length === 0) {
-      return {
-        content: [{ type: 'text', text: 'No AnimationPlayer node found. Add an AnimationPlayer node first.' }],
-        isError: true,
-      };
+            return plainError('No AnimationPlayer node found. Add an AnimationPlayer node first.');
     }
 
     // Use the first AnimationPlayer (or allow specifying a path?)
@@ -334,10 +326,7 @@ export function handleAddAnimationLibrary(
     const libKey = `_libraries/${args.animation_name}`;
     const existing = player.properties[libKey];
     if (existing) {
-      return {
-        content: [{ type: 'text', text: `Animation library "${args.animation_name}" already exists in ${player.name}` }],
-        isError: true,
-      };
+            return plainError(`Animation library "${args.animation_name}" already exists in ${player.name}`);
     }
 
     // Create a dummy sub-resource reference
@@ -351,7 +340,7 @@ export function handleAddAnimationLibrary(
       content: [{ type: 'text', text: `Animation library "${args.animation_name}" added to ${player.name} in ${args.scene_path}` }],
     };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    return plainError(`Error: ${err.message}`);
   }
 }
 
@@ -400,12 +389,12 @@ export function handleAddAnimationTrack(
     }
 
     if (!subId) {
-      return { content: [{ type: 'text', text: `Animation "${args.animation_name}" not found` }], isError: true };
+    return plainError(`Animation "${args.animation_name}" not found`);
     }
 
     const sub = doc.subResources.find(s => s.id === subId);
     if (!sub) {
-      return { content: [{ type: 'text', text: `Sub-resource ${subId} not found` }], isError: true };
+    return plainError(`Sub-resource ${subId} not found`);
     }
 
     // Find next track index
@@ -423,7 +412,7 @@ export function handleAddAnimationTrack(
 
     return { content: [{ type: 'text', text: `Track ${trackIdx} added to "${args.animation_name}": ${trackType} → ${args.track_path}` }] };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    return plainError(`Error: ${err.message}`);
   }
 }
 
@@ -446,12 +435,12 @@ export function handleSetKeyframe(
     }
 
     if (!subId) {
-      return { content: [{ type: 'text', text: `Animation "${args.animation_name}" not found` }], isError: true };
+    return plainError(`Animation "${args.animation_name}" not found`);
     }
 
     const sub = doc.subResources.find(s => s.id === subId);
     if (!sub) {
-      return { content: [{ type: 'text', text: `Sub-resource not found` }], isError: true };
+    return plainError(`Sub-resource not found`);
     }
 
     // Find next key index for this track
@@ -475,7 +464,7 @@ export function handleSetKeyframe(
 
     return { content: [{ type: 'text', text: `Keyframe set on "${args.animation_name}" track ${args.track_index}: t=${args.time} v=${args.value}` }] };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    return plainError(`Error: ${err.message}`);
   }
 }
 
@@ -498,12 +487,12 @@ export function handleRemoveAnimationTrack(
     }
 
     if (!subId) {
-      return { content: [{ type: 'text', text: `Animation not found` }], isError: true };
+    return plainError(`Animation not found`);
     }
 
     const sub = doc.subResources.find(s => s.id === subId);
     if (!sub) {
-      return { content: [{ type: 'text', text: `Sub-resource not found` }], isError: true };
+    return plainError(`Sub-resource not found`);
     }
 
     // Remove all properties for this track
@@ -518,7 +507,7 @@ export function handleRemoveAnimationTrack(
 
     return { content: [{ type: 'text', text: `Track ${args.track_index} removed from "${args.animation_name}"` }] };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    return plainError(`Error: ${err.message}`);
   }
 }
 
@@ -617,7 +606,7 @@ export function handleReadAnimationTree(
 
     return { content: [{ type: 'text', text: lines.join('\n') }] };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    return plainError(`Error: ${err.message}`);
   }
 }
 
@@ -644,7 +633,7 @@ export function handleSetAnimationTreeParam(
       : trees[0];
 
     if (!tree) {
-      return { content: [{ type: 'text', text: 'AnimationTree node not found.' }], isError: true };
+    return plainError('AnimationTree node not found.');
     }
 
     tree.properties[args.param] = args.value;
@@ -654,7 +643,7 @@ export function handleSetAnimationTreeParam(
 
     return { content: [{ type: 'text', text: `AnimationTree "${tree.name}" updated: ${args.param} = ${args.value}` }] };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    return plainError(`Error: ${err.message}`);
   }
 }
 

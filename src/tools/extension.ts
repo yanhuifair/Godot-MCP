@@ -5,6 +5,7 @@
 // ============================================================
 
 import { z } from 'zod';
+import { plainError } from '../utils/errors.js';
 import { ToolResult } from '../utils/types.js';
 import fs from 'node:fs';
 import { readTextFile, resolveProjectPath, findFilesByExtension, writeTextFile } from '../utils/file_utils.js';
@@ -41,7 +42,7 @@ export function handleReadGdextension(
 
     const absPath = resolveProjectPath(projectRoot, extPath);
     if (!fs.existsSync(absPath)) {
-      return { content: [{ type: 'text', text: `GDExtension file not found: ${extPath}` }], isError: true };
+    return plainError(`GDExtension file not found: ${extPath}`);
     }
 
     const content = fs.readFileSync(absPath, 'utf-8');
@@ -85,7 +86,7 @@ export function handleReadGdextension(
 
     return { content: [{ type: 'text', text: lines.join('\n') }] };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    return plainError(`Error: ${err.message}`);
   }
 }
 
@@ -124,7 +125,7 @@ export function handleListCsproj(projectRoot: string): ToolResult {
 
     return { content: [{ type: 'text', text: lines.join('\n') }] };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    return plainError(`Error: ${err.message}`);
   }
 }
 
@@ -159,6 +160,6 @@ environment = ExtResource("1_environment")
       content: [{ type: 'text', text: `World3D created: ${args.path}${envNote}` }],
     };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    return plainError(`Error: ${err.message}`);
   }
 }

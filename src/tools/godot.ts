@@ -5,6 +5,7 @@
 // ============================================================
 
 import { z } from 'zod';
+import { plainError } from '../utils/errors.js';
 import { ToolResult } from '../utils/types.js';
 import {
   findGodotBinary,
@@ -61,17 +62,14 @@ export const isEditorRunningSchema = {};
 
 // ---- Tool Handlers ----
 
-export function handleGetGodotVersion(): ToolResult {
+export async function handleGetGodotVersion(): Promise<ToolResult> {
   try {
     const binaryPath = findGodotBinary();
     if (!binaryPath) {
-      return {
-        content: [{ type: 'text', text: 'Godot binary not found. Set GODOT_PATH environment variable or install Godot in /Applications/.' }],
-        isError: true,
-      };
+            return plainError('Godot binary not found. Set GODOT_PATH environment variable or install Godot in /Applications/.');
     }
 
-    const info = getGodotVersion(binaryPath);
+    const info = await getGodotVersion(binaryPath);
     const lines = [
       `Godot Version: ${info.version}`,
       `Binary Path: ${info.path}`,
@@ -90,10 +88,7 @@ export function handleGetGodotVersion(): ToolResult {
       content: [{ type: 'text', text: lines.join('\n') }],
     };
   } catch (err: any) {
-    return {
-      content: [{ type: 'text', text: `Error getting Godot version: ${err.message}` }],
-      isError: true,
-    };
+        return plainError(`Error getting Godot version: ${err.message}`);
   }
 }
 
@@ -104,10 +99,7 @@ export function handleLaunchEditor(
   try {
     const binaryPath = findGodotBinary();
     if (!binaryPath) {
-      return {
-        content: [{ type: 'text', text: 'Godot binary not found. Set GODOT_PATH or install Godot.' }],
-        isError: true,
-      };
+            return plainError('Godot binary not found. Set GODOT_PATH or install Godot.');
     }
 
     const projectPath = args.project_path || projectRoot;
@@ -117,10 +109,7 @@ export function handleLaunchEditor(
       content: [{ type: 'text', text: `Godot editor launched. PID: ${result.pid}\nCommand: ${result.command}` }],
     };
   } catch (err: any) {
-    return {
-      content: [{ type: 'text', text: `Error launching editor: ${err.message}` }],
-      isError: true,
-    };
+        return plainError(`Error launching editor: ${err.message}`);
   }
 }
 
@@ -131,10 +120,7 @@ export function handleRunProject(
   try {
     const binaryPath = findGodotBinary();
     if (!binaryPath) {
-      return {
-        content: [{ type: 'text', text: 'Godot binary not found. Set GODOT_PATH or install Godot.' }],
-        isError: true,
-      };
+            return plainError('Godot binary not found. Set GODOT_PATH or install Godot.');
     }
 
     const projectPath = args.project_path || projectRoot;
@@ -152,10 +138,7 @@ export function handleRunProject(
       content: [{ type: 'text', text: details.join('\n') }],
     };
   } catch (err: any) {
-    return {
-      content: [{ type: 'text', text: `Error running project: ${err.message}` }],
-      isError: true,
-    };
+        return plainError(`Error running project: ${err.message}`);
   }
 }
 
@@ -193,10 +176,7 @@ export async function handleMonitorOutput(args: { clear?: boolean }): Promise<To
       content: [{ type: 'text', text: lines.join('\n') }],
     };
   } catch (err: any) {
-    return {
-      content: [{ type: 'text', text: `Error reading output: ${err.message}` }],
-      isError: true,
-    };
+        return plainError(`Error reading output: ${err.message}`);
   }
 }
 
@@ -207,10 +187,7 @@ export function handleExportProject(
   try {
     const binaryPath = findGodotBinary();
     if (!binaryPath) {
-      return {
-        content: [{ type: 'text', text: 'Godot binary not found. Set GODOT_PATH or install Godot.' }],
-        isError: true,
-      };
+            return plainError('Godot binary not found. Set GODOT_PATH or install Godot.');
     }
 
     const projectPath = args.project_path || projectRoot;
@@ -220,30 +197,27 @@ export function handleExportProject(
       content: [{ type: 'text', text: `Export started. PID: ${result.pid}\nPreset: ${args.preset}\nOutput: ${args.output_path}\nCommand: ${result.command}\n\nUse monitor_output to check build progress.` }],
     };
   } catch (err: any) {
-    return {
-      content: [{ type: 'text', text: `Error exporting project: ${err.message}` }],
-      isError: true,
-    };
+        return plainError(`Error exporting project: ${err.message}`);
   }
 }
 
-export function handleCaptureScreenshot(
+export async function handleCaptureScreenshot(
   projectRoot: string,
   args: { output_path?: string; window_title?: string; delay?: number }
-): ToolResult {
+): Promise<ToolResult> {
   try {
     // Keep the screenshot inside the project sandbox like every other write tool.
     const outputPath = args.output_path
       ? resolveProjectPath(projectRoot, args.output_path)
       : pathMod.join(projectRoot, 'screenshot.png');
-    const result = captureScreenshot(outputPath, args.window_title, args.delay);
+    const result = await captureScreenshot(outputPath, args.window_title, args.delay);
 
     if (result.success) {
       return { content: [{ type: 'text', text: result.message }] };
     }
-    return { content: [{ type: 'text', text: result.message }], isError: true };
+    return plainError(result.message);
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Screenshot error: ${err.message}` }], isError: true };
+    return plainError(`Screenshot error: ${err.message}`);
   }
 }
 
@@ -252,13 +226,13 @@ export function handleStopProject(): ToolResult {
     cleanupProcesses();
     return { content: [{ type: 'text', text: 'All running Godot processes stopped.' }] };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    return plainError(`Error: ${err.message}`);
   }
 }
 
-export function handleIsEditorRunning(): ToolResult {
+export async function handleIsEditorRunning(): Promise<ToolResult> {
   try {
-    const result = detectRunningGodot();
+    const result = await detectRunningGodot();
     if (!result.running) {
       return { content: [{ type: 'text', text: 'No Godot process detected.' }] };
     }
@@ -271,7 +245,7 @@ export function handleIsEditorRunning(): ToolResult {
 
     return { content: [{ type: 'text', text: lines.join('\n') }] };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    return plainError(`Error: ${err.message}`);
   }
 }
 
@@ -327,6 +301,6 @@ export function handleListProjects(
 
     return { content: [{ type: 'text', text: lines.join('\n') }] };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    return plainError(`Error: ${err.message}`);
   }
 }

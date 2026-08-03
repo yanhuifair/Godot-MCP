@@ -1,4 +1,31 @@
 # Changelog
+## v1.5.0 (2026-08-04)
+
+### Security & Hardening
+- **`--read-only` actually works now** — the flag previously only set `GODOT_MCP_READ_ONLY` with no enforcement anywhere. Added a maintained `WRITE_TOOLS` whitelist (~140 write/side-effect tools): in read-only mode they are hidden from `tools/list` and direct calls are rejected with a `READ_ONLY` error. Structural tests assert whitelist completeness (`editor_take_screenshot` included).
+- **Plugin TCP bridge bound to loopback only** — `_tcp_server.listen(port, "127.0.0.1")` (was `0.0.0.0` = LAN-wide unauthenticated RCE: arbitrary GDScript execution, file writes, `OS.execute`). Optional `auth` handshake via `GODOT_MCP_TOKEN` or project setting `godot_mcp/auth_token`; MCP server client (`editor.ts`) sends the handshake automatically.
+- **HTTP: non-loopback binds now require `GODOT_MCP_TOKEN`** — server refuses to start on `0.0.0.0`/LAN addresses without a token. Loopback-check fails closed.
+- **`captureScreenshot` window matching** — removed the always-true `id.length > 0` dead condition that selected the first window unconditionally.
+- **`server.on('error')` startup failure** — HTTP listen errors now reject the startup promise (was an un-rejectable `throw` inside an EventEmitter callback), so `all` transport mode exits controlled.
+
+### Bug Fixes
+- **`--install-addons` was a dead flag** — `parseArgs` never handled it (help text and `main()` did); it silently fell through to serving mode. Now works.
+- **Plugin JSON double-escaping** — `_value_to_json_string` hand-built quoted strings that were escaped a second time by `JSON.stringify`, producing `\"` and, for control chars, invalid JSON that could break the `__MCP__:` line protocol. Replaced with `_value_to_jsonable` (native values pass through, `JSON.stringify` does the escaping; depth-limited to 20 against self-referential structures).
+- **Editor exit hang in stdio mode** — `wait_to_finish()` on the stdin reader thread blocked forever (thread parked on `OS.read_string_from_stdin()`). `_exit_tree` now waits with a 1.5s deadline, then detaches.
+- **TCP framing** — plugin read raw chunks and parsed whole blocks (stuck/partial frames failed). Now buffers and splits on `\n` with a 1 MB cap; disconnected peers are removed from `_tcp_connections`.
+- **`_parse_value` out-of-bounds** — `Vector2(1)`-style input indexed missing elements, spamming errors; all branches now check element counts.
+- **Plugin misc** — JSON-RPC `id` now preserves string ids (was `id: int`); `params: null` handled; `health_check` version `3.0`→`1.5.0` (was hardcoded); `_cmd_add_autoload` dropped the invalid `set_plugin_enabled("reload_current_project")` call; `_cmd_close_scene` no longer calls `reload_scene_from_path("")`; `pause_project`/`get_running_scene_tree` now clearly report they operate on the *editor* tree, not the running game.
+- **Blocking event loop** — `getGodotVersion` (`spawnSync` 5s), `detectRunningGodot` (`execSync` 3s) and `captureScreenshot` (`spawnSync` up to 15s) are now async; `spawnedProcesses` entries are auto-removed 60s after exit.
+
+### Refactor
+- **244 hand-rolled error objects** unified into `plainError()` (`errors.ts`); fixed `read_audio_bus_layout` returning file-not-found as a *success*.
+- **`.import` parsing** merged into shared `src/utils/import_parser.ts` (import.ts / texture.ts each had a near-identical copy).
+- **Plugin `_key_name_to_code`** — 85-line if-chain replaced with a `const` dictionary; dead output-capture code and `_build_runtime_tree` removed.
+- **`src/index.ts` header** — version comment synchronized (was v1.2.0).
+
+### Documentation
+- READMEs corrected to match reality: read-only semantics, structured-error scope, tests badge 140→72 passed, plugin command count 97→102, and added the previously undocumented `GODOT_MCP_TOKEN` / `GODOT_MCP_READ_ONLY` / `MCP_STDIO` / `GODOT_PROJECT` env vars plus a security note.
+
 ## v1.4.0 (2026-07-23)
 
 ### Security & Hardening

@@ -4,11 +4,14 @@
 // Godot MCP Server - Godot CLI Detection and Execution
 // ============================================================
 
-import { execSync, spawn, spawnSync, ChildProcess } from 'node:child_process';
+import { execSync, execFile, spawn, ChildProcess } from 'node:child_process';
+import { promisify } from 'node:util';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { GodotVersionInfo, SpawnedProcess } from './types.js';
+
+const execFileAsync = promisify(execFile);
 
 // Track spawned processes for output monitoring
 const spawnedProcesses = new Map<number, { process: ChildProcess; output: string[] }>();
@@ -115,15 +118,12 @@ export function findGodotBinary(godotPath?: string): string | null {
 }
 
 /**
- * Get Godot version information.
+ * Get Godot version information (async — does not block the event loop).
  */
-export function getGodotVersion(godotPath: string): GodotVersionInfo {
+export async function getGodotVersion(godotPath: string): Promise<GodotVersionInfo> {
   try {
-    const result = spawnSync(godotPath, ['--version'], {
-      encoding: 'utf-8',
-      timeout: 5000,
-    });
-    const version = (result.stdout || '').trim();
+    const { stdout } = await execFileAsync(godotPath, ['--version'], { timeout: 5000 });
+    const version = (stdout || '').trim();
 
     return {
       version: version || 'unknown',
@@ -137,6 +137,42 @@ export function getGodotVersion(godotPath: string): GodotVersionInfo {
       platform: os.platform(),
     };
   }
+}
+
+/**
+ * Track a spawned process: capture its stdout/stderr into a bounded ring buffer
+ * and register it in `spawnedProcesses`. The entry is automatically removed
+ * 60s after the process exits (output stays available for `monitor_output`
+ * queries in the meantime), preventing unbounded memory growth.
+ */
+function trackProcess(proc: ChildProcess): void {
+  const output: string[] = [];
+  proc.stdout?.on('data', (data: Buffer) => {
+    const lines = data.toString().split('\n');
+    for (const line of lines) {
+      if (output.length >= MAX_OUTPUT_LINES) output.shift();
+      output.push(line);
+    }
+  });
+  proc.stderr?.on('data', (data: Buffer) => {
+    const lines = data.toString().split('\n');
+    for (const line of lines) {
+      if (output.length >= MAX_OUTPUT_LINES) output.shift();
+      output.push(line);
+    }
+  });
+
+  const pid = proc.pid || -1;
+  spawnedProcesses.set(pid, { process: proc, output });
+  proc.unref();
+
+  // 进程退出后 60s 自动清理 map 条目，避免长期运行内存增长
+  proc.on('exit', () => {
+    const timer = setTimeout(() => {
+      spawnedProcesses.delete(pid);
+    }, 60_000);
+    timer.unref?.();
+  });
 }
 
 /**
@@ -163,25 +199,7 @@ export function launchGodotEditor(
     startedAt: new Date().toISOString(),
   };
 
-  // Track output
-  const output: string[] = [];
-  proc.stdout?.on('data', (data: Buffer) => {
-    const lines = data.toString().split('\n');
-    for (const line of lines) {
-      if (output.length >= MAX_OUTPUT_LINES) output.shift();
-      output.push(line);
-    }
-  });
-  proc.stderr?.on('data', (data: Buffer) => {
-    const lines = data.toString().split('\n');
-    for (const line of lines) {
-      if (output.length >= MAX_OUTPUT_LINES) output.shift();
-      output.push(line);
-    }
-  });
-
-  spawnedProcesses.set(proc.pid || -1, { process: proc, output });
-  proc.unref();
+  trackProcess(proc);
 
   return spawned;
 }
@@ -348,29 +366,28 @@ export function cleanupProcesses(): void {
 }
 
 /**
- * Capture a screenshot of the running Godot window.
- * Uses platform-native tools.
+ * Capture a screenshot of the running Godot window (async).
+ * Uses platform-native tools. All child processes are spawned with
+ * argument arrays (never shell strings) to prevent injection.
  */
-export function captureScreenshot(
+export async function captureScreenshot(
   outputPath: string,
   windowTitle: string = 'Godot',
   delay: number = 1
-): { success: boolean; message: string; path?: string } {
+): Promise<{ success: boolean; message: string; path?: string }> {
   const platform = os.platform();
 
   try {
     if (platform === 'darwin') {
       const absPath = path.resolve(outputPath);
-      
+
       // Try to find the Godot game window by title
       let windowID = '';
       try {
         // List all windows, find the one matching the title
-        const script = `tell application "System Events" to get name of every window of every process whose name contains "godot"`
-        const osaOutput = execSync(`osascript -e '${script}' 2>/dev/null`, { timeout: 5000, encoding: 'utf-8' }).trim();
-        
-        // Find window ID for the matching title
-        if (osaOutput) {
+        const script = `tell application "System Events" to get name of every window of every process whose name contains "godot"`;
+        const { stdout: osaOutput } = await execFileAsync('osascript', ['-e', script], { timeout: 5000 });
+        if (osaOutput.trim()) {
           const findWindowScript = `
             set windowList to {}
             tell application "System Events"
@@ -382,13 +399,14 @@ export function captureScreenshot(
             end tell
             return windowList
           `;
-          const windowList = execSync(`osascript -e '${findWindowScript}' 2>/dev/null`, { timeout: 5000, encoding: 'utf-8' }).trim();
+          const { stdout: windowListOut } = await execFileAsync('osascript', ['-e', findWindowScript], { timeout: 5000 });
+          const windowList = windowListOut.trim();
           const lines = windowList.split(', ');
           for (let i = 0; i < lines.length - 1; i += 2) {
             const id = lines[i];
             const name = lines[i + 1];
             // Match: game window typically has the project name or "Godot Engine" / "Godot"
-            if (name && (name.includes(windowTitle) || name.toLowerCase().includes('godot') || id.length > 0)) {
+            if (name && (name.includes(windowTitle) || name.toLowerCase().includes('godot'))) {
               windowID = id;
               break;
             }
@@ -398,12 +416,11 @@ export function captureScreenshot(
         // osascript failed, fall back to active window capture
       }
 
+      // Await the actual capture (spawn + promise, args passed literally, no shell)
       if (windowID) {
-        // Capture by window ID — args passed literally (no shell) to prevent injection
-        spawnSync('screencapture', ['-T', String(delay), '-l', windowID, absPath], { timeout: 15000 });
+        await spawnAwait('screencapture', ['-T', String(delay), '-l', windowID, absPath], 15000);
       } else {
-        // Fallback: capture active window
-        spawnSync('screencapture', ['-T', String(delay), '-w', absPath], { timeout: 15000 });
+        await spawnAwait('screencapture', ['-T', String(delay), '-w', absPath], 15000);
       }
 
       if (fs.existsSync(absPath)) {
@@ -414,11 +431,19 @@ export function captureScreenshot(
 
     if (platform === 'linux') {
       const absPath = path.resolve(outputPath);
+      let captured = false;
       try {
-        spawnSync('import', ['-window', 'root', '-delay', '100', absPath], { timeout: 8000 });
+        await spawnAwait('import', ['-window', 'root', '-delay', '100', absPath], 8000);
+        captured = fs.existsSync(absPath);
       } catch {
         // fallback: try gnome-screenshot
-        spawnSync('gnome-screenshot', ['-f', absPath], { timeout: 8000 });
+      }
+      if (!captured) {
+        try {
+          await spawnAwait('gnome-screenshot', ['-f', absPath], 8000);
+        } catch {
+          // no screenshot tool available
+        }
       }
       if (fs.existsSync(absPath)) {
         return { success: true, message: `Screenshot saved to ${absPath}`, path: absPath };
@@ -427,10 +452,13 @@ export function captureScreenshot(
     }
 
     if (platform === 'win32') {
-      // Windows: use PowerShell to capture screen
+      // Windows: use PowerShell to capture screen.
+      // absPath is embedded as a PowerShell single-quoted literal; single quotes
+      // inside the path are escaped by doubling. Inside single quotes, $ and ;
+      // are literal, so no further escaping is needed.
       const absPath = path.resolve(outputPath);
       const psCmd = `Add-Type -AssemblyName System.Windows.Forms; $s=[System.Windows.Forms.Screen]::AllScreens[0]; $b=new-object Drawing.Bitmap($s.Bounds.Width,$s.Bounds.Height); $g=[Drawing.Graphics]::FromImage($b); $g.CopyFromScreen($s.Bounds.Location, [Drawing.Point]::Empty, $s.Bounds.Size); $b.Save('${absPath.replace(/'/g, "''")}'); $g.Dispose(); $b.Dispose()`;
-      spawnSync('powershell', ['-Command', psCmd], { timeout: 10000 });
+      await spawnAwait('powershell', ['-Command', psCmd], 10000);
       if (fs.existsSync(absPath)) {
         return { success: true, message: `Screenshot saved to ${absPath}`, path: absPath };
       }
@@ -443,25 +471,44 @@ export function captureScreenshot(
   }
 }
 
+/** Spawn a process and await its exit (resolves even on non-zero exit code). */
+function spawnAwait(command: string, args: string[], timeoutMs: number): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, { stdio: 'ignore' });
+    const timer = setTimeout(() => {
+      try { child.kill(); } catch { /* best effort */ }
+      reject(new Error(`"${command}" timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+    child.on('error', (err) => { clearTimeout(timer); reject(err); });
+    child.on('exit', () => { clearTimeout(timer); resolve(); });
+  });
+}
+
 /**
- * Detect if the Godot editor is currently running.
+ * Detect if the Godot editor is currently running (async).
  * Also checks if any project is being played from the editor.
  */
-export function detectRunningGodot(): { running: boolean; editor: boolean; playing: boolean; pids: string[] } {
+export async function detectRunningGodot(): Promise<{ running: boolean; editor: boolean; playing: boolean; pids: string[] }> {
   const platform = os.platform();
   const result = { running: false, editor: false, playing: false, pids: [] as string[] };
 
   try {
     let output = '';
     if (platform === 'darwin' || platform === 'linux') {
-      output = execSync(`ps aux 2>/dev/null | grep -i '[Gg]odot' | grep -v grep`, { encoding: 'utf-8', timeout: 3000 }).trim();
+      const { stdout } = await execFileAsync('ps', ['aux'], { timeout: 3000 });
+      output = stdout;
     } else if (platform === 'win32') {
-      output = execSync(`tasklist /FI "IMAGENAME eq Godot*" 2>nul`, { encoding: 'utf-8', timeout: 3000 }).trim();
+      const { stdout } = await execFileAsync('tasklist', ['/FI', 'IMAGENAME eq Godot*'], { timeout: 3000 });
+      output = stdout;
     }
 
-    if (!output) return result;
+    // Filter to Godot-related lines (was: `ps aux | grep -i '[Gg]odot' | grep -v grep`)
+    const lines = output
+      .split('\n')
+      .filter(l => /godot/i.test(l) && !/grep/.test(l) && l.trim().length > 0);
 
-    const lines = output.split('\n').filter(l => l.trim());
+    if (lines.length === 0) return result;
+
     result.running = true;
 
     for (const line of lines) {

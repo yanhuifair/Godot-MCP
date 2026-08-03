@@ -13,7 +13,7 @@ import { z } from 'zod';
 import net from 'node:net';
 import { spawn, ChildProcess } from 'node:child_process';
 import { ToolResult } from '../utils/types.js';
-import { ErrorCode, toolError, wrapError } from '../utils/errors.js';
+import { ErrorCode, toolError, wrapError, plainError } from '../utils/errors.js';
 import { findGodotBinary } from '../utils/godot_cli.js';
 
 const EDITOR_PORT = 9876;
@@ -90,6 +90,13 @@ function getTcpConnection(): Promise<net.Socket> {
       _lastHealthCheck = Date.now();
       _lastHealthStatus = true;
       _useTcp = true;
+
+      // 插件若配置了 auth_token（GODOT_MCP_TOKEN），TCP 连接必须先完成 auth 握手。
+      // 该响应不会匹配任何 pending 请求，会被 data 处理器忽略。
+      const token = process.env.GODOT_MCP_TOKEN;
+      if (token) {
+        client.write(JSON.stringify({ jsonrpc: '2.0', id: 'auth', method: 'auth', params: { token } }) + '\n');
+      }
 
       client.on('data', (chunk: Buffer) => {
         _tcpBuf += chunk.toString();
@@ -486,7 +493,7 @@ export async function handleEditorGetOpenScene(): Promise<ToolResult> {
 export async function handleEditorReadCurrentScene(): Promise<ToolResult> {
   try {
     const r = await sendEditorCommand('get_current_scene_tree');
-    if (r.error) return { content: [{ type: 'text', text: r.error }], isError: true };
+    if (r.error) return plainError(r.error);
     const lines = [`Scene: ${r.scene || '(unsaved)'}`, `Nodes: ${r.node_count}`, ''];
     for (const n of (r.tree || [])) {
       let line = `${'  '.repeat(n.depth)}${n.name} [${n.type}]`;
@@ -604,7 +611,7 @@ export async function handleEditorRunSpecificScene(args: { scene: string }): Pro
 export async function handleEditorRunGdscript(args: { code: string }): Promise<ToolResult> {
   try {
     const r = await sendEditorCommand('run_gdscript', args);
-    if (r.error) return { content: [{ type: 'text', text: r.error }], isError: true };
+    if (r.error) return plainError(r.error);
     return { content: [{ type: 'text', text: `GDScript executed.\nResult: ${r.result || 'void'}` }] };
   } catch (err: any) { return wrapError(ErrorCode.EDITOR_NOT_REACHABLE, err); }
 }
@@ -678,7 +685,7 @@ export async function handleEditorHealthCheck(): Promise<ToolResult> {
     await sendEditorCommand('get_editor_version');
     return { content: [{ type: 'text', text: 'Editor is reachable.' }] };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: 'Editor is NOT reachable.' + '\n' + err.message }], isError: true };
+    return plainError('Editor is NOT reachable.' + '\n' + err.message);
   }
 }
 
@@ -993,7 +1000,7 @@ export async function handleEditorBakeNavigation(): Promise<ToolResult> {
 
 // Runtime Inspection
 export async function handleEditorGetRunningSceneTree(): Promise<ToolResult> {
-  try { const r = await sendEditorCommand('get_running_scene_tree'); if (r.error) return { content: [{ type: 'text', text: r.error }], isError: true }; return { content: [{ type: 'text', text: JSON.stringify(r, null, 2) }] }; }
+  try { const r = await sendEditorCommand('get_running_scene_tree'); if (r.error) return plainError(r.error); return { content: [{ type: 'text', text: JSON.stringify(r, null, 2) }] }; }
   catch (e: any) { return wrapError(ErrorCode.EDITOR_NOT_REACHABLE, e); }
 }
 export async function handleEditorGetPerformanceMonitors(): Promise<ToolResult> {

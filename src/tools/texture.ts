@@ -5,10 +5,12 @@
 // ============================================================
 
 import { z } from 'zod';
+import { plainError } from '../utils/errors.js';
 import { ToolResult } from '../utils/types.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { resolveProjectPath } from '../utils/file_utils.js';
+import { parseImportConfig } from '../utils/import_parser.js';
 
 // ---- Tool Schemas ----
 
@@ -111,44 +113,11 @@ export function handleReadTextureInfo(
 
     return { content: [{ type: 'text', text: lines.join('\n') }] };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    return plainError(`Error: ${err.message}`);
   }
 }
 
 // ---- Helpers ----
-
-interface ImportConfig {
-  remap: Record<string, string>;
-  deps: Record<string, string>;
-  params: Record<string, string>;
-}
-
-function parseImportConfig(content: string): ImportConfig {
-  const config: ImportConfig = { remap: {}, deps: {}, params: {} };
-  let section: keyof ImportConfig | null = null;
-
-  for (const line of content.split('\n')) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith(';')) continue;
-
-    if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
-      section = trimmed.slice(1, -1) as keyof ImportConfig;
-      continue;
-    }
-
-    const eq = trimmed.indexOf('=');
-    if (eq > 0 && section) {
-      let key = trimmed.slice(0, eq).trim();
-      let value = trimmed.slice(eq + 1).trim();
-      if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
-        value = value.slice(1, -1);
-      }
-      config[section][key] = value;
-    }
-  }
-
-  return config;
-}
 
 function getPngDimensions(buffer: Buffer): { width: number; height: number } | null {
   try {

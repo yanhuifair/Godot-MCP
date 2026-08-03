@@ -2,7 +2,7 @@
 // Copyright (c) 2026 FairYan
 // SPDX-License-Identifier: MIT
 // ============================================================
-// Godot MCP Server - Entry Point (v1.2.0)
+// Godot MCP Server - Entry Point (v1.5.0)
 // ============================================================
 // 同时支持三种 MCP 通信协议：
 //   - Stdio（标准输入输出，默认）
@@ -72,6 +72,9 @@ function parseArgs(): CliConfig {
       case '-h':
         result.help = true;
         break;
+      case '--install-addons':
+        result.installAddons = true;
+        break;
       case '--enable-plugin':
         result.enablePlugin = true;
         break;
@@ -116,7 +119,7 @@ OPTIONS:
   --godot-path, -g <path>    Godot 可执行文件路径（默认：自动检测）
   --install-addons            将编辑器插件 (addons/) 安装到目标项目
   --enable-plugin             安装 addons 并自动在 project.godot 中启用插件
-  --read-only                 只读模式：拒绝所有写入/删除操作（安全模式）
+  --read-only                 只读模式：拒绝约 140 个写/副作用工具（安全模式）
 
 TRANSPORT OPTIONS:
   --transport, -t <mode>     传输协议（默认：stdio）
@@ -331,13 +334,16 @@ async function main(): Promise<void> {
     case 'all':
       // 同时启动 Stdio + HTTP（SSE + Streamable HTTP）
       console.error('[Godot MCP] Starting all transports: Stdio + SSE + Streamable HTTP');
-      // HTTP 服务在后台运行，Stdio 在主线程
+      // HTTP 服务在后台运行，Stdio 在主线程；HTTP 启动失败（如端口占用）直接报错退出
       runHttpTransport({
         port,
         host,
         projectRoot: projectPath,
         enableSse,
         enableStreamableHttp,
+      }).catch((err: unknown) => {
+        console.error(`[Godot MCP] HTTP server failed to start: ${err instanceof Error ? err.message : String(err)}`);
+        process.exit(1);
       });
       await runStdioTransport({ projectRoot: projectPath });
       break;

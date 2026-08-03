@@ -9,6 +9,7 @@
 // (Mesh primitives moved to mesh.ts)
 
 import { z } from 'zod';
+import { plainError } from '../utils/errors.js';
 import fs from 'node:fs';
 import { ToolResult } from '../utils/types.js';
 import { readTextFile, resolveProjectPath, findFilesByExtension, writeTextFile } from '../utils/file_utils.js';
@@ -52,7 +53,7 @@ export function handleReadLight2d(
     const lines = [`2D Lights (${lights.length}):`, ''];
     lights.forEach(l => lines.push(`  ${l.scene} → ${l.name} (${l.type})  energy=${l.energy}  shadow=${l.shadow}`));
     return { content: [{ type: 'text', text: lines.join('\n') }] };
-  } catch (e: any) { return { content: [{ type: 'text', text: `Error: ${e.message}` }], isError: true }; }
+  } catch (e: any) { return plainError(`Error: ${e.message}`); }
 }
 
 export function handleSetLight2dParam(projectRoot: string, args: { scene_path: string; light_name: string; param: string; value: string }): ToolResult {
@@ -60,11 +61,11 @@ export function handleSetLight2dParam(projectRoot: string, args: { scene_path: s
     const abs = resolveProjectPath(projectRoot, args.scene_path);
     const doc = parseScene(readTextFile(abs).content);
     const light = walk(doc.nodes, ['PointLight2D', 'DirectionalLight2D']).find(n => n.name === args.light_name);
-    if (!light) return { content: [{ type: 'text', text: `Light ${args.light_name} not found` }], isError: true };
+    if (!light) return plainError(`Light ${args.light_name} not found`);
     light.properties[args.param] = args.value;
     // Note: full round-trip requires scene serialization — light write is best-effort
     return { content: [{ type: 'text', text: `2D light updated: ${args.light_name}.${args.param}=${args.value}` }] };
-  } catch (e: any) { return { content: [{ type: 'text', text: `Error: ${e.message}` }], isError: true }; }
+  } catch (e: any) { return plainError(`Error: ${e.message}`); }
 }
 
 // ============================================================
@@ -96,7 +97,7 @@ export function handleCreateVehicleBody(
     }
     writeTextFile(abs, content, true);
     return { content: [{ type: 'text', text: `VehicleBody created: ${args.name || 'VehicleBody3D'} (${args.wheels?.length || 0} wheels)` }] };
-  } catch (e: any) { return { content: [{ type: 'text', text: `Error: ${e.message}` }], isError: true }; }
+  } catch (e: any) { return plainError(`Error: ${e.message}`); }
 }
 
 export function handleReadVehicleBody(projectRoot: string, args: { scene_path?: string }): ToolResult {
@@ -114,7 +115,7 @@ export function handleReadVehicleBody(projectRoot: string, args: { scene_path?: 
     const lines = [`Vehicles (${vehicles.length}):`, ''];
     vehicles.forEach(v => lines.push(`  ${v.scene} → ${v.name}  mass=${v.mass}  wheels=${v.wheels}`));
     return { content: [{ type: 'text', text: lines.join('\n') }] };
-  } catch (e: any) { return { content: [{ type: 'text', text: `Error: ${e.message}` }], isError: true }; }
+  } catch (e: any) { return plainError(`Error: ${e.message}`); }
 }
 
 // ============================================================
@@ -137,7 +138,7 @@ export function handleCreateSpringArm(
     content += `spring_length = ${args.length || 4}\n`;
     writeTextFile(abs, content, true);
     return { content: [{ type: 'text', text: `SpringArm created: ${args.name || 'SpringArm3D'} (length=${args.length || 4})` }] };
-  } catch (e: any) { return { content: [{ type: 'text', text: `Error: ${e.message}` }], isError: true }; }
+  } catch (e: any) { return plainError(`Error: ${e.message}`); }
 }
 
 export function handleReadSpringArm(projectRoot: string, args: { scene_path?: string }): ToolResult {
@@ -154,7 +155,7 @@ export function handleReadSpringArm(projectRoot: string, args: { scene_path?: st
     const lines = [`SpringArms (${arms.length}):`, ''];
     arms.forEach(a => lines.push(`  ${a.scene} → ${a.name}  length=${a.length}`));
     return { content: [{ type: 'text', text: lines.join('\n') }] };
-  } catch (e: any) { return { content: [{ type: 'text', text: `Error: ${e.message}` }], isError: true }; }
+  } catch (e: any) { return plainError(`Error: ${e.message}`); }
 }
 
 // ============================================================
@@ -177,7 +178,7 @@ export function handleReadDecal(projectRoot: string, args: { scene_path?: string
     const lines = [`Decals (${decals.length}):`, ''];
     decals.forEach(d => lines.push(`  ${d.scene} → ${d.name}  size=${d.size}`));
     return { content: [{ type: 'text', text: lines.join('\n') }] };
-  } catch (e: any) { return { content: [{ type: 'text', text: `Error: ${e.message}` }], isError: true }; }
+  } catch (e: any) { return plainError(`Error: ${e.message}`); }
 }
 
 // ============================================================
@@ -200,7 +201,7 @@ export function handleReadOccluder(projectRoot: string, args: { scene_path?: str
     const lines = [`Occluders (${occluders.length}):`, ''];
     occluders.forEach(o => lines.push(`  ${o.scene} → ${o.name} (${o.type})`));
     return { content: [{ type: 'text', text: lines.join('\n') }] };
-  } catch (e: any) { return { content: [{ type: 'text', text: `Error: ${e.message}` }], isError: true }; }
+  } catch (e: any) { return plainError(`Error: ${e.message}`); }
 }
 
 // ============================================================
@@ -226,7 +227,7 @@ export function handleReadMarker(projectRoot: string, args: { scene_path?: strin
     const lines = [`Markers (${markers.length}):`, ''];
     for (const [t, items] of Object.entries(byType)) { lines.push(`  ${t} (${items.length}):`); items.forEach(m => lines.push(`    ${m.scene} → ${m.name}`)); }
     return { content: [{ type: 'text', text: lines.join('\n') }] };
-  } catch (e: any) { return { content: [{ type: 'text', text: `Error: ${e.message}` }], isError: true }; }
+  } catch (e: any) { return plainError(`Error: ${e.message}`); }
 }
 
 // ============================================================
@@ -238,7 +239,7 @@ export const readAudioStreamSchema = { path: z.string().describe('Path to audio 
 export function handleReadAudioStream(projectRoot: string, args: { path: string }): ToolResult {
   try {
     const abs = resolveProjectPath(projectRoot, args.path);
-    if (!fs.existsSync(abs)) return { content: [{ type: 'text', text: `File not found: ${args.path}` }], isError: true };
+    if (!fs.existsSync(abs)) return plainError(`File not found: ${args.path}`);
     const stat = fs.statSync(abs);
     const ext = args.path.split('.').pop()?.toLowerCase();
     const lines = [`Audio Stream: ${args.path}`, `Format: ${ext?.toUpperCase()}`, `Size: ${Math.round(stat.size / 1024)} KB`, ''];
@@ -254,7 +255,7 @@ export function handleReadAudioStream(projectRoot: string, args: { path: string 
       if (modeMatch) lines.push(`  Stream Mode: ${modeMatch[1]} (${modeMatch[1] === '0' ? 'Stream' : modeMatch[1] === '1' ? 'Compressed' : 'RAM'})`);
     }
     return { content: [{ type: 'text', text: lines.join('\n') }] };
-  } catch (e: any) { return { content: [{ type: 'text', text: `Error: ${e.message}` }], isError: true }; }
+  } catch (e: any) { return plainError(`Error: ${e.message}`); }
 }
 
 // ============================================================
@@ -280,7 +281,7 @@ export function handleCreateCameraAttributes(
     const abs = resolveProjectPath(projectRoot, args.path);
     writeTextFile(abs, content, false);
     return { content: [{ type: 'text', text: `Camera attributes created: ${args.path} (${type})` }] };
-  } catch (e: any) { return { content: [{ type: 'text', text: `Error: ${e.message}` }], isError: true }; }
+  } catch (e: any) { return plainError(`Error: ${e.message}`); }
 }
 
 // ============================================================
@@ -308,7 +309,7 @@ export function handleCreateSpriteFrames(
     const abs = resolveProjectPath(projectRoot, args.path);
     writeTextFile(abs, content, false);
     return { content: [{ type: 'text', text: `SpriteFrames created: ${args.path} (${anims.length} animations)` }] };
-  } catch (e: any) { return { content: [{ type: 'text', text: `Error: ${e.message}` }], isError: true }; }
+  } catch (e: any) { return plainError(`Error: ${e.message}`); }
 }
 
 export function handleReadSpriteFrames(projectRoot: string, args: { scene_path?: string }): ToolResult {
@@ -335,7 +336,7 @@ export function handleReadSpriteFrames(projectRoot: string, args: { scene_path?:
     if (sprites.length) { lines.push(`Animated Sprites (${sprites.length}):`, ''); sprites.forEach(s => lines.push(`  ${s.scene} → ${s.name} (${s.type})  anim="${s.anim}"`)); lines.push(''); }
     if (frameFiles.length) { lines.push(`SpriteFrames Resources (${frameFiles.length}):`); frameFiles.forEach(f => lines.push(`  ${f}`)); }
     return { content: [{ type: 'text', text: lines.join('\n') }] };
-  } catch (e: any) { return { content: [{ type: 'text', text: `Error: ${e.message}` }], isError: true }; }
+  } catch (e: any) { return plainError(`Error: ${e.message}`); }
 }
 
 // ============================================================
@@ -358,7 +359,7 @@ export function handleReadSoftBody(projectRoot: string, args: { scene_path?: str
     const lines = [`Soft Bodies (${bodies.length}):`, ''];
     bodies.forEach(b => lines.push(`  ${b.scene} → ${b.name}  mass=${b.mass}  stiffness=${b.stiffness}`));
     return { content: [{ type: 'text', text: lines.join('\n') }] };
-  } catch (e: any) { return { content: [{ type: 'text', text: `Error: ${e.message}` }], isError: true }; }
+  } catch (e: any) { return plainError(`Error: ${e.message}`); }
 }
 
 // ============================================================
@@ -382,7 +383,7 @@ export function handleReadGridMap(projectRoot: string, args: { scene_path?: stri
     const lines = [`GridMaps (${maps.length}):`, ''];
     maps.forEach(m => lines.push(`  ${m.scene} → ${m.name}  cell=${m.size}`));
     return { content: [{ type: 'text', text: lines.join('\n') }] };
-  } catch (e: any) { return { content: [{ type: 'text', text: `Error: ${e.message}` }], isError: true }; }
+  } catch (e: any) { return plainError(`Error: ${e.message}`); }
 }
 
 export function handleCreateGridMap(
@@ -395,7 +396,7 @@ export function handleCreateGridMap(
     content += `\n[node name="${args.name || 'GridMap'}" type="GridMap" parent="${args.parent || '.'}"]\ncell_size = 2.0\n`;
     writeTextFile(abs, content, true);
     return { content: [{ type: 'text', text: `GridMap created: ${args.name || 'GridMap'}` }] };
-  } catch (e: any) { return { content: [{ type: 'text', text: `Error: ${e.message}` }], isError: true }; }
+  } catch (e: any) { return plainError(`Error: ${e.message}`); }
 }
 
 // ============================================================
@@ -418,5 +419,5 @@ export function handleReadAudioListener(projectRoot: string, args: { scene_path?
     const lines = [`Audio Listeners (${listeners.length}):`, ''];
     listeners.forEach(l => lines.push(`  ${l.scene} → ${l.name} (${l.type})`));
     return { content: [{ type: 'text', text: lines.join('\n') }] };
-  } catch (e: any) { return { content: [{ type: 'text', text: `Error: ${e.message}` }], isError: true }; }
+  } catch (e: any) { return plainError(`Error: ${e.message}`); }
 }

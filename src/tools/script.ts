@@ -5,6 +5,7 @@
 // ============================================================
 
 import { z } from 'zod';
+import { plainError } from '../utils/errors.js';
 import { ToolResult } from '../utils/types.js';
 import {
   readFileLines,
@@ -162,10 +163,7 @@ export function handleReadScript(
       content: [{ type: 'text', text: result }],
     };
   } catch (err: any) {
-    return {
-      content: [{ type: 'text', text: `Error reading script: ${err.message}` }],
-      isError: true,
-    };
+        return plainError(`Error reading script: ${err.message}`);
   }
 }
 
@@ -180,10 +178,7 @@ export function handleWriteScript(
       content: [{ type: 'text', text: `Script written: ${args.path} (${args.content.length} bytes)` }],
     };
   } catch (err: any) {
-    return {
-      content: [{ type: 'text', text: `Error writing script: ${err.message}` }],
-      isError: true,
-    };
+        return plainError(`Error writing script: ${err.message}`);
   }
 }
 
@@ -197,10 +192,7 @@ export function handleCreateScript(
     let content = templates[templateKey];
 
     if (!content) {
-      return {
-        content: [{ type: 'text', text: `Unknown template: ${args.template}. Available: ${Object.keys(templates).join(', ')}` }],
-        isError: true,
-      };
+            return plainError(`Unknown template: ${args.template}. Available: ${Object.keys(templates).join(', ')}`);
     }
 
     // Apply class_name for GDScript
@@ -215,10 +207,7 @@ export function handleCreateScript(
       content: [{ type: 'text', text: `Script created: ${args.path} (${args.type}, template: ${templateKey})` }],
     };
   } catch (err: any) {
-    return {
-      content: [{ type: 'text', text: `Error creating script: ${err.message}` }],
-      isError: true,
-    };
+        return plainError(`Error creating script: ${err.message}`);
   }
 }
 
@@ -262,10 +251,7 @@ export function handleListScripts(
       content: [{ type: 'text', text: lines.join('\n') }],
     };
   } catch (err: any) {
-    return {
-      content: [{ type: 'text', text: `Error listing scripts: ${err.message}` }],
-      isError: true,
-    };
+        return plainError(`Error listing scripts: ${err.message}`);
   }
 }
 
@@ -388,10 +374,7 @@ export function handleReadShader(
       content: [{ type: 'text', text: result }],
     };
   } catch (err: any) {
-    return {
-      content: [{ type: 'text', text: `Error reading shader: ${err.message}` }],
-      isError: true,
-    };
+        return plainError(`Error reading shader: ${err.message}`);
   }
 }
 
@@ -402,10 +385,7 @@ export function handleCreateShader(
   try {
     const template = ShaderTemplates[args.type];
     if (!template) {
-      return {
-        content: [{ type: 'text', text: `Unknown shader type: ${args.type}. Available: ${Object.keys(ShaderTemplates).join(', ')}` }],
-        isError: true,
-      };
+            return plainError(`Unknown shader type: ${args.type}. Available: ${Object.keys(ShaderTemplates).join(', ')}`);
     }
 
     const absPath = resolveProjectPath(projectRoot, args.path);
@@ -415,10 +395,7 @@ export function handleCreateShader(
       content: [{ type: 'text', text: `Shader created: ${args.path} (type: ${args.type})` }],
     };
   } catch (err: any) {
-    return {
-      content: [{ type: 'text', text: `Error creating shader: ${err.message}` }],
-      isError: true,
-    };
+        return plainError(`Error creating shader: ${err.message}`);
   }
 }
 
@@ -437,10 +414,7 @@ export function handleListShaders(
       content: [{ type: 'text', text: `Shaders (${shaders.length}):\n${shaders.sort().join('\n')}` }],
     };
   } catch (err: any) {
-    return {
-      content: [{ type: 'text', text: `Error listing shaders: ${err.message}` }],
-      isError: true,
-    };
+        return plainError(`Error listing shaders: ${err.message}`);
   }
 }
 
@@ -455,10 +429,7 @@ export function handleWriteShader(
       content: [{ type: 'text', text: `Shader written: ${args.path} (${args.content.length} bytes)` }],
     };
   } catch (err: any) {
-    return {
-      content: [{ type: 'text', text: `Error writing shader: ${err.message}` }],
-      isError: true,
-    };
+        return plainError(`Error writing shader: ${err.message}`);
   }
 }
 
@@ -535,10 +506,7 @@ export function handleValidateScript(
       content: [{ type: 'text', text: `Validation results for ${args.path}:\n\nIssues found:\n${issues.join('\n')}` }],
     };
   } catch (err: any) {
-    return {
-      content: [{ type: 'text', text: `Error validating script: ${err.message}` }],
-      isError: true,
-    };
+        return plainError(`Error validating script: ${err.message}`);
   }
 }
 
@@ -628,7 +596,7 @@ export function handleReadScriptStructure(
 
     return { content: [{ type: 'text', text: out.join('\n') }] };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error reading structure: ${err.message}` }], isError: true };
+    return plainError(`Error reading structure: ${err.message}`);
   }
 }
 
@@ -680,7 +648,7 @@ export function handleSearchInScripts(
 
     return { content: [{ type: 'text', text: out.join('\n') }] };
   } catch (err: any) {
-    return {       content: [{ type: 'text', text: `Error searching scripts: ${err.message}` }], isError: true };
+    return plainError(`Error searching scripts: ${err.message}`);
   }
 }
 
@@ -723,7 +691,7 @@ export function handleListVisualShaders(
 
     return { content: [{ type: 'text', text: lines.join('\n') }] };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error listing visual shaders: ${err.message}` }], isError: true };
+    return plainError(`Error listing visual shaders: ${err.message}`);
   }
 }
 
@@ -804,7 +772,7 @@ export function handleReadVisualShader(
 
     return { content: [{ type: 'text', text: lines.join('\n') }] };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error reading visual shader: ${err.message}` }], isError: true };
+    return plainError(`Error reading visual shader: ${err.message}`);
   }
 }
 
@@ -821,7 +789,7 @@ export function handleReadShaderInclude(
     lines.forEach((line, i) => result.push(`${String(i + 1).padStart(4, ' ')} | ${line}`));
     return { content: [{ type: 'text', text: result.join('\n') }] };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error reading shader include: ${err.message}` }], isError: true };
+    return plainError(`Error reading shader include: ${err.message}`);
   }
 }
 
@@ -835,7 +803,7 @@ export function handleCreateShaderInclude(
     writeTextFile(absPath, template);
     return { content: [{ type: 'text', text: `Shader include created: ${args.path}` }] };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error creating shader include: ${err.message}` }], isError: true };
+    return plainError(`Error creating shader include: ${err.message}`);
   }
 }
 
@@ -848,7 +816,7 @@ export function handleListShaderIncludes(
     if (includes.length === 0) return { content: [{ type: 'text', text: 'No .gdshaderinc files found.' }] };
     return { content: [{ type: 'text', text: `Shader Includes (${includes.length}):\n${includes.sort().join('\n')}` }] };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    return plainError(`Error: ${err.message}`);
   }
 }
 
@@ -896,7 +864,7 @@ export function handleAddScriptFunction(
 
     return { content: [{ type: 'text', text: `Function "${args.func_name}" added to ${args.path}` }] };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    return plainError(`Error: ${err.message}`);
   }
 }
 
@@ -926,7 +894,7 @@ export function handleAddScriptSignal(
 
     return { content: [{ type: 'text', text: `Signal "${args.signal_name}" added to ${args.path}` }] };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    return plainError(`Error: ${err.message}`);
   }
 }
 
@@ -959,7 +927,7 @@ export function handleAddScriptExport(
 
     return { content: [{ type: 'text', text: `@export "${args.var_name}" added to ${args.path}` }] };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    return plainError(`Error: ${err.message}`);
   }
 }
 
@@ -980,7 +948,7 @@ export function handleValidateShader(
   try {
     const absPath = resolveProjectPath(projectRoot, args.path);
     if (!absPath.endsWith('.gdshader') && !absPath.endsWith('.gdshaderinc')) {
-      return { content: [{ type: 'text', text: `Expected .gdshader or .gdshaderinc file: ${args.path}` }], isError: true };
+    return plainError(`Expected .gdshader or .gdshaderinc file: ${args.path}`);
     }
 
     const { lines } = readFileLines(absPath);
@@ -1052,7 +1020,7 @@ export function handleValidateShader(
       content: [{ type: 'text', text: `Shader validation for ${args.path}:\n\nIssues:\n${issues.join('\n')}` }],
     };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error validating shader: ${err.message}` }], isError: true };
+    return plainError(`Error validating shader: ${err.message}`);
   }
 }
 

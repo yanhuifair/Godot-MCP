@@ -7,6 +7,7 @@
 // NavigationRegion2D/3D nodes and NavigationMesh/2D resources.
 
 import { z } from 'zod';
+import { plainError } from '../utils/errors.js';
 import { ToolResult } from '../utils/types.js';
 import { readTextFile, resolveProjectPath, findFilesByExtension, writeTextFile } from '../utils/file_utils.js';
 import { parseResource } from '../parsers/resource_parser.js';
@@ -92,7 +93,7 @@ export function handleListNavRegions(
 
     return { content: [{ type: 'text', text: lines.join('\n') }] };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    return plainError(`Error: ${err.message}`);
   }
 }
 
@@ -121,7 +122,7 @@ export function handleReadNavRegion(
       : regions[0];
 
     if (!region) {
-      return { content: [{ type: 'text', text: `Navigation region not found in ${args.scene_path}` }], isError: true };
+    return plainError(`Navigation region not found in ${args.scene_path}`);
     }
 
     const lines: string[] = [];
@@ -162,7 +163,7 @@ export function handleReadNavRegion(
 
     return { content: [{ type: 'text', text: lines.join('\n') }] };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    return plainError(`Error: ${err.message}`);
   }
 }
 
@@ -187,6 +188,6 @@ cell_height = ${args.cell_height ?? 0.25}
       content: [{ type: 'text', text: `NavigationMesh created: ${args.path}\n  agent_radius=${args.agent_radius ?? 0.5} agent_height=${args.agent_height ?? 2.0}` }],
     };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    return plainError(`Error: ${err.message}`);
   }
 }

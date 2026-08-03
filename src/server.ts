@@ -1,7 +1,7 @@
 // Copyright (c) 2026 FairYan
 // SPDX-License-Identifier: MIT
 // ============================================================
-// Godot MCP Server - Server Factory & Handlers (v1.4.0)
+// Godot MCP Server - Server Factory & Handlers (v1.5.0)
 // ============================================================
 // 将 MCP Server 创建、工具注册、请求处理抽离为独立工厂函数，
 // 供 Stdio、SSE、Streamable HTTP 三种传输层共用。
@@ -34,7 +34,9 @@ let sharedProjectRoot: string | null = null;
  */
 export function initSharedResources(projectRoot?: string): { registry: ToolRegistry; projectRoot: string | null } {
   if (!sharedRegistry) {
-    sharedRegistry = new ToolRegistry();
+    // --read-only 通过环境变量 GODOT_MCP_READ_ONLY 传入（见 src/index.ts）
+    const readOnly = process.env.GODOT_MCP_READ_ONLY === 'true';
+    sharedRegistry = new ToolRegistry({ readOnly });
     registerAllTools(sharedRegistry);
   }
   if (sharedProjectRoot === undefined || sharedProjectRoot === null) {
@@ -65,7 +67,7 @@ export function createMcpServer(options: CreateServerOptions = {}): Server {
   const { registry } = initSharedResources();
 
   const server = new Server(
-    { name: 'godot-mcp', version: '1.4.0' },
+    { name: 'godot-mcp', version: '1.5.0' },
     { capabilities: { tools: {} } }
   );
 
@@ -92,6 +94,14 @@ export function createMcpServer(options: CreateServerOptions = {}): Server {
     const tool = registry.find(name);
     if (!tool) {
       return toolError(ErrorCode.NOT_FOUND, `Unknown tool: ${name}`);
+    }
+
+    // ---- READ-ONLY 模式：拒绝所有写/副作用工具 ----
+    if (!registry.canCall(name)) {
+      return toolError(
+        ErrorCode.READ_ONLY,
+        `Tool "${name}" is a write operation and is blocked in read-only mode`
+      );
     }
 
     try {

@@ -1,7 +1,7 @@
 # <div align="center">Godot MCP</div>
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-140%20passed-brightgreen)](.)
+[![Tests](https://img.shields.io/badge/tests-72%20passed-brightgreen)](.)
 [![npm](https://img.shields.io/npm/v/@yanhuifair/godot-mcp)](https://www.npmjs.com/package/@yanhuifair/godot-mcp)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-green)](.)
 [![Godot](https://img.shields.io/badge/godot-4.x-blue)](https://godotengine.org)
@@ -194,7 +194,7 @@ npx @yanhuifair/godot-mcp --enable-plugin -p .
   |   Godot 编辑器     |                                       |  +-------------+ |
   |  (GDScript 插件)  |                                       +------------------+
   |  TCP 端口 9876    |
-  |  97 条命令        |
+  |  102 条命令       |
   +------------------+
 ```
 
@@ -249,7 +249,7 @@ godot-mcp/
 ├── addons/
 │   └── godot-mcp/            # Godot 编辑器插件
 │       ├── plugin.cfg         # 插件元数据
-│       └── plugin.gd          # stdin 读取器、TCP 服务器、97 个命令处理器
+│       └── plugin.gd          # stdin 读取器、TCP 服务器、102 个命令处理器
 ├── test/                     # Vitest 套件（140 个测试）+ 旧版 .mjs 套件
 │   ├── test_all.mjs          # 旧版独立套件（167 项工具检查）
 │   ├── test_editor.mjs       # Editor 桥 TCP 测试
@@ -292,9 +292,9 @@ godot-mcp/
 
 ### 双模式编辑器桥
 
-编辑器插件（`addons/godot-mcp/plugin.gd`）实现了 97 个命令处理器，封装了 Godot 的 `EditorInterface` API。通信通过两个通道使用 JSON-RPC 2.0：
+编辑器插件（`addons/godot-mcp/plugin.gd`）实现了 102 个命令处理器，封装了 Godot 的 `EditorInterface` API。通信通过两个通道使用 JSON-RPC 2.0：
 
-- **TCP 模式**（端口 9876）：当 Godot 独立运行时，插件接受 TCP 连接并处理命令。这是交互式开发的首选模式。
+- **TCP 模式**（端口 9876）：当 Godot 独立运行时，插件仅在 `127.0.0.1` 上接受 TCP 连接（绝不暴露到局域网）。这是交互式开发的首选模式。设置 `GODOT_MCP_TOKEN`（或项目设置 `godot_mcp/auth_token`）可要求每个连接先完成 `auth` 握手。
 
 - **Stdio 模式**：当 MCP 服务器将 Godot 作为子进程启动时（`godot --editor --path <project>`），插件从 stdin 读取 JSON-RPC 请求，并以 `__MCP__:` 前缀标记将响应写入 stdout。服务器过滤这些标记以区分 JSON-RPC 和 Godot 的标准输出。
 
@@ -308,8 +308,10 @@ godot-mcp/
 
 - **路径穿越防护**：所有文件操作验证解析后的路径保持在项目根目录内
 - **自动备份**：脚本和场景文件的写操作会创建 `.bak` 备份副本
-- **只读模式**：`--read-only` 标志拒绝所有写和删除操作
-- **结构化错误**：所有错误使用类型化的错误码（`FILE_NOT_FOUND`、`PARSE_ERROR`、`VALIDATION_ERROR` 等），并附有可操作的提示
+- **只读模式**：`--read-only`（或 `GODOT_MCP_READ_ONLY=true`）通过维护的白名单拒绝约 140 个写/副作用工具（write_、create_、delete_、move_、set_、edit_、editor_* 变更类、run/export/launch 等）——它们从 `tools/list` 中隐藏，直接调用时返回 `READ_ONLY` 错误
+- **TCP 仅限本机**：编辑器插件的 TCP 桥只绑定 `127.0.0.1`，绝不暴露到局域网
+- **可选令牌鉴权**：设置 `GODOT_MCP_TOKEN` 后，HTTP（`/mcp`、`/sse`）要求 Bearer 令牌，插件 TCP 桥要求 `auth` 握手；非 loopback 的 HTTP 绑定在没有令牌时拒绝启动
+- **结构化错误**：工具失败统一返回 `{ content, isError: true }` 结构；关键路径（只读、编辑器不可达）携带类型化错误码（`READ_ONLY`、`EDITOR_NOT_REACHABLE`、`NOT_FOUND` 等）
 
 ---
 
@@ -396,7 +398,7 @@ npx @yanhuifair/godot-mcp -t all --port 3000 -p /path/to/your/godot/project
 
 ```bash
 curl http://127.0.0.1:3000/health
-# {"status":"ok","version":"1.4.0","projectRoot":"/path/to/project","endpoints":{...}}
+# {"status":"ok","version":"1.5.0","projectRoot":"/path/to/project","endpoints":{...}}
 ```
 
 ---
@@ -429,9 +431,15 @@ npm run build
 | 变量 | 描述 |
 |---|---|
 | `GODOT_PATH` | Godot 二进制路径（可选，自动检测） |
+| `GODOT_MCP_READ_ONLY` | `true` — 启用只读模式（拒绝约 140 个写/副作用工具） |
+| `GODOT_MCP_TOKEN` | 鉴权令牌。HTTP：绑定非 loopback 地址时必须设置；插件 TCP 桥：在 9876 端口启用 `auth` 握手 |
 | `GODOT_MCP_TEST_PROJECT` | 集成测试项目路径 |
+| `GODOT_PROJECT` | `sync-addons` 构建钩子的目标项目 |
+| `MCP_STDIO` | `true` — 让编辑器插件以 stdio 模式运行（MCP 启动 Godot 时自动设置） |
 
 Godot 自动检测顺序：`GODOT_PATH` -> `/Applications/Godot.app` -> `PATH` -> snap/flatpak -> Windows Program Files
+
+> **安全提示**：MCP 服务器可读写你的项目文件、执行 GDScript、导出构建。使用 HTTP 传输时务必设置 `GODOT_MCP_TOKEN`——没有令牌时服务器拒绝绑定非 loopback 地址，且仍强烈建议仅限本机访问。
 
 ---
 
@@ -839,7 +847,10 @@ mcp_servers:
 
 ## 编辑器插件
 
-编辑器插件实现了与 Godot 编辑器的实时交互。当调用编辑器工具时，MCP 将 Godot 作为子进程启动，通过 stdin/stdout 使用 JSON-RPC 2.0 进行通信。
+编辑器插件通过两种模式实现与 Godot 编辑器的实时交互：
+
+- **stdio 模式** — 当 MCP 将 Godot 作为子进程启动时（通过 stdin/stdout 使用 JSON-RPC 2.0 通信）
+- **TCP 模式** — 当手动打开 Godot 时，插件监听 `127.0.0.1:9876`（仅本机）。若设置了 `GODOT_MCP_TOKEN` 或项目设置 `godot_mcp/auth_token`，每个连接必须先完成 `auth` 握手。端口可通过项目设置 `godot_mcp/editor_port` 修改。
 
 ### 安装
 
@@ -1264,7 +1275,7 @@ npm run test:watch   # 监听模式
 | `--host` | HTTP 绑定地址（默认：127.0.0.1） |
 | `--install-addons` | 将编辑器插件复制到目标 Godot 项目 |
 | `--enable-plugin` | 安装并自动启用编辑器插件 |
-| `--read-only` | 拒绝所有写和删除操作 |
+| `--read-only` | 拒绝约 140 个写/副作用工具（安全模式） |
 | `--no-sse` | 禁用 SSE 端点 |
 | `--no-streamable-http` | 禁用 Streamable HTTP 端点 |
 | `-h, --help` | 显示帮助 |
@@ -1285,13 +1296,13 @@ npm run test:watch   # 监听模式
 
 ```bash
 npm run vsix
-# 输出: godot-mcp-1.4.0.vsix
+# 输出: godot-mcp-1.5.0.vsix
 ```
 
 在 VS Code 中安装：
 
 ```bash
-code --install-extension godot-mcp-1.4.0.vsix
+code --install-extension godot-mcp-1.5.0.vsix
 ```
 
 ---

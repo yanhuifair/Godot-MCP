@@ -178,7 +178,7 @@ describe('Resource Tools (integration)', () => {
 describe('Godot Tools (integration)', () => {
   it('get_godot_version works when Godot found or returns informative error', async () => {
     const { handleGetGodotVersion } = await import('../src/tools/godot.js');
-    const result = handleGetGodotVersion();
+    const result = await handleGetGodotVersion();
     // Either Godot is found (not error) or we get a helpful message
     if (result.isError) {
       expect(result.content[0].text).toContain('Godot binary not found');

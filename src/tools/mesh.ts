@@ -7,6 +7,7 @@
 // Plane, Prism, Sphere, Torus, Quad, Text, RibbonTrail, TubeTrail.
 
 import { z } from 'zod';
+import { plainError } from '../utils/errors.js';
 import { ToolResult } from '../utils/types.js';
 import { resolveProjectPath, writeTextFile } from '../utils/file_utils.js';
 
@@ -42,7 +43,7 @@ export function handleCreateMeshPrimitive(
 ): ToolResult {
   try {
     const defaults = MESH_DEFAULTS[args.mesh_type];
-    if (!defaults) return { content: [{ type: 'text', text: `Unknown mesh: ${args.mesh_type}. Valid: ${Object.keys(MESH_DEFAULTS).join(', ')}` }], isError: true };
+    if (!defaults) return plainError(`Unknown mesh: ${args.mesh_type}. Valid: ${Object.keys(MESH_DEFAULTS).join(', ')}`);
 
     const props = { ...defaults, ...(args.params || {}) };
     let content = `[gd_resource type="${args.mesh_type}" format=3 uid=""]\n\n[resource]\n`;
@@ -52,6 +53,6 @@ export function handleCreateMeshPrimitive(
     writeTextFile(absPath, content, false);
     return { content: [{ type: 'text', text: `Mesh created: ${args.path} (${args.mesh_type})` }] };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    return plainError(`Error: ${err.message}`);
   }
 }

@@ -311,3 +311,84 @@ describe('GDScript Writer', () => {
     expect(content).toContain('gravity');
   });
 });
+
+// ---- READ-ONLY Write-Tool 名单完整性 ----
+// WRITE_TOOLS 白名单是 read-only 模式的唯一防线：漏列一个写工具 = 安全失效。
+// 本测试确保「以明显写前缀命名」的工具都在名单中，新增写类工具时必须同步加入。
+
+describe('WRITE_TOOLS 名单完整性', () => {
+  it('所有已注册工具都以已知前缀分类（写/读互斥无冲突）', async () => {
+    const { WRITE_TOOLS } = await import('../src/utils/registry.js');
+    const { registerAllTools } = await import('../src/tools/register.js');
+    const { ToolRegistry } = await import('../src/utils/registry.js');
+
+    const registry = new ToolRegistry();
+    registerAllTools(registry);
+    const names = registry.list().map((t) => t.name);
+
+    // 注册列表在非只读模式下应包含全部工具
+    expect(names.length).toBeGreaterThan(100);
+
+    // 所有写名单中的工具必须是已注册的真实工具（防拼写错误）
+    for (const w of WRITE_TOOLS) {
+      expect(names).toContain(w);
+    }
+  });
+
+  it('明显写前缀的工具必须列入 WRITE_TOOLS（防漏）', async () => {
+    const { WRITE_TOOLS } = await import('../src/utils/registry.js');
+    const { registerAllTools } = await import('../src/tools/register.js');
+    const { ToolRegistry } = await import('../src/utils/registry.js');
+
+    const registry = new ToolRegistry();
+    registerAllTools(registry);
+    const names = registry.list().map((t) => t.name);
+
+    // 写前缀：以这些词开头的工具几乎必然是写/副作用操作。
+    // 若新增工具名落入此集合但不在 WRITE_TOOLS，说明 read-only 防线有缺口。
+    const writePrefixes = [
+      'write_', 'create_', 'delete_', 'move_', 'edit_', 'add_', 'remove_',
+      'set_', 'rename_', 'duplicate_', 'update_', 'compile_', 'transform_',
+      'attach_', 'load_', 'connect_', 'disconnect_', 'launch_', 'run_',
+      'export_', 'stop_', 'capture_', 'bake_', 'reimport_',
+    ];
+
+    // editor_* 工具中写/副作用操作的完整名单（editor_take_screenshot 会通过插件落盘文件）
+    const editorWriteTools = [
+      'editor_set_selection', 'editor_play', 'editor_stop', 'editor_undo', 'editor_redo',
+      'editor_save', 'editor_reload_scene', 'editor_add_node', 'editor_remove_node',
+      'editor_set_node_properties', 'editor_rename_node', 'editor_duplicate_node',
+      'editor_reparent_node', 'editor_move_node', 'editor_run_specific_scene',
+      'editor_run_gdscript', 'editor_create_script', 'editor_attach_script',
+      'editor_set_breakpoint', 'editor_remove_breakpoint', 'editor_save_all',
+      'editor_delete_selected', 'editor_create_scene', 'editor_instantiate_scene',
+      'editor_set_main_scene', 'editor_debug_continue', 'editor_debug_step',
+      'editor_debug_step_over', 'editor_debug_break', 'editor_evaluate_expression',
+      'editor_set_editor_setting', 'editor_set_project_setting', 'editor_connect_signal',
+      'editor_disconnect_signal', 'editor_simulate_key', 'editor_enable_plugin',
+      'editor_disable_plugin', 'editor_create_folder', 'editor_delete_asset',
+      'editor_rename_asset', 'editor_move_asset', 'editor_duplicate_asset',
+      'editor_set_camera', 'editor_add_autoload', 'editor_remove_autoload',
+      'editor_add_input_action', 'editor_remove_input_action', 'editor_reimport_asset',
+      'editor_bake_lightmaps', 'editor_bake_navigation', 'editor_take_screenshot',
+    ];
+
+    // 已知例外：这些工具虽命中前缀但是只读/UI 操作，不在写名单中
+    const readOnlyExceptions = new Set([
+      'generate_project_report', // 分析报告（读）
+      'generate_cohesion_report', // 分析报告（读）
+    ]);
+
+    const missing: string[] = [];
+    for (const name of names) {
+      if (readOnlyExceptions.has(name)) continue;
+      if (writePrefixes.some((p) => name.startsWith(p)) && !WRITE_TOOLS.has(name)) {
+        missing.push(name);
+      }
+      if (name.startsWith('editor_') && editorWriteTools.includes(name) && !WRITE_TOOLS.has(name)) {
+        missing.push(name);
+      }
+    }
+    expect(missing).toEqual([]);
+  });
+});

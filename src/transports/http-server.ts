@@ -63,6 +63,18 @@ export async function runHttpTransport(options: HttpTransportOptions = {}): Prom
   const enableSse = options.enableSse ?? true;
   const enableStreamableHttp = options.enableStreamableHttp ?? true;
 
+  // ---- 安全防线：非 loopback 绑定必须设置 GODOT_MCP_TOKEN ----
+  // 该服务器可读写文件系统、执行 GDScript、导出工程，暴露到局域网/公网
+  // 而无鉴权等于远程代码执行。拒绝启动而不是静默裸奔。
+  const isLoopback = /^(127\.\d+\.\d+\.\d+|localhost|::1|0:0:0:0:0:0:0:1)$/i.test(host);
+  if (!isLoopback && !process.env.GODOT_MCP_TOKEN) {
+    console.error(
+      `[Godot MCP] Refusing to listen on non-loopback host "${host}" without GODOT_MCP_TOKEN. ` +
+      'Set GODOT_MCP_TOKEN to enable remote access, or bind 127.0.0.1.'
+    );
+    process.exit(1);
+  }
+
   // 初始化共享资源
   const { projectRoot } = initSharedResources(options.projectRoot);
   if (projectRoot) {
@@ -109,7 +121,7 @@ export async function runHttpTransport(options: HttpTransportOptions = {}): Prom
   app.get('/health', (_req: Request, res: Response) => {
     res.json({
       status: 'ok',
-      version: '1.4.0',
+      version: '1.5.0',
       projectRoot: getProjectRoot(),
       endpoints: {
         ...(enableSse ? { sse: `http://${host}:${port}/sse` } : {}),
@@ -118,16 +130,26 @@ export async function runHttpTransport(options: HttpTransportOptions = {}): Prom
     });
   });
 
-  // 启动 HTTP 服务器
-  const server = app.listen(port, host, () => {
-    console.error(`[Godot MCP] HTTP server listening on http://${host}:${port}`);
-    if (enableSse) {
-      console.error(`[Godot MCP]   SSE endpoint:           http://${host}:${port}/sse`);
-    }
-    if (enableStreamableHttp) {
-      console.error(`[Godot MCP]   Streamable HTTP:        http://${host}:${port}/mcp`);
-    }
-    console.error(`[Godot MCP]   Health check:           http://${host}:${port}/health`);
+  // 启动 HTTP 服务器。启动失败（端口占用等）通过 reject 让调用方（index.ts 的
+  // all 模式 .catch）走受控退出路径；运行期 error 事件也由此监听器消费，
+  // 不会升级为 uncaughtException。
+  let server: ReturnType<typeof app.listen>;
+  await new Promise<void>((resolve, reject) => {
+    server = app.listen(port, host, () => {
+      console.error(`[Godot MCP] HTTP server listening on http://${host}:${port}`);
+      if (enableSse) {
+        console.error(`[Godot MCP]   SSE endpoint:           http://${host}:${port}/sse`);
+      }
+      if (enableStreamableHttp) {
+        console.error(`[Godot MCP]   Streamable HTTP:        http://${host}:${port}/mcp`);
+      }
+      console.error(`[Godot MCP]   Health check:           http://${host}:${port}/health`);
+      resolve();
+    });
+    server.on('error', (err: NodeJS.ErrnoException) => {
+      console.error(`[Godot MCP] HTTP server error: ${err.message}`);
+      reject(err);
+    });
   });
 
   // 优雅关闭

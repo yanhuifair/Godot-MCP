@@ -5,6 +5,7 @@
 // ============================================================
 
 import { z } from 'zod';
+import { plainError } from '../utils/errors.js';
 import fs from 'node:fs';
 import pathMod from 'node:path';
 import { ToolResult, SceneOperation, SceneTemplateType } from '../utils/types.js';
@@ -183,10 +184,7 @@ export function handleReadScene(
       content: [{ type: 'text', text: result }],
     };
   } catch (err: any) {
-    return {
-      content: [{ type: 'text', text: `Error reading scene: ${err.message}` }],
-      isError: true,
-    };
+        return plainError(`Error reading scene: ${err.message}`);
   }
 }
 
@@ -203,10 +201,7 @@ export function handleCreateScene(
       content: [{ type: 'text', text: `Scene created: ${args.path} (root: ${rootName}, type: ${args.template})` }],
     };
   } catch (err: any) {
-    return {
-      content: [{ type: 'text', text: `Error creating scene: ${err.message}` }],
-      isError: true,
-    };
+        return plainError(`Error creating scene: ${err.message}`);
   }
 }
 
@@ -236,10 +231,7 @@ export function handleEditScene(
       content: [{ type: 'text', text: `Scene edited: ${args.path}\n\nOperations:\n${opsSummary}` }],
     };
   } catch (err: any) {
-    return {
-      content: [{ type: 'text', text: `Error editing scene: ${err.message}` }],
-      isError: true,
-    };
+        return plainError(`Error editing scene: ${err.message}`);
   }
 }
 
@@ -259,10 +251,7 @@ export function handleListScenes(
       content: [{ type: 'text', text: scenes.join('\n') }],
     };
   } catch (err: any) {
-    return {
-      content: [{ type: 'text', text: `Error listing scenes: ${err.message}` }],
-      isError: true,
-    };
+        return plainError(`Error listing scenes: ${err.message}`);
   }
 }
 
@@ -377,10 +366,7 @@ export function handleSceneDependencyGraph(projectRoot: string): ToolResult {
       content: [{ type: 'text', text: lines.join('\n') }],
     };
   } catch (err: any) {
-    return {
-      content: [{ type: 'text', text: `Error building dependency graph: ${err.message}` }],
-      isError: true,
-    };
+        return plainError(`Error building dependency graph: ${err.message}`);
   }
 }
 
@@ -486,10 +472,7 @@ export function handleFindNodesInScenes(
       content: [{ type: 'text', text: lines.join('\n') }],
     };
   } catch (err: any) {
-    return {
-      content: [{ type: 'text', text: `Error finding nodes: ${err.message}` }],
-      isError: true,
-    };
+        return plainError(`Error finding nodes: ${err.message}`);
   }
 }
 
@@ -528,7 +511,7 @@ export function handleSearchSceneContent(
 
     return { content: [{ type: 'text', text: lines.join('\n') }] };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error searching scenes: ${err.message}` }], isError: true };
+    return plainError(`Error searching scenes: ${err.message}`);
   }
 }
 
@@ -627,7 +610,7 @@ export function handleListUiNodes(
 
     return { content: [{ type: 'text', text: lines.join('\n') }] };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error listing UI nodes: ${err.message}` }], isError: true };
+    return plainError(`Error listing UI nodes: ${err.message}`);
   }
 }
 
@@ -728,10 +711,7 @@ export function handleTransformNode(
     }
 
     if (!found) {
-      return {
-        content: [{ type: 'text', text: `Node "${args.node_path}" not found in ${args.scene_path}.` }],
-        isError: true,
-      };
+            return plainError(`Node "${args.node_path}" not found in ${args.scene_path}.`);
     }
 
     // Detect 2D / 3D
@@ -743,14 +723,11 @@ export function handleTransformNode(
       if (args.rotation !== undefined) props.rotation = normalizeRotation(args.rotation, dim);
       if (args.scale) props.scale = normalizeVector(args.scale, dim, 'scale');
     } catch (err: any) {
-      return { content: [{ type: 'text', text: `Format error: ${err.message} (node type: ${found.type}, dimension: ${dim})` }], isError: true };
+    return plainError(`Format error: ${err.message} (node type: ${found.type}, dimension: ${dim})`);
     }
 
     if (Object.keys(props).length === 0) {
-      return {
-        content: [{ type: 'text', text: 'No transform parameters provided. Specify at least one: position, rotation, scale.' }],
-        isError: true,
-      };
+            return plainError('No transform parameters provided. Specify at least one: position, rotation, scale.');
     }
 
     const ops: SceneOperation[] = [{ action: 'modify_node', node_path: args.node_path, properties: props }];
@@ -766,10 +743,7 @@ export function handleTransformNode(
       content: [{ type: 'text', text: `Node "${args.node_path}" [${dim}] transformed in ${args.scene_path}:\n  ${changed.join('\n  ')}` }],
     };
   } catch (err: any) {
-    return {
-      content: [{ type: 'text', text: `Error transforming node: ${err.message}` }],
-      isError: true,
-    };
+        return plainError(`Error transforming node: ${err.message}`);
   }
 }
 
@@ -787,7 +761,7 @@ export function handleRenameNode(
     writeTextFile(absPath, modified, true);
     return { content: [{ type: 'text', text: `Node renamed: "${args.node_path}" → "${args.new_name}" in ${args.scene_path}` }] };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error renaming node: ${err.message}` }], isError: true };
+    return plainError(`Error renaming node: ${err.message}`);
   }
 }
 
@@ -805,7 +779,7 @@ export function handleAttachScript(
     writeTextFile(absPath, modified, true);
     return { content: [{ type: 'text', text: `Script "${args.script_path}" attached to "${args.node_path}" in ${args.scene_path}` }] };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error attaching script: ${err.message}` }], isError: true };
+    return plainError(`Error attaching script: ${err.message}`);
   }
 }
 
@@ -842,7 +816,7 @@ export function handleSetCollisionShape(
       content: [{ type: 'text', text: `Shape "${shapePath}" assigned to "${args.node_path}" in ${args.scene_path}` }],
     };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    return plainError(`Error: ${err.message}`);
   }
 }
 
@@ -860,7 +834,7 @@ function doSceneOp(projectRoot: string, scenePath: string, op: SceneOperation, l
     writeTextFile(absPath, modified, true);
     return { content: [{ type: 'text', text: label }] };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    return plainError(`Error: ${err.message}`);
   }
 }
 
@@ -976,18 +950,12 @@ export function handleLoadSprite(
 
     const node = findNode(doc.nodes, args.node_path);
     if (!node) {
-      return {
-        content: [{ type: 'text', text: `Node "${args.node_path}" not found in ${args.scene_path}.` }],
-        isError: true,
-      };
+            return plainError(`Node "${args.node_path}" not found in ${args.scene_path}.`);
     }
 
     // 检查节点类型
     if (node.type !== 'Sprite2D' && node.type !== 'TextureRect') {
-      return {
-        content: [{ type: 'text', text: `Node "${args.node_path}" is ${node.type}, not Sprite2D or TextureRect.` }],
-        isError: true,
-      };
+            return plainError(`Node "${args.node_path}" is ${node.type}, not Sprite2D or TextureRect.`);
     }
 
     // 添加 ExtResource 引用
@@ -1009,9 +977,6 @@ export function handleLoadSprite(
       content: [{ type: 'text', text: `🖼️ Texture "${args.texture_path}" loaded onto "${args.node_path}" in ${args.scene_path}.` }],
     };
   } catch (err: any) {
-    return {
-      content: [{ type: 'text', text: `Error loading sprite: ${err.message}` }],
-      isError: true,
-    };
+        return plainError(`Error loading sprite: ${err.message}`);
   }
 }

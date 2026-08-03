@@ -8,10 +8,12 @@
 // They control import settings (compression, sampling, etc.)
 
 import { z } from 'zod';
+import { plainError } from '../utils/errors.js';
 import { ToolResult } from '../utils/types.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { resolveProjectPath, findFilesByExtension, writeTextFile } from '../utils/file_utils.js';
+import { ImportConfig, parseImportConfig, serializeImportConfig } from '../utils/import_parser.js';
 
 // ---- Tool Schemas ----
 
@@ -31,76 +33,6 @@ export const writeImportConfigSchema = {
 
 // ---- Helpers ----
 
-interface ImportConfig {
-  remap: Record<string, string>;  // [remap] section
-  deps: Record<string, string>;   // [deps] section
-  params: Record<string, string>; // [params] section
-}
-
-function parseImportFile(content: string): ImportConfig {
-  const result: ImportConfig = { remap: {}, deps: {}, params: {} };
-  let currentSection: 'remap' | 'deps' | 'params' | null = null;
-
-  for (const rawLine of content.split('\n')) {
-    const line = rawLine.trim();
-    if (!line || line.startsWith(';')) continue;
-
-    if (line.startsWith('[') && line.endsWith(']')) {
-      const section = line.slice(1, -1).trim();
-      switch (section) {
-        case 'remap': currentSection = 'remap'; break;
-        case 'deps': currentSection = 'deps'; break;
-        case 'params': currentSection = 'params'; break;
-        default: currentSection = null;
-      }
-      continue;
-    }
-
-    const eqIdx = line.indexOf('=');
-    if (eqIdx > 0 && currentSection) {
-      const key = line.slice(0, eqIdx).trim();
-      let value = line.slice(eqIdx + 1).trim();
-      // Strip surrounding quotes
-      if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
-        value = value.slice(1, -1);
-      }
-      result[currentSection][key] = value;
-    }
-  }
-
-  return result;
-}
-
-function serializeImportFile(config: ImportConfig): string {
-  const lines: string[] = [];
-
-  if (Object.keys(config.remap).length > 0) {
-    lines.push('[remap]');
-    for (const [k, v] of Object.entries(config.remap)) {
-      lines.push(`${k}=${v}`);
-    }
-    lines.push('');
-  }
-
-  if (Object.keys(config.deps).length > 0) {
-    lines.push('[deps]');
-    for (const [k, v] of Object.entries(config.deps)) {
-      lines.push(`${k}=${v}`);
-    }
-    lines.push('');
-  }
-
-  if (Object.keys(config.params).length > 0) {
-    lines.push('[params]');
-    for (const [k, v] of Object.entries(config.params)) {
-      lines.push(`${k}=${v}`);
-    }
-    lines.push('');
-  }
-
-  return lines.join('\n').trim();
-}
-
 // ---- Tool Handlers ----
 
 /**
@@ -115,14 +47,11 @@ export function handleReadImportConfig(
     const absPath = resolveProjectPath(projectRoot, importFilePath);
 
     if (!fs.existsSync(absPath)) {
-      return {
-        content: [{ type: 'text', text: `No .import file found for "${args.asset_path}". The asset may not be imported yet — open it in the Godot editor first.` }],
-        isError: true,
-      };
+            return plainError(`No .import file found for "${args.asset_path}". The asset may not be imported yet — open it in the Godot editor first.`);
     }
 
     const content = fs.readFileSync(absPath, 'utf-8');
-    const config = parseImportFile(content);
+    const config = parseImportConfig(content);
 
     const lines: string[] = [];
     lines.push(`Import config: ${args.asset_path}`);
@@ -151,7 +80,7 @@ export function handleReadImportConfig(
 
     return { content: [{ type: 'text', text: lines.join('\n') }] };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    return plainError(`Error: ${err.message}`);
   }
 }
 
@@ -196,7 +125,7 @@ export function handleListImportFiles(
     const prefix = `Import files: ${total} asset(s) across ${Object.keys(byType).length} type(s)`;
     return { content: [{ type: 'text', text: prefix + lines.join('\n') }] };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    return plainError(`Error: ${err.message}`);
   }
 }
 
@@ -215,7 +144,7 @@ export function handleWriteImportConfig(
 
     if (fs.existsSync(absPath)) {
       const content = fs.readFileSync(absPath, 'utf-8');
-      config = parseImportFile(content);
+      config = parseImportConfig(content);
     } else {
       // Create a minimal .import file
       const ext = path.extname(args.asset_path).toLowerCase();
@@ -230,7 +159,7 @@ export function handleWriteImportConfig(
     // Merge settings into params
     Object.assign(config.params, args.settings);
 
-    const serialized = serializeImportFile(config);
+    const serialized = serializeImportConfig(config);
     writeTextFile(absPath, serialized, true);
 
     // Update the corresponding .godot/imported file timestamp to force reimport
@@ -240,7 +169,7 @@ export function handleWriteImportConfig(
       content: [{ type: 'text', text: `Import config updated: ${args.asset_path} (${Object.keys(args.settings).length} settings)` }],
     };
   } catch (err: any) {
-    return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+    return plainError(`Error: ${err.message}`);
   }
 }
 
