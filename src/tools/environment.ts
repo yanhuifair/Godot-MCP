@@ -326,3 +326,65 @@ function readWorldEnvFromScene(absPath: string, relPath: string): ToolResult {
     return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
   }
 }
+
+// ---- Additional environment tools (Tier1) ----
+
+export const createSkySchema = {
+  path: z.string().describe('Output path for new Sky .tres (e.g. "environments/sky.tres")'),
+  material: z.enum(['procedural', 'panorama']).optional().default('procedural').describe('Sky material type'),
+};
+
+export function handleCreateSky(
+  projectRoot: string,
+  args: { path: string; material?: string }
+): ToolResult {
+  try {
+    let content = '[gd_resource type="Sky" format=3 uid=""]\n\n';
+    if (args.material === 'panorama') {
+      content += '[sub_resource type="PanoramaSkyMaterial" id="1"]\n\n';
+      content += '[resource]\n';
+      content += 'sky_material = SubResource("1")\n';
+    } else {
+      content += '[sub_resource type="ProceduralSkyMaterial" id="1"]\n\n';
+      content += '[resource]\n';
+      content += 'sky_material = SubResource("1")\n';
+    }
+
+    const absPath = resolveProjectPath(projectRoot, args.path);
+    writeTextFile(absPath, content, false);
+    return { content: [{ type: 'text', text: `Sky created: ${args.path} (material: ${args.material || 'procedural'})` }] };
+  } catch (err: any) {
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
+  }
+}
+
+export const createWorldEnvironmentSchema = {
+  path: z.string().describe('Output path for new .tscn with a WorldEnvironment node (e.g. "environments/world_env.tscn")'),
+  environment_path: z.string().optional().describe('Optional .tres Environment to reference; if omitted an inline default Environment is used'),
+};
+
+export function handleCreateWorldEnvironment(
+  projectRoot: string,
+  args: { path: string; environment_path?: string }
+): ToolResult {
+  try {
+    let content = '[gd_scene format=3 uid=""]\n\n';
+    if (args.environment_path) {
+      const rel = args.environment_path.startsWith('res://') ? args.environment_path.slice(6) : args.environment_path;
+      content += `[ext_resource type="Environment" path="res://${rel}" id="1_env"]\n\n`;
+      content += '[node name="WorldEnvironment" type="WorldEnvironment"]\n';
+      content += 'environment = ExtResource("1_env")\n';
+    } else {
+      content += '[sub_resource type="Environment" id="1"]\n\n';
+      content += '[node name="WorldEnvironment" type="WorldEnvironment"]\n';
+      content += 'environment = SubResource("1")\n';
+    }
+
+    const absPath = resolveProjectPath(projectRoot, args.path);
+    writeTextFile(absPath, content, false);
+    const note = args.environment_path ? ` referencing ${args.environment_path}` : ' with inline default Environment';
+    return { content: [{ type: 'text', text: `WorldEnvironment scene created: ${args.path}${note}` }] };
+  } catch (err: any) {
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
+  }
+}

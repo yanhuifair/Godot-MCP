@@ -9,7 +9,7 @@ import { toolError, ErrorCode } from '../utils/errors.js';
 import { ToolResult } from '../utils/types.js';
 import { readTextFile, resolveProjectPath, findFilesByExtension, writeTextFile } from '../utils/file_utils.js';
 import { parseResource } from '../parsers/resource_parser.js';
-import { parseScene } from '../parsers/scene_parser.js';
+import { parseScene, serializeScene } from '../parsers/scene_parser.js';
 
 // ---- Schemas ----
 
@@ -535,4 +535,149 @@ function extractBones(node: any): string[] {
   }
   bones.sort((a, b) => a.idx - b.idx);
   return bones.map(b => `  bone_${b.idx}: ${b.name}  parent=${b.parent}`);
+}
+
+// ---- Additional domain tools (Tier1) ----
+
+export const createMultimeshSchema = {
+  path: z.string().describe('Output path for new MultiMesh .tres (e.g. "meshes/grass_multimesh.tres")'),
+  instance_count: z.number().int().optional().default(100).describe('Number of instances to allocate'),
+  mesh_path: z.string().optional().describe('Optional .tres Mesh path (res://...) to assign'),
+  transform_mode: z.enum(['none', 'transform_2d', 'transform_3d']).optional().default('transform_3d').describe('Transform format'),
+};
+
+export function handleCreateMultimesh(
+  projectRoot: string,
+  args: { path: string; instance_count?: number; mesh_path?: string; transform_mode?: string }
+): ToolResult {
+  try {
+    const modes: Record<string, number> = { none: 0, transform_2d: 1, transform_3d: 2 };
+    const tf = modes[args.transform_mode || 'transform_3d'] ?? 2;
+    const count = args.instance_count ?? 100;
+
+    let content: string;
+    if (args.mesh_path) {
+      const rel = args.mesh_path.startsWith('res://') ? args.mesh_path.slice(6) : args.mesh_path;
+      content = `[gd_resource type="MultiMesh" load_steps=2 format=3 uid=""]
+
+[ext_resource type="Mesh" path="res://${rel}" id="1_mesh"]
+
+[resource]
+instance_count = ${count}
+transform_format = ${tf}
+mesh = ExtResource("1_mesh")
+`;
+    } else {
+      content = `[gd_resource type="MultiMesh" format=3 uid=""]
+
+[resource]
+instance_count = ${count}
+transform_format = ${tf}
+`;
+    }
+
+    const absPath = resolveProjectPath(projectRoot, args.path);
+    writeTextFile(absPath, content, false);
+    return { content: [{ type: 'text', text: `MultiMesh created: ${args.path} (instances: ${count})` }] };
+  } catch (err: any) {
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
+  }
+}
+
+export const setSkeletonBonePoseSchema = {
+  scene_path: z.string().describe('Path to .tscn scene containing a Skeleton3D/2D node'),
+  skeleton: z.string().optional().describe('Skeleton node name (first found if omitted)'),
+  bone: z.string().describe('Name of the bone to pose'),
+  position: z.array(z.number()).optional().describe('Local position as [x, y, z]'),
+  rotation: z.array(z.number()).optional().describe('Local rotation as quaternion [x, y, z, w]'),
+  scale: z.array(z.number()).optional().describe('Local scale as [x, y, z]'),
+};
+
+export function handleSetSkeletonBonePose(
+  projectRoot: string,
+  args: { scene_path: string; skeleton?: string; bone: string; position?: number[]; rotation?: number[]; scale?: number[] }
+): ToolResult {
+  try {
+    const absPath = resolveProjectPath(projectRoot, args.scene_path);
+    const { content } = readTextFile(absPath);
+    const doc = parseScene(content);
+
+    const skeletons = walkNodes(doc.nodes, ['Skeleton3D', 'Skeleton2D']);
+    const skel = args.skeleton ? skeletons.find(s => s.name === args.skeleton) : skeletons[0];
+    if (!skel) {
+      return toolError(ErrorCode.FILE_NOT_FOUND, `No Skeleton node found in ${args.scene_path}`);
+    }
+
+    let idx = -1;
+    for (const [key, val] of Object.entries(skel.properties)) {
+      const m = key.match(/^bones\/(\d+)\/name$/);
+      if (m && String(val) === args.bone) {
+        idx = parseInt(m[1], 10);
+        break;
+      }
+    }
+    if (idx < 0) {
+      return toolError(ErrorCode.INVALID_ARGUMENT, `Bone "${args.bone}" not found in skeleton ${skel.name}`);
+    }
+
+    if (args.position) skel.properties[`bones/${idx}/position`] = `Vector3(${args.position.join(', ')})`;
+    if (args.rotation) skel.properties[`bones/${idx}/rotation`] = `Quaternion(${args.rotation.join(', ')})`;
+    if (args.scale) skel.properties[`bones/${idx}/scale`] = `Vector3(${args.scale.join(', ')})`;
+
+    writeTextFile(absPath, serializeScene(doc), true);
+    return {
+      content: [{ type: 'text', text: `Bone "${args.bone}" posed in ${skel.name} (${args.scene_path})` }],
+    };
+  } catch (err: any) {
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
+  }
+}
+
+export const writePathCurveSchema = {
+  scene_path: z.string().describe('Path to .tscn scene containing a Path2D/Path3D node'),
+  path: z.string().optional().describe('Path node name (first found if omitted)'),
+  points: z.array(z.array(z.number())).describe('Control points as arrays of [x, y, z] (Path3D) or [x, y] (Path2D)'),
+  closed: z.boolean().optional().default(false).describe('Whether the curve is closed'),
+  bake_resolution: z.number().int().optional().default(100).describe('Curve bake resolution'),
+};
+
+export function handleWritePathCurve(
+  projectRoot: string,
+  args: { scene_path: string; path?: string; points: number[][]; closed?: boolean; bake_resolution?: number }
+): ToolResult {
+  try {
+    const absPath = resolveProjectPath(projectRoot, args.scene_path);
+    const { content } = readTextFile(absPath);
+    const doc = parseScene(content);
+
+    const paths = walkNodes(doc.nodes, ['Path2D', 'Path3D']);
+    const target = args.path ? paths.find(p => p.name === args.path) : paths[0];
+    if (!target) {
+      return toolError(ErrorCode.FILE_NOT_FOUND, `No Path node found in ${args.scene_path}`);
+    }
+
+    const flat: number[] = [];
+    for (const p of args.points) {
+      for (const c of p) flat.push(c);
+    }
+
+    const id = `Curve_${Math.random().toString(36).slice(2, 9)}`;
+    doc.subResources.push({
+      type: target.type === 'Path3D' ? 'Curve3D' : 'Curve2D',
+      id,
+      properties: {
+        bake_resolution: String(args.bake_resolution ?? 100),
+        _data: `{\n"points": PackedFloat32Array(${flat.join(', ')}),\n"tilts": PackedFloat32Array()\n}`,
+      },
+    });
+    target.properties['curve'] = `SubResource("${id}")`;
+    target.properties['closed'] = String(args.closed ?? false);
+
+    writeTextFile(absPath, serializeScene(doc), true);
+    return {
+      content: [{ type: 'text', text: `Curve written to ${target.name} in ${args.scene_path} (${args.points.length} points, closed=${args.closed ?? false})` }],
+    };
+  } catch (err: any) {
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
+  }
 }

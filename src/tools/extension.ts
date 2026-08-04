@@ -163,3 +163,82 @@ environment = ExtResource("1_environment")
     return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
   }
 }
+
+// ---- Additional extension tools (Tier1) ----
+
+export const createGdextensionSchema = {
+  path: z.string().describe('Output path for new .gdextension (e.g. "addons/myext/myext.gdextension")'),
+  entry_symbol: z.string().optional().default('myext_init').describe('Entry symbol (init function name)'),
+  library_path: z.string().optional().describe('Path to the compiled library (e.g. "res://addons/myext/bin/libmyext.linux.debug.x86_64.so")'),
+};
+
+export function handleCreateGdextension(
+  projectRoot: string,
+  args: { path: string; entry_symbol?: string; library_path?: string }
+): ToolResult {
+  try {
+    let content = '; GDExtension configuration\n';
+    content += '[configuration]\n\n';
+    content += `entry_symbol = "${args.entry_symbol || 'myext_init'}"\n\n`;
+    if (args.library_path) {
+      const rel = args.library_path.startsWith('res://') ? args.library_path.slice(6) : args.library_path;
+      content += '[libraries]\n\n';
+      content += `linux.debug.x86_64 = "res://${rel}"\n`;
+      content += `linux.release.x86_64 = "res://${rel}"\n`;
+    }
+
+    const absPath = resolveProjectPath(projectRoot, args.path);
+    writeTextFile(absPath, content, false);
+    return { content: [{ type: 'text', text: `GDExtension created: ${args.path} (entry: ${args.entry_symbol || 'myext_init'})` }] };
+  } catch (err: any) {
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
+  }
+}
+
+export const readCsprojSchema = {
+  path: z.string().describe('Path to .csproj file (relative to project root)'),
+};
+
+export function handleReadCsproj(
+  projectRoot: string,
+  args: { path: string }
+): ToolResult {
+  try {
+    const absPath = resolveProjectPath(projectRoot, args.path);
+    if (!fs.existsSync(absPath)) {
+      return toolError(ErrorCode.FILE_NOT_FOUND, `File not found: ${args.path}`);
+    }
+    const content = fs.readFileSync(absPath, 'utf-8');
+
+    const lines: string[] = [];
+    lines.push(`C# Project: ${args.path}`);
+    lines.push('');
+
+    const grab = (tag: string) => {
+      const m = content.match(new RegExp(`<${tag}>([^<]*)</${tag}>`, 'i'));
+      return m ? m[1] : '';
+    };
+    const assemblyName = grab('AssemblyName') || grab('RootNamespace');
+    const target = grab('TargetFramework');
+    if (assemblyName) lines.push(`  Assembly/Namespace: ${assemblyName}`);
+    if (target) lines.push(`  Target Framework: ${target}`);
+
+    const pkgRefs = [...content.matchAll(/<PackageReference[^>]*Include="([^"]+)"[^>]*Version="([^"]+)"/g)];
+    if (pkgRefs.length) {
+      lines.push('');
+      lines.push(`  Package References (${pkgRefs.length}):`);
+      for (const r of pkgRefs) lines.push(`    ${r[1]} = ${r[2]}`);
+    }
+
+    const projRefs = [...content.matchAll(/<ProjectReference[^>]*Include="([^"]+)"/g)];
+    if (projRefs.length) {
+      lines.push('');
+      lines.push(`  Project References (${projRefs.length}):`);
+      for (const r of projRefs) lines.push(`    ${r[1]}`);
+    }
+
+    return { content: [{ type: 'text', text: lines.join('\n') }] };
+  } catch (err: any) {
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
+  }
+}

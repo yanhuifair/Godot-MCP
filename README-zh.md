@@ -10,7 +10,7 @@
 
 ---
 
-**Model Context Protocol (MCP) 服务器**，使 AI 助手能够与 Godot Engine 项目交互。AI 可以读取、检查、修改 Godot 项目的各个方面——从场景文件和脚本到材质、动画、音频总线和实时编辑器。**282 个工具、26 个分类、支持 12 种 AI 客户端。**
+**Model Context Protocol (MCP) 服务器**，使 AI 助手能够与 Godot Engine 项目交互。AI 可以读取、检查、修改 Godot 项目的各个方面——从场景文件和脚本到材质、动画、音频总线和实时编辑器。**345 个工具、26 个分类、支持 12 种 AI 客户端。**
 
 | 依赖 | |
 |---|---|
@@ -80,7 +80,7 @@ AI 客户端自动启动 MCP 服务器。基于文件的工具（.tscn、.tres�
 
 ## 功能
 
-Godot MCP 通过 282 个工具、26 个分类，全面覆盖 Godot 4.x 引擎。
+Godot MCP 通过 345 个工具、26 个分类，全面覆盖 Godot 4.x 引擎。
 
 ### 快速演示
 
@@ -127,7 +127,7 @@ npx @yanhuifair/godot-mcp --enable-plugin -p .
 | Diff | 2 | 场景与资源对比 |
 | Other | 4 | GDExtension、C#、World3D、Texture |
 
-**总计：282 个工具，26 个分类**
+**总计：345 个工具，26 个分类**
 
 ### 核心能力详解
 
@@ -178,7 +178,7 @@ npx @yanhuifair/godot-mcp --enable-plugin -p .
   |   Claude 等)     |                                        |                  |
   +-----------------+                                        |  +-------------+ |
                                                              |  | 工具注册表    | |
-                                                             |  |  (282 工具)  | |
+                                                             |  |  (345 工具)  | |
                                                              |  +------+------+ |
                                                              |         |        |
                                                              |    +----v-----+  |
@@ -218,7 +218,7 @@ godot-mcp/
 │   ├── index.ts              # CLI 入口点，参数解析，传输调度
 │   ├── server.ts             # MCP 服务器工厂，工具注册，请求路由
 │   ├── tools/                # 29 个工具处理文件（每个分类一个）
-│   │   ├── register.ts       # 集中注册（282 个工具）
+│   │   ├── register.ts       # 集中注册（345 个工具）
 │   │   ├── project.ts        # 项目管理工具
 │   │   ├── scene.ts          # 场景编辑工具
 │   │   ├── script.ts         # 脚本和着色器工具
@@ -398,7 +398,7 @@ npx @yanhuifair/godot-mcp -t all --port 3000 -p /path/to/your/godot/project
 
 ```bash
 curl http://127.0.0.1:3000/health
-# {"status":"ok","version":"1.6.0","projectRoot":"/path/to/project","endpoints":{...}}
+# {"status":"ok","version":"1.7.0","projectRoot":"/path/to/project","endpoints":{...}}
 ```
 
 ---
@@ -1296,13 +1296,13 @@ npm run test:watch   # 监听模式
 
 ```bash
 npm run vsix
-# 输出: godot-mcp-1.6.0.vsix
+# 输出: godot-mcp-1.7.0.vsix
 ```
 
 在 VS Code 中安装：
 
 ```bash
-code --install-extension godot-mcp-1.6.0.vsix
+code --install-extension godot-mcp-1.7.0.vsix
 ```
 
 ---

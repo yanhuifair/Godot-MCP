@@ -331,3 +331,56 @@ function readGettextPo(absPath: string, args: { path: string; filter?: string })
 function parseQuoted(s: string): string {
   return s.replace(/^"/, '').replace(/"$/, '').replace(/\\n/g, '\n').replace(/\\"/g, '"');
 }
+
+// ---- Write / Append Translation ----
+
+export const writeTranslationSchema = {
+  path: z.string().describe('Path to .csv translation file to write/overwrite'),
+  language: z.string().optional().default('en').describe('Target language column code'),
+  entries: z.record(z.string()).describe('Map of translation key to its value'),
+};
+
+export const addTranslationKeySchema = {
+  path: z.string().describe('Path to .csv translation file'),
+  key: z.string().describe('New translation key to add'),
+  translations: z.record(z.string()).optional().describe('Optional map of language code to value'),
+};
+
+export function handleWriteTranslation(
+  projectRoot: string,
+  args: { path: string; language?: string; entries: Record<string, string> }
+): ToolResult {
+  try {
+    const lang = args.language || 'en';
+    let content = `keys,en,${lang}\n`;
+    const keys = Object.keys(args.entries);
+    if (keys.length === 0) return toolError(ErrorCode.INVALID_ARGUMENT, 'entries must not be empty.');
+    for (const k of keys) {
+      content += `"${k}","${k}","${args.entries[k]}"\n`;
+    }
+    const absPath = resolveProjectPath(projectRoot, args.path);
+    writeTextFile(absPath, content, false);
+    return { content: [{ type: 'text', text: `Translation written: ${args.path} (${keys.length} entries, languages: en,${lang})` }] };
+  } catch (err: any) {
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
+  }
+}
+
+export function handleAddTranslationKey(
+  projectRoot: string,
+  args: { path: string; key: string; translations?: Record<string, string> }
+): ToolResult {
+  try {
+    const absPath = resolveProjectPath(projectRoot, args.path);
+    if (!fs.existsSync(absPath)) return toolError(ErrorCode.FILE_NOT_FOUND, `File not found: ${args.path}`);
+    const raw = fs.readFileSync(absPath, 'utf-8');
+    const firstLine = raw.split('\n')[0] || 'keys,en';
+    const langs = parseCsvLine(firstLine).slice(1);
+    const vals: string[] = langs.map(l => (args.translations && args.translations[l] !== undefined ? args.translations[l] : ''));
+    const row = `"${args.key}",` + vals.map(v => `"${v}"`).join(',');
+    writeTextFile(absPath, raw.replace(/\n*$/, '') + '\n' + row + '\n', true);
+    return { content: [{ type: 'text', text: `Added key "${args.key}" to ${args.path}` }] };
+  } catch (err: any) {
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
+  }
+}

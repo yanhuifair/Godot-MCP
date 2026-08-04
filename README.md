@@ -10,7 +10,7 @@
 
 ---
 
-A **Model Context Protocol (MCP) server** that enables AI assistants to interact with Godot Engine projects. AI can read, inspect, and modify every aspect of your Godot project — from scene files and scripts to materials, animations, audio buses, and the live editor itself. **282 tools, 26 categories, 12 AI clients supported.**
+A **Model Context Protocol (MCP) server** that enables AI assistants to interact with Godot Engine projects. AI can read, inspect, and modify every aspect of your Godot project — from scene files and scripts to materials, animations, audio buses, and the live editor itself. **345 tools, 26 categories, 12 AI clients supported.**
 
 | Requirement | |
 |---|---|
@@ -80,7 +80,7 @@ The AI client auto-launches the MCP server. File-based tools (.tscn, .tres, .gd)
 
 ## What You Can Do
 
-Godot MCP provides comprehensive coverage of the Godot 4.x engine through 282 tools in 26 categories.
+Godot MCP provides comprehensive coverage of the Godot 4.x engine through 345 tools in 26 categories.
 
 ### Quick Demo
 
@@ -127,7 +127,7 @@ npx @yanhuifair/godot-mcp --enable-plugin -p .
 | Diff | 2 | Scene and resource comparison |
 | Other | 4 | GDExtension, C#, World3D, Texture |
 
-**Total: 282 tools across 26 categories**
+**Total: 345 tools across 26 categories**
 
 ### Core Capabilities in Detail
 
@@ -145,7 +145,7 @@ npx @yanhuifair/godot-mcp --enable-plugin -p .
   |   Claude/etc.)   |                                        |                  |
   +-----------------+                                        |  +-------------+ |
                                                              |  | Tool Registry| |
-                                                             |  |  (282 tools) | |
+                                                             |  |  (345 tools) | |
                                                              |  +------+------+ |
                                                              |         |        |
                                                              |    +----v-----+  |
@@ -185,7 +185,7 @@ godot-mcp/
 │   ├── index.ts              # CLI entry point, argument parsing, transport dispatch
 │   ├── server.ts             # MCP server factory, tool registration, request routing
 │   ├── tools/                # 29 tool handler files (one per category)
-│   │   ├── register.ts       # Centralized registration (282 tools)
+│   │   ├── register.ts       # Centralized registration (345 tools)
 │   │   ├── project.ts        # Project management tools
 │   │   ├── scene.ts          # Scene editing tools
 │   │   ├── script.ts         # Script and shader tools
@@ -366,7 +366,7 @@ Starts: Stdio + SSE (`/sse`) + Streamable HTTP (`/mcp`) + Health Check (`/health
 
 ```bash
 curl http://127.0.0.1:3000/health
-# {"status":"ok","version":"1.6.0","projectRoot":"/path/to/project","endpoints":{...}}
+# {"status":"ok","version":"1.7.0","projectRoot":"/path/to/project","endpoints":{...}}
 ```
 
 ---
@@ -700,7 +700,7 @@ aider --mcp-server "godot-mcp=godot-mcp -p ."
 Aider's `/tools` command lists all available MCP tools. Use them directly in chat:
 
 ```
-/tools                    # List all 282 tools
+/tools                    # List all 345 tools
 Create a new Node2D scene called "MainMenu"
 ```
 
@@ -1284,13 +1284,13 @@ npm run test:watch   # Watch mode
 
 ```bash
 npm run vsix
-# Output: godot-mcp-1.6.0.vsix
+# Output: godot-mcp-1.7.0.vsix
 ```
 
 Install in VS Code:
 
 ```bash
-code --install-extension godot-mcp-1.6.0.vsix
+code --install-extension godot-mcp-1.7.0.vsix
 ```
 
 ---

@@ -11,7 +11,7 @@ import { z } from 'zod';
 import { toolError, ErrorCode } from '../utils/errors.js';
 import { ToolResult } from '../utils/types.js';
 import fs from 'node:fs';
-import { readTextFile, resolveProjectPath, findFilesByExtension } from '../utils/file_utils.js';
+import { readTextFile, writeTextFile, resolveProjectPath, findFilesByExtension } from '../utils/file_utils.js';
 import { parseResource } from '../parsers/resource_parser.js';
 import { parseScene } from '../parsers/scene_parser.js';
 
@@ -208,4 +208,102 @@ function tilesetPropLabel(key: string): string {
     custom_data_layers: 'Custom data layers',
   };
   return labels[key] || '';
+}
+
+// ---- Additional TileSet tools (Tier1) ----
+
+export const createTilesetSchema = {
+  path: z.string().describe('Output path for new TileSet .tres (e.g. "tilesets/main.tres")'),
+  tile_size: z.array(z.number()).optional().default([64, 64]).describe('Tile size [x, y] in pixels'),
+};
+
+export function handleCreateTileset(
+  projectRoot: string,
+  args: { path: string; tile_size?: number[] }
+): ToolResult {
+  try {
+    const ts = args.tile_size || [64, 64];
+    const content = `[gd_resource type="TileSet" format=3 uid=""]
+
+[resource]
+tile_size = Vector2i(${ts[0]}, ${ts[1]})
+`;
+    const absPath = resolveProjectPath(projectRoot, args.path);
+    writeTextFile(absPath, content, false);
+    return { content: [{ type: 'text', text: `TileSet created: ${args.path} (tile_size ${ts[0]}x${ts[1]})` }] };
+  } catch (err: any) {
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
+  }
+}
+
+export const addTilesetSourceSchema = {
+  tileset_path: z.string().describe('Path to .tres TileSet file'),
+  texture_path: z.string().describe('Path to the tileset atlas texture (e.g. "res://textures/tiles.png")'),
+  source_id: z.number().int().optional().describe('Source index (auto-detected if omitted)'),
+  tile_size: z.array(z.number()).optional().default([64, 64]).describe('Tile size [x, y] in pixels'),
+  margin: z.array(z.number()).optional().default([0, 0]).describe('Atlas margin [x, y]'),
+  separation: z.array(z.number()).optional().default([0, 0]).describe('Atlas separation [x, y]'),
+};
+
+export function handleAddTilesetSource(
+  projectRoot: string,
+  args: { tileset_path: string; texture_path: string; source_id?: number; tile_size?: number[]; margin?: number[]; separation?: number[] }
+): ToolResult {
+  try {
+    const absPath = resolveProjectPath(projectRoot, args.tileset_path);
+    const { content } = readTextFile(absPath);
+    const lines = content.split('\n');
+
+    const rel = args.texture_path.startsWith('res://') ? args.texture_path.slice(6) : args.texture_path;
+
+    // Determine next free source id
+    let maxSrc = -1;
+    for (const l of lines) {
+      const m = l.match(/^sources\/(\d+)\s*=/);
+      if (m) maxSrc = Math.max(maxSrc, parseInt(m[1], 10));
+    }
+    const srcId = args.source_id ?? maxSrc + 1;
+
+    // Reuse an existing texture ext_resource if present
+    let texExtId = '';
+    for (const l of lines) {
+      const m = l.match(/\[ext_resource type="Texture2D" path="res:\/\/([^"]+)" id="([^"]+)"\]/);
+      if (m && m[1] === rel) {
+        texExtId = m[2];
+        break;
+      }
+    }
+    const needTexExt = !texExtId;
+    if (needTexExt) texExtId = `1_tex_${srcId}`;
+
+    const subId = `Atlas_${srcId}`;
+    const ts = args.tile_size || [64, 64];
+    const margin = args.margin || [0, 0];
+    const sep = args.separation || [0, 0];
+
+    const out: string[] = [];
+    let inserted = false;
+    for (let i = 0; i < lines.length; i++) {
+      const l = lines[i];
+      if (l.startsWith('[resource]') && !inserted) {
+        if (needTexExt) out.push(`[ext_resource type="Texture2D" path="res://${rel}" id="${texExtId}"]`);
+        out.push(`[sub_resource type="TileSetAtlasSource" id="${subId}"]`);
+        out.push(`texture = ExtResource("${texExtId}")`);
+        out.push(`atlas_grid_size = Vector2i(${ts[0]}, ${ts[1]})`);
+        out.push(`margins = Vector2i(${margin[0]}, ${margin[1]})`);
+        out.push(`separation = Vector2i(${sep[0]}, ${sep[1]})`);
+        out.push('');
+        out.push(l); // [resource]
+        out.push(`sources/${srcId} = SubResource("${subId}")`);
+        inserted = true;
+        continue;
+      }
+      out.push(l);
+    }
+
+    writeTextFile(absPath, out.join('\n'), true);
+    return { content: [{ type: 'text', text: `Added atlas source ${srcId} to ${args.tileset_path} (texture: ${args.texture_path})` }] };
+  } catch (err: any) {
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
+  }
 }

@@ -146,3 +146,74 @@ export function handleUpdateProjectUids(
 export function handleListMissingUids(projectRoot: string): ToolResult {
   return handleUpdateProjectUids(projectRoot, { check_only: true });
 }
+
+// ---- Additional UID tools (Tier1) ----
+
+function generateUid(): string {
+  const alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  let s = '';
+  for (let i = 0; i < 12; i++) {
+    s += alphabet[Math.floor(Math.random() * alphabet.length)];
+  }
+  return `uid://${s}`;
+}
+
+export const fixMissingUidsSchema = {};
+
+export function handleFixMissingUids(projectRoot: string): ToolResult {
+  try {
+    const sceneFiles = findFilesByExtension(projectRoot, ['.tscn']);
+    const tresFiles = findFilesByExtension(projectRoot, ['.tres']);
+
+    const fixedFiles: string[] = [];
+    const failedFiles: string[] = [];
+
+    for (const file of [...sceneFiles, ...tresFiles]) {
+      try {
+        const absPath = resolveProjectPath(projectRoot, file);
+        const { content } = readTextFile(absPath);
+
+        let newContent = content;
+        if (file.endsWith('.tscn')) {
+          if (!/\[gd_scene[^\]]*uid="uid:/i.test(content)) {
+            newContent = content.replace(/^(\[gd_scene[^\]]*\])/m, (m) =>
+              m.replace(/\]$/, ` uid="${generateUid()}"]`)
+            );
+          }
+        } else if (file.endsWith('.tres')) {
+          if (!/\[gd_resource[^\]]*uid="uid:/i.test(content)) {
+            newContent = content.replace(/^(\[gd_resource[^\]]*\])/m, (m) =>
+              m.replace(/\]$/, ` uid="${generateUid()}"]`)
+            );
+          }
+        }
+
+        if (newContent !== content) {
+          writeTextFile(absPath, newContent, true);
+          fixedFiles.push(file);
+        }
+      } catch {
+        failedFiles.push(file);
+      }
+    }
+
+    const lines: string[] = [];
+    lines.push(`UID Fix Complete: ${fixedFiles.length} file(s) updated`);
+    if (fixedFiles.length) {
+      lines.push('');
+      for (const f of fixedFiles) lines.push(`  + ${f}`);
+    }
+    if (failedFiles.length) {
+      lines.push('');
+      lines.push(`Failed: ${failedFiles.length}`);
+      for (const f of failedFiles) lines.push(`  - ${f}`);
+    }
+    if (fixedFiles.length === 0 && failedFiles.length === 0) {
+      lines.push('All scanned files already have UIDs.');
+    }
+
+    return { content: [{ type: 'text', text: lines.join('\n') }] };
+  } catch (err: any) {
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
+  }
+}

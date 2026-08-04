@@ -201,3 +201,90 @@ export function handleListJoints(
     return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
   }
 }
+
+// ---- Additional joint tools (Tier1) ----
+
+export const readJointSchema = {
+  scene_path: z.string().describe('Path to .tscn scene file'),
+  joint_name: z.string().optional().describe('Specific joint node name (defaults to all joints)'),
+};
+
+export const removeJointSchema = {
+  scene_path: z.string().describe('Path to .tscn scene file'),
+  joint_name: z.string().describe('Joint node name to remove'),
+};
+
+export function handleReadJoint(
+  projectRoot: string,
+  args: { scene_path: string; joint_name?: string }
+): ToolResult {
+  try {
+    const absPath = resolveProjectPath(projectRoot, args.scene_path);
+    const { content } = readTextFile(absPath);
+    const doc = parseScene(content);
+
+    const joints: any[] = [];
+    function walk(nodes: any[]): void {
+      for (const node of nodes) {
+        if (ALL_JOINT_TYPES.includes(node.type) && (!args.joint_name || node.name === args.joint_name)) {
+          joints.push(node);
+        }
+        if (node.children) walk(node.children);
+      }
+    }
+    walk(doc.nodes);
+
+    if (joints.length === 0) {
+      return { content: [{ type: 'text', text: `No joint nodes found${args.joint_name ? ` matching "${args.joint_name}"` : ''}.` }] };
+    }
+
+    const lines: string[] = [`Joints (${joints.length}):`, ''];
+    for (const j of joints) {
+      lines.push(`  ${j.name} (${j.type})`);
+      const a = j.properties['node_a'] || '';
+      const b = j.properties['node_b'] || '';
+      lines.push(`    connections: ${[a, b].filter(Boolean).join(' ↔ ') || 'none'}`);
+      for (const [key, val] of Object.entries(j.properties)) {
+        if (key === 'node_a' || key === 'node_b') continue;
+        lines.push(`    ${key} = ${val}`);
+      }
+      lines.push('');
+    }
+    return { content: [{ type: 'text', text: lines.join('\n') }] };
+  } catch (err: any) {
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
+  }
+}
+
+export function handleRemoveJoint(
+  projectRoot: string,
+  args: { scene_path: string; joint_name: string }
+): ToolResult {
+  try {
+    const absPath = resolveProjectPath(projectRoot, args.scene_path);
+    const { content } = readTextFile(absPath);
+    const doc = parseScene(content);
+
+    function removeNode(nodes: any[]): boolean {
+      for (let i = 0; i < nodes.length; i++) {
+        const node = nodes[i];
+        if (node.name === args.joint_name && ALL_JOINT_TYPES.includes(node.type)) {
+          nodes.splice(i, 1);
+          return true;
+        }
+        if (node.children && removeNode(node.children)) return true;
+      }
+      return false;
+    }
+
+    const removed = removeNode(doc.nodes);
+    if (!removed) {
+      return toolError(ErrorCode.FILE_NOT_FOUND, `Joint "${args.joint_name}" not found in ${args.scene_path}`);
+    }
+
+    writeTextFile(absPath, serializeScene(doc), true);
+    return { content: [{ type: 'text', text: `Joint "${args.joint_name}" removed from ${args.scene_path}.` }] };
+  } catch (err: any) {
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
+  }
+}

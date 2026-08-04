@@ -11,7 +11,7 @@ import { toolError, ErrorCode } from '../utils/errors.js';
 import { ToolResult } from '../utils/types.js';
 import { readTextFile, resolveProjectPath, findFilesByExtension, writeTextFile } from '../utils/file_utils.js';
 import { parseResource } from '../parsers/resource_parser.js';
-import { parseScene } from '../parsers/scene_parser.js';
+import { parseScene, serializeScene } from '../parsers/scene_parser.js';
 
 // ---- Tool Schemas ----
 
@@ -187,6 +187,163 @@ cell_height = ${args.cell_height ?? 0.25}
     return {
       content: [{ type: 'text', text: `NavigationMesh created: ${args.path}\n  agent_radius=${args.agent_radius ?? 0.5} agent_height=${args.agent_height ?? 2.0}` }],
     };
+  } catch (err: any) {
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
+  }
+}
+
+// ---- Additional navigation tools (Tier1) ----
+
+export const readNavAgentSchema = {
+  scene_path: z.string().describe('Path to .tscn scene'),
+  agent_name: z.string().optional().describe('Specific NavigationAgent node name'),
+};
+
+export const createNavLinkSchema = {
+  scene_path: z.string().describe('Path to .tscn scene file'),
+  link_type: z.enum(['NavigationLink3D', 'NavigationLink2D']).optional().default('NavigationLink3D').describe('Link node type'),
+  parent_path: z.string().optional().default('.').describe('Parent node path'),
+  name: z.string().optional().default('NavigationLink3D').describe('Node name'),
+  start: z.array(z.number()).optional().default([0, 0, 0]).describe('Start point [x, y] or [x, y, z]'),
+  end: z.array(z.number()).optional().default([0, 0, 0]).describe('End point [x, y] or [x, y, z]'),
+};
+
+export const readNavObstacleSchema = {
+  scene_path: z.string().describe('Path to .tscn scene'),
+  obstacle_name: z.string().optional().describe('Specific NavigationObstacle node name'),
+};
+
+const NAV_AGENT_TYPES = ['NavigationAgent2D', 'NavigationAgent3D'];
+const NAV_OBSTACLE_TYPES = ['NavigationObstacle2D', 'NavigationObstacle3D'];
+
+function vecLiteral(coords: number[], is3D: boolean): string {
+  if (is3D) return `Vector3(${coords[0] ?? 0}, ${coords[1] ?? 0}, ${coords[2] ?? 0})`;
+  return `Vector2(${coords[0] ?? 0}, ${coords[1] ?? 0})`;
+}
+
+export function handleReadNavAgent(
+  projectRoot: string,
+  args: { scene_path: string; agent_name?: string }
+): ToolResult {
+  try {
+    const absPath = resolveProjectPath(projectRoot, args.scene_path);
+    const { content } = readTextFile(absPath);
+    const doc = parseScene(content);
+
+    const agents: any[] = [];
+    function walk(nodes: any[]): void {
+      for (const node of nodes) {
+        if (NAV_AGENT_TYPES.includes(node.type)) {
+          if (!args.agent_name || node.name === args.agent_name) agents.push(node);
+        }
+        if (node.children) walk(node.children);
+      }
+    }
+    walk(doc.nodes);
+
+    if (agents.length === 0) {
+      return { content: [{ type: 'text', text: `No NavigationAgent nodes found${args.agent_name ? ` matching "${args.agent_name}"` : ''}.` }] };
+    }
+
+    const labels: Record<string, string> = {
+      pathfinding_layers: 'Pathfinding layers bitmask',
+      navigation_layers: 'Navigation layers bitmask',
+      avoidance_enabled: 'Avoidance enabled',
+      avoidance_layers: 'Avoidance layers',
+      radius: 'Agent radius',
+      height: 'Agent height',
+      max_speed: 'Max speed',
+    };
+
+    const lines: string[] = [`Navigation Agents (${agents.length}):`, ''];
+    for (const a of agents) {
+      lines.push(`  ${a.name} (${a.type})`);
+      for (const [key, val] of Object.entries(a.properties)) {
+        const label = labels[key] ? `  # ${labels[key]}` : '';
+        lines.push(`    ${key} = ${val}${label}`);
+      }
+      lines.push('');
+    }
+    return { content: [{ type: 'text', text: lines.join('\n') }] };
+  } catch (err: any) {
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
+  }
+}
+
+export function handleCreateNavLink(
+  projectRoot: string,
+  args: { scene_path: string; link_type?: string; parent_path?: string; name?: string; start?: number[]; end?: number[] }
+): ToolResult {
+  try {
+    const absPath = resolveProjectPath(projectRoot, args.scene_path);
+    const { content } = readTextFile(absPath);
+    const doc = parseScene(content);
+
+    const is3D = args.link_type !== 'NavigationLink2D';
+    const newNode: any = {
+      name: args.name || 'NavigationLink3D',
+      type: args.link_type || 'NavigationLink3D',
+      parent: args.parent_path || '.',
+      properties: {
+        start: vecLiteral(args.start || [0, 0, 0], is3D),
+        end: vecLiteral(args.end || [0, 0, 0], is3D),
+      },
+      children: [],
+    };
+
+    if (!args.parent_path || args.parent_path === '.') {
+      doc.nodes.push(newNode);
+    } else {
+      function findAndAdd(nodes: any[], target: string): boolean {
+        for (const node of nodes) {
+          if (node.name === target) { node.children.push(newNode); return true; }
+          if (node.children && findAndAdd(node.children, target)) return true;
+        }
+        return false;
+      }
+      if (!findAndAdd(doc.nodes, args.parent_path)) doc.nodes.push(newNode);
+    }
+
+    writeTextFile(absPath, serializeScene(doc), true);
+    return { content: [{ type: 'text', text: `Navigation link created: ${newNode.name} (${newNode.type}) start=${JSON.stringify(args.start)} end=${JSON.stringify(args.end)}` }] };
+  } catch (err: any) {
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
+  }
+}
+
+export function handleReadNavObstacle(
+  projectRoot: string,
+  args: { scene_path: string; obstacle_name?: string }
+): ToolResult {
+  try {
+    const absPath = resolveProjectPath(projectRoot, args.scene_path);
+    const { content } = readTextFile(absPath);
+    const doc = parseScene(content);
+
+    const obstacles: any[] = [];
+    function walk(nodes: any[]): void {
+      for (const node of nodes) {
+        if (NAV_OBSTACLE_TYPES.includes(node.type)) {
+          if (!args.obstacle_name || node.name === args.obstacle_name) obstacles.push(node);
+        }
+        if (node.children) walk(node.children);
+      }
+    }
+    walk(doc.nodes);
+
+    if (obstacles.length === 0) {
+      return { content: [{ type: 'text', text: `No NavigationObstacle nodes found${args.obstacle_name ? ` matching "${args.obstacle_name}"` : ''}.` }] };
+    }
+
+    const lines: string[] = [`Navigation Obstacles (${obstacles.length}):`, ''];
+    for (const o of obstacles) {
+      lines.push(`  ${o.name} (${o.type})`);
+      for (const [key, val] of Object.entries(o.properties)) {
+        lines.push(`    ${key} = ${val}`);
+      }
+      lines.push('');
+    }
+    return { content: [{ type: 'text', text: lines.join('\n') }] };
   } catch (err: any) {
     return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
   }

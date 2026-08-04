@@ -79,8 +79,15 @@ export const WRITE_TOOLS: ReadonlySet<string> = new Set([
   'remove_audio_bus', 'add_bus_effect', 'set_bus_volume', 'create_physics_material',
   'set_light_param', 'create_nav_mesh', 'create_translation', 'update_project_uids',
   'create_joint', 'set_joint_param', 'create_collision_polygon', 'set_shape_points',
-  'set_mesh_surface_material', 'create_curve', 'create_gradient', 'create_noise_texture',
+  'set_mesh_surface_material',   'create_curve', 'create_gradient', 'create_noise_texture',
   'create_atlas_texture', 'create_world',
+  // ---- 新增资源创建 / 修改工具 (v1.7.0) ----
+  'create_image_texture', 'set_texture_import_flags', 'create_multimesh',
+  'set_skeleton_bone_pose', 'write_path_curve', 'create_sky',
+  'create_world_environment', 'create_gdextension', 'create_theme',
+  'add_theme_type', 'set_stylebox', 'create_tileset', 'add_tileset_source',
+  'create_nav_link', 'remove_joint', 'write_collision_layers',
+  'write_translation', 'add_translation_key',
 ]);
 
 /** 该工具是否为写/副作用操作（read-only 模式下应被拒绝）。 */

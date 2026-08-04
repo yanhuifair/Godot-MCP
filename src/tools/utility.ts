@@ -357,3 +357,136 @@ export function handleGenerateCohesionReport(projectRoot: string): ToolResult {
     return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
   }
 }
+
+// ---- Theme Tools (Tier1) ----
+
+export const createThemeSchema = {
+  path: z.string().describe('Output path for new Theme .tres (e.g. "themes/main.tres")'),
+  default_font_size: z.number().int().optional().default(16).describe('Default font size'),
+};
+
+export function handleCreateTheme(
+  projectRoot: string,
+  args: { path: string; default_font_size?: number }
+): ToolResult {
+  try {
+    const content = `[gd_resource type="Theme" format=3 uid=""]
+
+[resource]
+default_font_size = ${args.default_font_size ?? 16}
+`;
+    const absPath = resolveProjectPath(projectRoot, args.path);
+    writeTextFile(absPath, content, false);
+    return { content: [{ type: 'text', text: `Theme created: ${args.path} (default_font_size ${args.default_font_size ?? 16})` }] };
+  } catch (err: any) {
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
+  }
+}
+
+export const addThemeTypeSchema = {
+  theme_path: z.string().describe('Path to .tres Theme file'),
+  type: z.string().describe('Control type to add (e.g. "Button", "Label", "Panel")'),
+  font_size: z.number().int().optional().describe('Default font size for this type'),
+  font_color: z.string().optional().describe('Default font color (e.g. "Color(1, 1, 1, 1)")'),
+};
+
+export function handleAddThemeType(
+  projectRoot: string,
+  args: { theme_path: string; type: string; font_size?: number; font_color?: string }
+): ToolResult {
+  try {
+    const absPath = resolveProjectPath(projectRoot, args.theme_path);
+    const { content } = readTextFile(absPath);
+    const lines = content.split('\n');
+
+    const out: string[] = [];
+    let inserted = false;
+    for (let i = 0; i < lines.length; i++) {
+      const l = lines[i];
+      out.push(l);
+      if (l.startsWith('[resource]') && !inserted) {
+        if (args.font_size !== undefined) {
+          out.push(`${args.type}/font_sizes/font_size = ${args.font_size}`);
+        }
+        if (args.font_color) {
+          out.push(`${args.type}/colors/font_color = ${args.font_color}`);
+        }
+        inserted = true;
+      }
+    }
+
+    writeTextFile(absPath, out.join('\n'), true);
+    return { content: [{ type: 'text', text: `Added type "${args.type}" to theme ${args.theme_path}` }] };
+  } catch (err: any) {
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
+  }
+}
+
+export const setStyleboxSchema = {
+  theme_path: z.string().describe('Path to .tres Theme file'),
+  type: z.string().describe('Control type (e.g. "Button")'),
+  state: z.string().optional().default('normal').describe('Style state (normal, hover, pressed, focus, disabled)'),
+  bg_color: z.string().optional().describe('Background color (e.g. "Color(0.2, 0.2, 0.2, 1)")'),
+  border_color: z.string().optional().describe('Border color'),
+  border_width: z.array(z.number()).optional().describe('Border widths [left, right, top, bottom]'),
+  corner_radius: z.array(z.number()).optional().describe('Corner radii [top_left, top_right, bottom_right, bottom_left]'),
+  content_margin: z.array(z.number()).optional().describe('Content margins [left, right, top, bottom]'),
+};
+
+export function handleSetStylebox(
+  projectRoot: string,
+  args: { theme_path: string; type: string; state?: string; bg_color?: string; border_color?: string; border_width?: number[]; corner_radius?: number[]; content_margin?: number[] }
+): ToolResult {
+  try {
+    const absPath = resolveProjectPath(projectRoot, args.theme_path);
+    const { content } = readTextFile(absPath);
+    const lines = content.split('\n');
+
+    const subId = `StyleBoxFlat_${args.type}_${args.state}`;
+    const props: string[] = [];
+    if (args.bg_color) props.push(`bg_color = ${args.bg_color}`);
+    if (args.border_color) props.push(`border_color = ${args.border_color}`);
+    if (args.border_width) {
+      const b = args.border_width;
+      props.push(`border_width_left = ${b[0] ?? 0}`);
+      props.push(`border_width_right = ${b[1] ?? 0}`);
+      props.push(`border_width_top = ${b[2] ?? 0}`);
+      props.push(`border_width_bottom = ${b[3] ?? 0}`);
+    }
+    if (args.corner_radius) {
+      const c = args.corner_radius;
+      props.push(`corner_radius_top_left = ${c[0] ?? 0}`);
+      props.push(`corner_radius_top_right = ${c[1] ?? 0}`);
+      props.push(`corner_radius_bottom_right = ${c[2] ?? 0}`);
+      props.push(`corner_radius_bottom_left = ${c[3] ?? 0}`);
+    }
+    if (args.content_margin) {
+      const m = args.content_margin;
+      props.push(`content_margin_left = ${m[0] ?? 0}`);
+      props.push(`content_margin_right = ${m[1] ?? 0}`);
+      props.push(`content_margin_top = ${m[2] ?? 0}`);
+      props.push(`content_margin_bottom = ${m[3] ?? 0}`);
+    }
+
+    const out: string[] = [];
+    let inserted = false;
+    for (let i = 0; i < lines.length; i++) {
+      const l = lines[i];
+      if (l.startsWith('[resource]') && !inserted) {
+        out.push(`[sub_resource type="StyleBoxFlat" id="${subId}"]`);
+        for (const p of props) out.push(p);
+        out.push('');
+        out.push(l); // [resource]
+        out.push(`${args.type}/styles/${args.state || 'normal'} = SubResource("${subId}")`);
+        inserted = true;
+        continue;
+      }
+      out.push(l);
+    }
+
+    writeTextFile(absPath, out.join('\n'), true);
+    return { content: [{ type: 'text', text: `StyleBox "${args.state || 'normal'}" set for ${args.type} in ${args.theme_path}` }] };
+  } catch (err: any) {
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
+  }
+}

@@ -1,4 +1,10 @@
 # Changelog
+## v1.7.0 (2026-08-04)
+
+### New Tools (+63, total 345 across 26 categories)
+- **Editor bridge (34)** — clipboard & playback (`editor_cut`/`editor_copy`/`editor_paste`/`editor_pause`/`editor_unpause`) wrapping existing plugin commands; 19 node-property setters (`editor_set_*_param`) reusing `set_node_properties`; 10 typed node creators (`editor_create_*`) reusing `add_node`.
+- **File-path tools (29)** — physics (`write_collision_layers`); translation (`write_translation`/`add_translation_key`); texture (`list_textures`/`create_image_texture`/`set_texture_import_flags`); diff (`diff_script`/`diff_project_config`/`diff_animation`); geometry (`read_collision_polygon`/`simplify_polygon`); navigation (`read_nav_agent`/`create_nav_link`/`read_nav_obstacle`); joints (`read_joint`/`remove_joint`); environment (`create_sky`/`create_world_environment`); extension (`create_gdextension`/`read_csproj`); uid (`fix_missing_uids`); domain (`create_multimesh`/`set_skeleton_bone_pose`/`write_path_curve`); tileset (`create_tileset`/`add_tileset_source`); utility (`create_theme`/`add_theme_type`/`set_stylebox`).
+
 ## v1.6.0 (2026-08-04)
 
 ### Refactor

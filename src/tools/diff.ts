@@ -223,13 +223,107 @@ function extractResourceProperties(content: string): Record<string, string> {
       if (inResource) break;
       continue;
     }
-    if (inResource) {
-      const eq = line.indexOf('=');
-      if (eq > 0) {
-        props[line.slice(0, eq).trim()] = line.slice(eq + 1).trim();
+      if (inResource) {
+        const eq = line.indexOf('=');
+        if (eq > 0) {
+          props[line.slice(0, eq).trim()] = line.slice(eq + 1).trim();
+        }
       }
     }
+
+    return props;
   }
 
-  return props;
+// ---- Additional diff tools (Tier1) ----
+
+export const diffScriptSchema = {
+  path_a: z.string().describe('First .gd script path'),
+  path_b: z.string().describe('Second .gd script path'),
+};
+
+export const diffProjectConfigSchema = {
+  path_a: z.string().describe('First config file path (project.godot, .cfg, .import, etc.)'),
+  path_b: z.string().describe('Second config file path'),
+};
+
+export const diffAnimationSchema = {
+  path_a: z.string().describe('First animation .tres path'),
+  path_b: z.string().describe('Second animation .tres path'),
+};
+
+function formatDiff(lines: string[], title: string, diff: DiffResult): string {
+  lines.push(title);
+  lines.push(`Changes: +${diff.adds} -${diff.removes} ~${diff.mods} (${diff.adds + diff.removes + diff.mods} total)`);
+  lines.push('');
+  if (diff.changes.length === 0) {
+    lines.push('No differences found.');
+    return lines.join('\n');
+  }
+  for (const change of diff.changes) {
+    switch (change.type) {
+      case 'add':
+        lines.push(`  + [${change.lineB}] ${change.text}`);
+        break;
+      case 'remove':
+        lines.push(`  - [${change.lineA}] ${change.text}`);
+        break;
+      case 'modify':
+        lines.push(`  ~ [${change.lineA} → ${change.lineB}]`);
+        lines.push(`    - ${change.text}`);
+        lines.push(`    + ${change.newText}`);
+        break;
+    }
+  }
+  return lines.join('\n');
+}
+
+export function handleDiffScript(
+  projectRoot: string,
+  args: { path_a: string; path_b: string }
+): ToolResult {
+  try {
+    const absA = resolveProjectPath(projectRoot, args.path_a);
+    const absB = resolveProjectPath(projectRoot, args.path_b);
+    const { content: contentA } = readTextFile(absA);
+    const { content: contentB } = readTextFile(absB);
+    const diff = computeDiff(contentA.split('\n'), contentB.split('\n'));
+    return { content: [{ type: 'text', text: formatDiff([`Script Diff: ${args.path_a} ↔ ${args.path_b}`], '', diff) }] };
+  } catch (err: any) {
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
+  }
+}
+
+export function handleDiffProjectConfig(
+  projectRoot: string,
+  args: { path_a: string; path_b: string }
+): ToolResult {
+  try {
+    const absA = resolveProjectPath(projectRoot, args.path_a);
+    const absB = resolveProjectPath(projectRoot, args.path_b);
+    const { content: contentA } = readTextFile(absA);
+    const { content: contentB } = readTextFile(absB);
+    // Trim whitespace + drop blank/comment lines for a cleaner config diff
+    const norm = (s: string) => s.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith(';') && !l.startsWith('#'));
+    const diff = computeDiff(norm(contentA), norm(contentB));
+    return { content: [{ type: 'text', text: formatDiff([`Config Diff: ${args.path_a} ↔ ${args.path_b}`], '', diff) }] };
+  } catch (err: any) {
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
+  }
+}
+
+export function handleDiffAnimation(
+  projectRoot: string,
+  args: { path_a: string; path_b: string }
+): ToolResult {
+  try {
+    const absA = resolveProjectPath(projectRoot, args.path_a);
+    const absB = resolveProjectPath(projectRoot, args.path_b);
+    const { content: contentA } = readTextFile(absA);
+    const { content: contentB } = readTextFile(absB);
+    // Animations store tracks as sub_resources; a full line diff is the most informative.
+    const diff = computeDiff(contentA.split('\n'), contentB.split('\n'));
+    return { content: [{ type: 'text', text: formatDiff([`Animation Diff: ${args.path_a} ↔ ${args.path_b}`], '', diff) }] };
+  } catch (err: any) {
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
+  }
 }

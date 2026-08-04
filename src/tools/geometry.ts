@@ -174,3 +174,108 @@ export function handleSetShapePoints(
     return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
   }
 }
+
+// ---- Additional geometry tools (Tier1) ----
+
+export const readCollisionPolygonSchema = {
+  scene_path: z.string().describe('Path to .tscn scene file'),
+  node_path: z.string().optional().describe('Specific CollisionPolygon2D node path (defaults to all)'),
+};
+
+export const simplifyPolygonSchema = {
+  points: z.array(z.array(z.number())).describe('Array of [x, y] points to simplify'),
+  tolerance: z.number().optional().default(1.0).describe('Douglas-Peucker tolerance (higher = more aggressive)'),
+};
+
+function parsePackedVector2Array(text: string): number[][] {
+  const inner = text.replace(/^PackedVector2Array\(/, '').replace(/\)$/, '');
+  const nums = inner.split(',').map(s => parseFloat(s.trim())).filter(n => !isNaN(n));
+  const pts: number[][] = [];
+  for (let i = 0; i + 1 < nums.length; i += 2) pts.push([nums[i], nums[i + 1]]);
+  return pts;
+}
+
+export function handleReadCollisionPolygon(
+  projectRoot: string,
+  args: { scene_path: string; node_path?: string }
+): ToolResult {
+  try {
+    const absPath = resolveProjectPath(projectRoot, args.scene_path);
+    const { content } = readTextFile(absPath);
+    const doc = parseScene(content);
+
+    const found: { name: string; type: string; points: number[][] }[] = [];
+    function walk(nodes: any[]): void {
+      for (const node of nodes) {
+        if (node.type === 'CollisionPolygon2D') {
+          const prop = node.properties['polygon'] || '';
+          const pts = prop.includes('PackedVector2Array') ? parsePackedVector2Array(prop) : [];
+          if (!args.node_path || node.name === args.node_path || args.node_path.endsWith('/' + node.name)) {
+            found.push({ name: node.name, type: node.type, points: pts });
+          }
+        }
+        if (node.children) walk(node.children);
+      }
+    }
+    walk(doc.nodes);
+
+    if (found.length === 0) {
+      return { content: [{ type: 'text', text: `No CollisionPolygon2D nodes found${args.node_path ? ` matching "${args.node_path}"` : ''}.` }] };
+    }
+
+    const lines: string[] = [`CollisionPolygon2D nodes (${found.length}):`, ''];
+    for (const f of found) {
+      lines.push(`  ${f.name} (${f.points.length} points):`);
+      f.points.forEach((p, i) => lines.push(`    [${i}] (${p[0]}, ${p[1]})`));
+      lines.push('');
+    }
+    return { content: [{ type: 'text', text: lines.join('\n') }] };
+  } catch (err: any) {
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
+  }
+}
+
+export function handleSimplifyPolygon(
+  projectRoot: string,
+  args: { points: number[][]; tolerance?: number }
+): ToolResult {
+  try {
+    if (!args.points || args.points.length < 3) {
+      return toolError(ErrorCode.INVALID_ARGUMENT, 'Provide at least 3 points.');
+    }
+    const eps = args.tolerance ?? 1.0;
+    const simplified = douglasPeucker(args.points, eps);
+    return {
+      content: [{ type: 'text', text: `Simplified ${args.points.length} → ${simplified.length} points (tolerance ${eps}).\n\n${JSON.stringify(simplified)}` }],
+    };
+  } catch (err: any) {
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
+  }
+}
+
+// ---- Douglas-Peucker polygon simplification ----
+
+function perpDistance(p: number[], a: number[], b: number[]): number {
+  const dx = b[0] - a[0];
+  const dy = b[1] - a[1];
+  const mag = Math.sqrt(dx * dx + dy * dy);
+  if (mag === 0) return Math.hypot(p[0] - a[0], p[1] - a[1]);
+  return Math.abs((p[0] - a[0]) * dy - (p[1] - a[1]) * dx) / mag;
+}
+
+function douglasPeucker(points: number[][], epsilon: number): number[][] {
+  if (points.length < 3) return points.slice();
+  let maxDist = 0;
+  let index = 0;
+  const end = points.length - 1;
+  for (let i = 1; i < end; i++) {
+    const d = perpDistance(points[i], points[0], points[end]);
+    if (d > maxDist) { maxDist = d; index = i; }
+  }
+  if (maxDist > epsilon) {
+    const left = douglasPeucker(points.slice(0, index + 1), epsilon);
+    const right = douglasPeucker(points.slice(index), epsilon);
+    return left.slice(0, -1).concat(right);
+  }
+  return [points[0], points[end]];
+}

@@ -1011,3 +1011,126 @@ export async function handleEditorGetDependencyList(args: { path: string }): Pro
   try { const r = await sendEditorCommand('get_dependency_list', args); return { content: [{ type: 'text', text: `Dependencies (${r.count}):\n${(r.dependencies||[]).join('\n')}` }] }; }
   catch (e: any) { return wrapError(ErrorCode.EDITOR_NOT_REACHABLE, e); }
 }
+
+// ---- Clipboard & Playback (plugin commands already implemented) ----
+
+export const editorCutSchema = {};
+export const editorCopySchema = {};
+export const editorPasteSchema = { parent: z.string().optional().default('.').describe('Parent node path for paste target (defaults to selected node or scene root)') };
+export const editorPauseSchema = {};
+export const editorUnpauseSchema = {};
+
+export async function handleEditorCut(): Promise<ToolResult> {
+  try { const r = await sendEditorCommand('cut_selected'); return { content: [{ type: 'text', text: r.error ? r.error : `Cut ${r.cut ?? 0} node(s) to editor clipboard.` }], isError: !!r.error }; }
+  catch (e: any) { return wrapError(ErrorCode.EDITOR_NOT_REACHABLE, e); }
+}
+export async function handleEditorCopy(): Promise<ToolResult> {
+  try { const r = await sendEditorCommand('copy_selected'); return { content: [{ type: 'text', text: r.error ? r.error : `Copied ${r.copied ?? 0} node(s) to editor clipboard.` }], isError: !!r.error }; }
+  catch (e: any) { return wrapError(ErrorCode.EDITOR_NOT_REACHABLE, e); }
+}
+export async function handleEditorPaste(args: { parent?: string }): Promise<ToolResult> {
+  try { const r = await sendEditorCommand('paste', args.parent && args.parent !== '.' ? { parent: args.parent } : {}); return { content: [{ type: 'text', text: r.error ? r.error : `Pasted ${r.pasted ?? 0} node(s).` }], isError: !!r.error }; }
+  catch (e: any) { return wrapError(ErrorCode.EDITOR_NOT_REACHABLE, e); }
+}
+export async function handleEditorPause(): Promise<ToolResult> {
+  try { const r = await sendEditorCommand('pause_project'); return { content: [{ type: 'text', text: r.error ? r.error : (r.message || 'Editor scene tree paused.') }], isError: !!r.error }; }
+  catch (e: any) { return wrapError(ErrorCode.EDITOR_NOT_REACHABLE, e); }
+}
+export async function handleEditorUnpause(): Promise<ToolResult> {
+  try { const r = await sendEditorCommand('unpause_project'); return { content: [{ type: 'text', text: r.error ? r.error : (r.message || 'Editor scene tree resumed.') }], isError: !!r.error }; }
+  catch (e: any) { return wrapError(ErrorCode.EDITOR_NOT_REACHABLE, e); }
+}
+
+// ---- Node property setters (reuse editor set_node_properties) ----
+
+const nodePropSetterSchema = {
+  node_path: z.string().describe('Node path in the currently open scene'),
+  param: z.string().describe('Property key to set (e.g. "mass", "energy", "visible")'),
+  value: z.string().describe('Property value as GDScript literal (e.g. "40.0", "true", "Color(1,0,0,1)")'),
+};
+
+function makeNodePropSetter(): (args: { node_path: string; param: string; value: string }) => Promise<ToolResult> {
+  return async (args) => {
+    try {
+      await sendEditorCommand('set_node_properties', { path: args.node_path, properties: { [args.param]: args.value } });
+      return { content: [{ type: 'text', text: `Set ${args.node_path}.${args.param} = ${args.value}` }] };
+    } catch (e: any) { return wrapError(ErrorCode.EDITOR_NOT_REACHABLE, e); }
+  };
+}
+
+export const editorSetCharacterBodyParamSchema = nodePropSetterSchema;
+export const handleEditorSetCharacterBodyParam = makeNodePropSetter();
+export const editorSetAnimatedSpriteParamSchema = nodePropSetterSchema;
+export const handleEditorSetAnimatedSpriteParam = makeNodePropSetter();
+export const editorSetAudioPlayerParamSchema = nodePropSetterSchema;
+export const handleEditorSetAudioPlayerParam = makeNodePropSetter();
+export const editorSetVideoPlayerParamSchema = nodePropSetterSchema;
+export const handleEditorSetVideoPlayerParam = makeNodePropSetter();
+export const editorSetParallaxParamSchema = nodePropSetterSchema;
+export const handleEditorSetParallaxParam = makeNodePropSetter();
+export const editorSetRichTextParamSchema = nodePropSetterSchema;
+export const handleEditorSetRichTextParam = makeNodePropSetter();
+export const editorSetContainerParamSchema = nodePropSetterSchema;
+export const handleEditorSetContainerParam = makeNodePropSetter();
+export const editorSetTabContainerParamSchema = nodePropSetterSchema;
+export const handleEditorSetTabContainerParam = makeNodePropSetter();
+export const editorSetCameraParamSchema = nodePropSetterSchema;
+export const handleEditorSetCameraParam = makeNodePropSetter();
+export const editorSetParticlesParamSchema = nodePropSetterSchema;
+export const handleEditorSetParticlesParam = makeNodePropSetter();
+export const editorSetViewportParamSchema = nodePropSetterSchema;
+export const handleEditorSetViewportParam = makeNodePropSetter();
+export const editorSetAreaParamSchema = nodePropSetterSchema;
+export const handleEditorSetAreaParam = makeNodePropSetter();
+export const editorSetDecalParamSchema = nodePropSetterSchema;
+export const handleEditorSetDecalParam = makeNodePropSetter();
+export const editorSetOccluderParamSchema = nodePropSetterSchema;
+export const handleEditorSetOccluderParam = makeNodePropSetter();
+export const editorSetMarkerParamSchema = nodePropSetterSchema;
+export const handleEditorSetMarkerParam = makeNodePropSetter();
+export const editorSetSoftBodyParamSchema = nodePropSetterSchema;
+export const handleEditorSetSoftBodyParam = makeNodePropSetter();
+export const editorSetAudioListenerParamSchema = nodePropSetterSchema;
+export const handleEditorSetAudioListenerParam = makeNodePropSetter();
+export const editorSetMultiplayerSpawnerParamSchema = nodePropSetterSchema;
+export const handleEditorSetMultiplayerSpawnerParam = makeNodePropSetter();
+export const editorSetMultiplayerSynchronizerParamSchema = nodePropSetterSchema;
+export const handleEditorSetMultiplayerSynchronizerParam = makeNodePropSetter();
+
+// ---- Typed node creators (reuse editor add_node) ----
+
+const createTypedNodeSchema = {
+  name: z.string().optional().describe('Node name (auto-generated if omitted)'),
+  parent: z.string().optional().default('.').describe('Parent node path'),
+  properties: z.record(z.string()).optional().describe('Properties to set on the new node'),
+};
+
+function makeTypedNodeCreator(type: string): (args: { name?: string; parent?: string; properties?: Record<string, string> }) => Promise<ToolResult> {
+  return async (args) => {
+    try {
+      const r = await sendEditorCommand('add_node', { type, name: args.name, parent: args.parent || '.', properties: args.properties || {} });
+      return { content: [{ type: 'text', text: `Created ${type}: ${r.name} at ${r.path}` }] };
+    } catch (e: any) { return wrapError(ErrorCode.EDITOR_NOT_REACHABLE, e); }
+  };
+}
+
+export const editorCreateCameraSchema = createTypedNodeSchema;
+export const handleEditorCreateCamera = makeTypedNodeCreator('Camera3D');
+export const editorCreateMeshInstanceSchema = createTypedNodeSchema;
+export const handleEditorCreateMeshInstance = makeTypedNodeCreator('MeshInstance3D');
+export const editorCreateMultiplayerSpawnerSchema = createTypedNodeSchema;
+export const handleEditorCreateMultiplayerSpawner = makeTypedNodeCreator('MultiplayerSpawner3D');
+export const editorCreateMultiplayerSynchronizerSchema = createTypedNodeSchema;
+export const handleEditorCreateMultiplayerSynchronizer = makeTypedNodeCreator('MultiplayerSynchronizer3D');
+export const editorCreateCsgBoxSchema = createTypedNodeSchema;
+export const handleEditorCreateCsgBox = makeTypedNodeCreator('CSGBox3D');
+export const editorCreateCsgSphereSchema = createTypedNodeSchema;
+export const handleEditorCreateCsgSphere = makeTypedNodeCreator('CSGSphere3D');
+export const editorCreateCsgCylinderSchema = createTypedNodeSchema;
+export const handleEditorCreateCsgCylinder = makeTypedNodeCreator('CSGCylinder3D');
+export const editorCreateCsgMergeSchema = createTypedNodeSchema;
+export const handleEditorCreateCsgMerge = makeTypedNodeCreator('CSGCombiner3D');
+export const editorCreateCsgPolygonSchema = createTypedNodeSchema;
+export const handleEditorCreateCsgPolygon = makeTypedNodeCreator('CSGPolygon3D');
+export const editorCreateGpuParticlesSchema = createTypedNodeSchema;
+export const handleEditorCreateGpuParticles = makeTypedNodeCreator('GPUParticles3D');

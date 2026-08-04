@@ -33,6 +33,11 @@ export const createPhysicsMaterialSchema = {
 
 export const readCollisionLayersSchema = {}; // reads from project.godot
 
+export const writeCollisionLayersSchema = {
+  layers_2d: z.record(z.string()).optional().describe('Map of layer number (e.g. "1") to display name for 2D physics'),
+  layers_3d: z.record(z.string()).optional().describe('Map of layer number to display name for 3D physics'),
+};
+
 // ---- Tool Handlers ----
 
 export function handleListPhysicsMaterials(
@@ -192,6 +197,56 @@ export function handleReadCollisionLayers(projectRoot: string): ToolResult {
     }
 
     return { content: [{ type: 'text', text: lines.join('\n') }] };
+  } catch (err: any) {
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
+  }
+}
+
+// Rewrite (or append) a [layer_names/...] section in project.godot from a name map.
+function rewriteLayerSection(lines: string[], section: string, map?: Record<string, string>): string[] {
+  if (!map || Object.keys(map).length === 0) return lines;
+  const header = `[${section}]`;
+  const out: string[] = [];
+  let i = 0;
+  let replaced = false;
+  while (i < lines.length) {
+    const line = lines[i];
+    if (line.trim() === header) {
+      replaced = true;
+      out.push(header);
+      for (const [k, v] of Object.entries(map)) out.push(`${k} = "${v}"`);
+      i++;
+      while (i < lines.length && !(lines[i].trim().startsWith('[') && lines[i].trim().endsWith(']'))) i++;
+      continue;
+    }
+    out.push(line);
+    i++;
+  }
+  if (!replaced) {
+    out.push('');
+    out.push(header);
+    for (const [k, v] of Object.entries(map)) out.push(`${k} = "${v}"`);
+  }
+  return out;
+}
+
+export function handleWriteCollisionLayers(
+  projectRoot: string,
+  args: { layers_2d?: Record<string, string>; layers_3d?: Record<string, string> }
+): ToolResult {
+  try {
+    if (!args.layers_2d && !args.layers_3d) {
+      return toolError(ErrorCode.INVALID_ARGUMENT, 'Provide layers_2d and/or layers_3d.');
+    }
+    const projPath = resolveProjectPath(projectRoot, 'project.godot');
+    const { content } = readTextFile(projPath);
+    let lines = content.split('\n');
+    lines = rewriteLayerSection(lines, 'layer_names/2d_physics', args.layers_2d);
+    lines = rewriteLayerSection(lines, 'layer_names/3d_physics', args.layers_3d);
+    writeTextFile(projPath, lines.join('\n'), true);
+    const total = (args.layers_2d ? Object.keys(args.layers_2d).length : 0)
+      + (args.layers_3d ? Object.keys(args.layers_3d).length : 0);
+    return { content: [{ type: 'text', text: `Collision layers updated (${total} entries written).` }] };
   } catch (err: any) {
     return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
   }
