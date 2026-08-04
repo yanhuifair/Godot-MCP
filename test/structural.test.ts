@@ -443,6 +443,6 @@ describe('register.ts 分类计数注释', () => {
       }
     }
     expect(mismatches).toEqual([]);
-    expect(total).toBe(345);
+    expect(total).toBe(358);
   });
 });

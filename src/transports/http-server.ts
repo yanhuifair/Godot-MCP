@@ -1,5 +1,5 @@
 // Copyright (c) 2026 FairYan
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // ============================================================
 // HTTP Transport - SSE + Streamable HTTP 双协议支持
 // ============================================================
@@ -121,7 +121,7 @@ export async function runHttpTransport(options: HttpTransportOptions = {}): Prom
   app.get('/health', (_req: Request, res: Response) => {
     res.json({
       status: 'ok',
-      version: '1.7.0',
+      version: '1.9.0',
       projectRoot: getProjectRoot(),
       endpoints: {
         ...(enableSse ? { sse: `http://${host}:${port}/sse` } : {}),

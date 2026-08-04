@@ -1,5 +1,5 @@
 // Copyright (c) 2026 FairYan
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // ============================================================
 // Godot MCP Server - Structured Error System
 // ============================================================
@@ -17,6 +17,7 @@ export enum ErrorCode {
   GODOT_CLI_ERROR = 'GODOT_CLI_ERROR',
   PROCESS_ERROR = 'PROCESS_ERROR',
   EDITOR_NOT_REACHABLE = 'EDITOR_NOT_REACHABLE',
+  RUNTIME_NOT_REACHABLE = 'RUNTIME_NOT_REACHABLE',
   INVALID_ARGUMENT = 'INVALID_ARGUMENT',
   ALREADY_EXISTS = 'ALREADY_EXISTS',
   NOT_FOUND = 'NOT_FOUND',
@@ -43,6 +44,10 @@ const SOLUTION_MAP: Partial<Record<ErrorCode, string[]>> = {
   [ErrorCode.EDITOR_NOT_REACHABLE]: [
     'Open the Godot editor with the MCP plugin installed, or run: npx @yanhuifair/godot-mcp --enable-plugin -p <project>',
     'The editor bridge probes TCP on 127.0.0.1:9876 first, then falls back to spawning Godot — verify the plugin is present in the target project.',
+  ],
+  [ErrorCode.RUNTIME_NOT_REACHABLE]: [
+    'The running game is not reachable. Add the `runtime_bridge.gd` autoload to your project (copy addons/godot-mcp/runtime_bridge.gd into your project and enable it as an autoload named `godot_mcp_runtime`), then run the game from the editor.',
+    'The runtime bridge listens on 127.0.0.1:9877 — verify nothing else is using that port and the game is actually running (not just the editor).',
   ],
   [ErrorCode.GODOT_NOT_FOUND]: [
     'Set GODOT_PATH to your Godot 4.x binary, or install Godot from https://godotengine.org/download',

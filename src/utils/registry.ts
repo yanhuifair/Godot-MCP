@@ -1,5 +1,5 @@
 // Copyright (c) 2026 FairYan
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // ============================================================
 // Godot MCP Server - Tool Registry
 // ============================================================
@@ -88,11 +88,28 @@ export const WRITE_TOOLS: ReadonlySet<string> = new Set([
   'add_theme_type', 'set_stylebox', 'create_tileset', 'add_tileset_source',
   'create_nav_link', 'remove_joint', 'write_collision_layers',
   'write_translation', 'add_translation_key',
+  // ---- 实时游戏运行时写工具 (v1.8.0) ----
+  'runtime_set_node', 'runtime_call_method', 'runtime_emit_signal', 'runtime_input',
+  'runtime_freeze', 'runtime_resume', 'runtime_step', 'runtime_screenshot',
 ]);
 
 /** 该工具是否为写/副作用操作（read-only 模式下应被拒绝）。 */
 export function isWriteTool(name: string): boolean {
   return WRITE_TOOLS.has(name);
+}
+
+// ---- Global registry singleton ----
+// Set once at startup by registerAllTools so meta/discovery tools can search
+// the full tool catalog without threading the registry instance through every
+// handler. Returns null before registration completes.
+let _activeRegistry: ToolRegistry | null = null;
+
+export function setActiveRegistry(registry: ToolRegistry): void {
+  _activeRegistry = registry;
+}
+
+export function getActiveRegistry(): ToolRegistry | null {
+  return _activeRegistry;
 }
 
 export class ToolRegistry {

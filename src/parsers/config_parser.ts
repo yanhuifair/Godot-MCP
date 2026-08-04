@@ -1,5 +1,5 @@
 // Copyright (c) 2026 FairYan
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // ============================================================
 // Godot MCP Server - Config File Parser (project.godot / .cfg)
 // ============================================================

@@ -1,16 +1,35 @@
-# <div align="center">Godot MCP</div>
+<div align="center">
 
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+# Godot MCP
+
+### The most complete MCP server for Godot Engine — **358 tools** that give your AI assistant real hands inside your game project.
+
+[![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE.md)
 [![CI](https://github.com/yanhuifair/Godot-MCP/actions/workflows/ci.yml/badge.svg)](https://github.com/yanhuifair/Godot-MCP/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/@yanhuifair/godot-mcp)](https://www.npmjs.com/package/@yanhuifair/godot-mcp)
+[![npm downloads](https://img.shields.io/npm/dm/@yanhuifair/godot-mcp)](https://www.npmjs.com/package/@yanhuifair/godot-mcp)
+[![Tools](https://img.shields.io/badge/tools-358-orange)](#all-tools)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-green)](.)
 [![Godot](https://img.shields.io/badge/godot-4.x-blue)](https://godotengine.org)
 
 [English](README.md) | [中文文档](README-zh.md)
 
+</div>
+
 ---
 
-A **Model Context Protocol (MCP) server** that enables AI assistants to interact with Godot Engine projects. AI can read, inspect, and modify every aspect of your Godot project — from scene files and scripts to materials, animations, audio buses, and the live editor itself. **345 tools, 26 categories, 12 AI clients supported.**
+**Godot MCP** is a [Model Context Protocol](https://modelcontextprotocol.io) server that connects any AI assistant — **Claude, Cursor, VS Code Copilot, Windsurf, Cline, Codex, Aider** — directly to **Godot Engine 4.x**. Your AI stops guessing about your project and starts *operating* it.
+
+- 📂 **Reads and writes your project files natively** — `.tscn` scenes, `.tres` resources, GDScript, C#, `.gdshader`, `project.godot`. Custom parsers, no Godot process required, instant response.
+- 🎛️ **Drives the live editor** — select nodes, connect signals, author visual shaders, bake lightmaps, set breakpoints, step the debugger, run and stop the game.
+- 🎮 **Reaches inside the running game** — inspect the live scene tree, call methods, inject input, **freeze the game, step it one frame at a time, and screenshot the result.** No other public Godot MCP does this.
+- 🔎 **Stays usable at scale** — `search_tools` finds the right tool out of 358, `get_status` tells you exactly what is connected, and every error returns a typed code plus a repair hint.
+
+**358 tools · 29 categories · 18 AI clients · 4 communication paths · one-command setup.**
+
+```bash
+npx @yanhuifair/godot-mcp --enable-plugin -p .
+```
 
 | Requirement | |
 |---|---|
@@ -20,37 +39,83 @@ A **Model Context Protocol (MCP) server** that enables AI assistants to interact
 
 ---
 
+## Why Godot MCP
+
+| | **Godot MCP** | Other Godot MCP servers |
+|---|---|---|
+| **Tool count** | **358** across 29 categories | 16 – 156 |
+| **Works without Godot running** | ✅ Native `.tscn` / `.tres` / `.godot` parsers | ⚠️ Usually needs a live editor |
+| **Live editor control** | ✅ 123 tools — play, debug, breakpoints, viewport, bake | Partial |
+| **Control the _running game_** | ✅ **11 tools** — live tree, method calls, input injection | ❌ None |
+| **Deterministic frame stepping** | ✅ `runtime_freeze` → `runtime_step` → `runtime_screenshot` | ❌ None |
+| **Tool discovery for large catalogs** | ✅ `search_tools` + `get_status` | ❌ None |
+| **Error messages** | ✅ Typed error code + actionable repair hint | Raw stack traces |
+| **Transports** | Stdio · SSE · Streamable HTTP | Usually stdio only |
+| **Editor plugin install** | ✅ One command, auto-enabled | Manual copy |
+| **Engine introspection** | ✅ Live ClassDB — classes, methods, properties, signals, docs | Rare |
+
+If you have ever wanted to say *"run the game, freeze it at the moment the player lands, and show me the collision state"* — this is the server that can actually do it.
+
+---
+
 ## Table of Contents
 
-1. [Quick Start](#quick-start)
-2. [What You Can Do](#what-you-can-do)
-3. [Architecture](#architecture)
-4. [Implementation Principles](#implementation-principles)
-5. [Transport Modes](#transport-modes)
-6. [Installation](#installation)
-7. [AI Client Configuration](#ai-client-configuration)
-8. [Usage Examples](#usage-examples)
-9. [Editor Plugin](#editor-plugin)
-10. [All Tools](#all-tools)
-11. [Supported Formats](#supported-formats)
-12. [Development](#development)
-13. [Build VSIX](#build-vsix)
+1. [Why Godot MCP](#why-godot-mcp)
+2. [Quick Start](#quick-start)
+3. [What You Can Do](#what-you-can-do)
+4. [Architecture](#architecture)
+5. [Implementation Principles](#implementation-principles)
+6. [Transport Modes](#transport-modes)
+7. [Installation](#installation)
+8. [AI Client Configuration](#ai-client-configuration)
+9. [Usage Examples](#usage-examples)
+10. [Editor Plugin](#editor-plugin)
+11. [Tool Discovery & Live Game Runtime](#tool-discovery--live-game-runtime)
+12. [All Tools](#all-tools)
+13. [Supported Formats](#supported-formats)
+14. [Development](#development)
+15. [Build VSIX](#build-vsix)
 
 ---
 
 ## Quick Start
 
-### Step 1: Install the Editor Plugin
+**Two setup steps, about two minutes.** You do *not* need to install anything globally, and you do *not* need to keep a terminal open — your AI client starts the server for you.
+
+### Before You Begin
+
+| You need | How to check |
+|---|---|
+| **Godot 4.x** installed | Open Godot → the version shows in the title bar. *(Godot 3 is not supported.)* |
+| **Node.js 18 or newer** | Run `node -v` in a terminal. If it says `command not found`, install from [nodejs.org](https://nodejs.org). |
+| **An MCP-capable AI client** | VS Code + Copilot, Cursor, Claude Desktop, Windsurf, Cline… see [the full list](#ai-client-configuration). |
+
+### Step 1 — Install the Editor Plugin
+
+Open a terminal, `cd` into your Godot project folder (the one containing `project.godot`), and run:
 
 ```bash
-npx @yanhuifair/godot-mcp --enable-plugin -p /path/to/your/godot/project
+npx @yanhuifair/godot-mcp --enable-plugin -p .
 ```
 
-This copies the plugin to `addons/godot-mcp/` and auto-enables it in `project.godot`. No manual Godot steps required.
+> The `-p .` means "this folder". You can also pass an absolute path from anywhere:
+> `npx @yanhuifair/godot-mcp --enable-plugin -p /Users/me/games/my-game`
 
-### Step 2: Configure Your AI Client
+**What this does:** copies the plugin into `addons/godot-mcp/` and switches it on inside `project.godot`. Nothing to click in Godot.
 
-Create `.vscode/mcp.json` in your project root:
+**How to confirm it worked:** you should now see an `addons/godot-mcp/` folder in your project. If Godot is already open, reload the project (Project → Reload Current Project) so it picks up the plugin.
+
+<details>
+<summary>Do I actually need this step?</summary>
+
+Only if you want the **live editor** and **live game** tools (play the scene, read the current selection, set breakpoints, bake lightmaps, freeze the running game…).
+
+Over **220 of the 358 tools** — everything that reads and writes `.tscn`, `.tres`, `.gd`, shaders, project settings, etc. — work **without the plugin and without Godot even being open**. If that's all you need, skip to Step 2.
+</details>
+
+### Step 2 — Point Your AI Client at the Server
+
+Create `.vscode/mcp.json` in your project root (this exact file works for **VS Code / GitHub Copilot**):
 
 ```json
 {
@@ -64,23 +129,47 @@ Create `.vscode/mcp.json` in your project root:
 }
 ```
 
-See [AI Client Configuration](#ai-client-configuration) for Cursor, Claude Desktop, Windsurf, Codex, Cline, Aider, Cody, Goose, and others.
+Then **restart your AI client** so it reads the new config.
 
-### Step 3: Start Chatting
+> Using something else? The config file has a different name and location per client, but the `command` / `args` part is almost always identical. Copy-paste blocks for **Cursor, Claude Desktop, Claude CLI, Windsurf, OpenAI Codex, Cline, Roo Code, Continue, Aider, Cody, Goose, Zed** are in [AI Client Configuration](#ai-client-configuration).
 
-The AI client auto-launches the MCP server. File-based tools (.tscn, .tres, .gd) work immediately. Editor tools (play, select nodes, debug) cause MCP to spawn Godot automatically.
+### Step 3 — Verify and Start Chatting
+
+Ask your AI:
+
+```
+"Run get_status"
+```
+
+You should get back the tool count and whether the editor / runtime bridges are reachable. That means everything is wired up. Now try:
 
 ```
 "List all scenes in the project"
-"Find all CharacterBody2D nodes"
+"Find all CharacterBody2D nodes and tell me their collision layers"
 "Run the game and take a screenshot"
 ```
+
+With 358 tools, the AI can't see them all at once — tell it to **`search_tools`** when it isn't sure what's available (e.g. *"search_tools for animation"*).
+
+<details>
+<summary>Something not working?</summary>
+
+| Symptom | Fix |
+|---|---|
+| Client shows no `godot-mcp` tools | Restart the client. Config files are only read on startup. |
+| `npx: command not found` | Node.js isn't installed or isn't on your `PATH`. Run `node -v` to confirm. |
+| `Project not found` errors | The `-p` path must point at the folder containing `project.godot`. Using `"."` only works if the client's working directory *is* your project — otherwise use an absolute path. |
+| Editor tools fail, file tools work | The plugin isn't installed/enabled. Re-run Step 1, then reload the project in Godot. |
+| `EDITOR_NOT_REACHABLE` | Godot isn't running, or the plugin isn't enabled. The server will try to launch Godot itself; if that fails, open the project in Godot manually and check Project → Project Settings → Plugins → **Godot MCP** is enabled. |
+| Godot binary not found | Set the `GODOT_PATH` environment variable to your Godot executable. See [Environment Variables](#environment-variables). |
+
+</details>
 
 ---
 
 ## What You Can Do
 
-Godot MCP provides comprehensive coverage of the Godot 4.x engine through 345 tools in 26 categories.
+Godot MCP provides comprehensive coverage of the Godot 4.x engine through 358 tools in 29 categories.
 
 ### Quick Demo
 
@@ -100,36 +189,78 @@ npx @yanhuifair/godot-mcp --enable-plugin -p .
 
 | Category | Tools | Description |
 |---|---|---|
-| Editor | 89 | Live editor control — select, play, undo, save, breakpoints, file ops, performance |
-| Scene | 22 | Scene CRUD — nodes, signals, transforms, collision, sprites |
+| Editor | 123 | Live editor control — select, play, undo, save, breakpoints, file ops, performance |
 | Project | 21 | Config, input map, file ops, autoloads, validation, unused assets |
-| Script | 21 | GDScript/Shader CRUD, structure analysis, code injection, validation |
-| Domain | 11 | Curve, Gradient, Path, Skeleton, ReflectionProbe, MultiMesh, NoiseTexture |
+| Scene | 22 | Scene CRUD — nodes, signals, transforms, collision, sprites |
+| Script + Shader | 21 | GDScript/Shader CRUD, structure analysis, code injection, validation |
+| Domain | 14 | Curve, Gradient, Path, Skeleton, ReflectionProbe, MultiMesh, NoiseTexture |
 | Animation | 10 | AnimationPlayer/AnimationTree — tracks, keyframes, parameters |
 | Godot Engine | 9 | Engine detection, launch editor, run/export project, screenshot |
 | Coverage | 18 | Mesh primitives, 2D lights, vehicles, spring arm, decal, occluder, grid map |
-| Nodes | 8 | CharacterBody, AnimatedSprite, Audio, Video, Parallax, RichText, Container, Tab |
+| Node Inspectors | 8 | CharacterBody, AnimatedSprite, Audio, Video, Parallax, RichText, Container, Tab |
 | Resource | 8 | .tres CRUD, PBR materials, themes, 14 templates |
 | Audio | 7 | Audio bus layout, effects, volume |
 | Shader Graph | 8 | VisualShader graph — 40+ node types, connections, parameters |
-| Utility | 6 | Signal catalog, StyleBox, AtlasTexture, popup listing, cohesion report |
+| Utility | 9 | Signal catalog, StyleBox, AtlasTexture, popup listing, cohesion report |
 | Rendering | 5 | MeshInstance, Viewport, Area, RayCast/ShapeCast |
-| Environment | 4 | Environment read/write, 4 presets |
+| Environment | 6 | Environment read/write, presets |
 | Inspector | 5 | Camera, Light, Particle node inspection |
-| Physics | 4 | PhysicsMaterial CRUD, collision layers |
+| Physics | 5 | PhysicsMaterial CRUD, collision layers |
 | Import | 3 | .import file read/write |
-| TileMap | 3 | TileSet resources, TileMapLayer inspection |
-| Navigation | 3 | NavigationRegion, NavigationMesh |
-| Translation | 3 | CSV/PO translation files |
-| Joints | 3 | Physics joints — create, configure, list |
-| UID | 3 | File UID query, batch update, missing UID detection |
-| 2D Geometry | 2 | CollisionPolygon2D, shape point editing |
-| Diff | 2 | Scene and resource comparison |
-| Other | 4 | GDExtension, C#, World3D, Texture |
+| TileMap | 5 | TileSet resources, TileMapLayer inspection |
+| Navigation | 6 | NavigationRegion, NavigationMesh |
+| Translation | 5 | CSV/PO translation files |
+| Joints | 5 | Physics joints — create, configure, list |
+| UID | 4 | File UID query, batch update, missing UID detection |
+| 2D Geometry | 4 | CollisionPolygon2D, shape point editing |
+| Diff | 5 | Scene and resource comparison |
+| Texture | 4 | Texture import/read/write, atlas, noise |
+| Extension/World/C# | 5 | GDExtension, C#, World3D, CSProj |
+| Meta / Introspection | 2 | Tool search (search_tools) + system diagnostics (get_status) |
+| Runtime (game) | 11 | Control the running game — tree, properties, methods, signals, input, freeze/step, screenshot |
 
-**Total: 345 tools across 26 categories**
+**Total: 358 tools across 29 categories**
 
 ### Core Capabilities in Detail
+
+**Project Management**
+Read and write `project.godot` settings, input maps, autoload singletons, and export presets. Perform file operations (list, search, move, delete with `.bak` backups), validate project health, detect unused assets, and generate comprehensive project reports.
+
+**Scene Editing**
+Full CRUD on `.tscn` scene files. Add, delete, modify, clone, and rename nodes. Edit node properties, transforms (position/rotation/scale), collision shapes, and sprite textures. Connect and disconnect signals between nodes. Search nodes across scenes by type, property, group, or signal.
+
+**Scripting & Shaders**
+Read, write, and create GDScript, C#, and `.gdshader` files. Analyze script structure (class names, signals, exported variables, functions). Inject functions, signals, and `@export` variables into existing scripts. Validate GDScript for common syntax issues. Validate and compile shaders. Manage VisualShader graphs — add, remove, connect, and configure nodes.
+
+**Resource Management**
+Read, write, and create `.tres` resource files with 14 built-in templates (StandardMaterial3D, ShaderMaterial, ORMMaterial3D, CanvasItemMaterial, and more). Inspect and modify PBR material parameters. Read Theme resources with properties grouped by type.
+
+**Animation Pipeline**
+Complete AnimationPlayer and AnimationTree support: list animations, read tracks and keyframes, create new animations, add/remove tracks, set keyframes at specific times, configure animation libraries, and inspect AnimationTree state machines.
+
+**Audio Configuration**
+Read, create, and modify audio bus layouts. Add and remove audio buses, attach effects (14 types: Reverb, Delay, Chorus, Compressor, and more), and set bus volume in dB.
+
+**Physics & Collision**
+Inspect VehicleBody3D, SoftBody3D, and physics materials. Create collision shapes. Read collision layer and mask configuration from project settings. Create physics joints (PinJoint, HingeJoint, SliderJoint, and more).
+
+**Rendering & Environment**
+Inspect MeshInstance3D, Viewport, Area, and RayCast nodes. Create and configure Environment resources (4 presets). Manage 2D lights, decals, and occluders. Read 3D mesh primitives (Box, Sphere, Capsule, Cylinder, Torus, and more).
+
+**Live Editor Control (123 tools)**
+Interact with the running Godot editor in real time over a TCP or stdio bridge: select nodes, run/stop/pause the project, undo/redo, save scenes, create and attach scripts, set breakpoints, step the debugger, evaluate expressions, control the 3D viewport camera, bake lightmaps and navigation meshes, manage plugins, and simulate key presses.
+
+**Live Game Runtime Control (11 tools)**
+Go beyond the editor and reach into the **actually running game**. Inspect the live scene tree with real positions, read and write node properties at runtime, call arbitrary methods, emit signals, inject keyboard input, and — the headline feature — `runtime_freeze` the game, `runtime_step` forward an exact number of frames, and `runtime_screenshot` the result. This makes AI-driven gameplay debugging deterministic and reproducible.
+
+**Visual Shader Graphs**
+Create and modify VisualShader graphs programmatically. Add nodes from a catalog of 40+ types (constants, math operations, textures, inputs), connect node ports, set node parameters, and list available node types with their default input/output configurations.
+
+**Engine Introspection (ClassDB)**
+Query the live engine's ClassDB: list all classes, inspect methods, properties, and signals of any Godot type, read built-in class documentation, and search the help system. The AI works from ground truth instead of hallucinating APIs.
+
+**TileMap, Navigation & Translation**
+Inspect TileSet resources and TileMapLayer nodes. List and read NavigationRegion nodes, create NavigationMesh resources. Read and create CSV/PO translation files with search support.
 
 ---
 
@@ -145,7 +276,7 @@ npx @yanhuifair/godot-mcp --enable-plugin -p .
   |   Claude/etc.)   |                                        |                  |
   +-----------------+                                        |  +-------------+ |
                                                              |  | Tool Registry| |
-                                                             |  |  (345 tools) | |
+                                                             |  |  (358 tools) | |
                                                              |  +------+------+ |
                                                              |         |        |
                                                              |    +----v-----+  |
@@ -167,7 +298,7 @@ npx @yanhuifair/godot-mcp --enable-plugin -p .
 
 ### Communication Paths
 
-The server uses three distinct communication paths depending on the operation:
+The server uses four distinct communication paths depending on the operation:
 
 1. **Direct File I/O** — For file-based tools (read_scene, write_script, create_resource, etc.), the server reads and writes Godot project files directly on disk using custom parsers. No Godot process is required. This is the fastest path.
 
@@ -177,6 +308,8 @@ The server uses three distinct communication paths depending on the operation:
    - **TCP mode** (default): Connects to an already-running Godot on `localhost:9876`. The editor plugin listens on this port.
    - **Stdio mode** (fallback): Spawns Godot as a child process with `--editor --path <project>`, sets `MCP_STDIO=true`, and communicates via stdin/stdout using JSON-RPC with a `__MCP__:` marker prefix. This mode auto-starts and auto-restarts Godot as needed.
 
+4. **Live-Game Runtime Bridge** — For runtime tools (`runtime_*`, e.g. `runtime_get_tree`, `runtime_set_node`, `runtime_step`), the MCP server talks to a small autoload running **inside your played game** on `127.0.0.1:9877`. The autoload (`addons/godot-mcp/runtime_bridge.gd`, named `godot_mcp_runtime`) is added to your project and listens only on loopback. This lets the AI inspect and mutate the live scene tree, inject input, pause/resume, deterministically step frames, and screenshot the running game — a tier no other public Godot MCP offers out of the box.
+
 ### Project Structure
 
 ```
@@ -185,7 +318,7 @@ godot-mcp/
 │   ├── index.ts              # CLI entry point, argument parsing, transport dispatch
 │   ├── server.ts             # MCP server factory, tool registration, request routing
 │   ├── tools/                # 29 tool handler files (one per category)
-│   │   ├── register.ts       # Centralized registration (345 tools)
+│   │   ├── register.ts       # Centralized registration (358 tools)
 │   │   ├── project.ts        # Project management tools
 │   │   ├── scene.ts          # Scene editing tools
 │   │   ├── script.ts         # Script and shader tools
@@ -366,32 +499,85 @@ Starts: Stdio + SSE (`/sse`) + Streamable HTTP (`/mcp`) + Health Check (`/health
 
 ```bash
 curl http://127.0.0.1:3000/health
-# {"status":"ok","version":"1.7.0","projectRoot":"/path/to/project","endpoints":{...}}
+# {"status":"ok","version":"1.9.0","projectRoot":"/path/to/project","endpoints":{...}}
 ```
 
 ---
 
 ## Installation
 
-### npx (recommended, no pre-install)
+> **Read this first.** In normal use you never launch this server yourself — your AI client launches it in the background using the `command` from its config file. The commands below are for **installing the package** and for **manual/advanced runs** (HTTP transports, debugging, CI).
+
+### Which method should I use?
+
+| Method | Best for | Trade-off |
+|---|---|---|
+| **npx** *(recommended)* | Almost everyone | Nothing to install; always fetches the latest version. Tiny delay on first run. |
+| **Global install** | Slow/offline networks, pinning a version, using a bare `godot-mcp` command | You must run `npm update -g` yourself to get new releases. |
+| **From source** | Contributing, or you need an unreleased change | You have to rebuild after every `git pull`. |
+
+### Option A — npx (recommended, nothing to pre-install)
 
 ```bash
 npx -y @yanhuifair/godot-mcp -p /path/to/your/godot/project
 ```
 
-### Global Install
+`npx` downloads the package on demand and caches it. This is exactly what the config snippets in [AI Client Configuration](#ai-client-configuration) use, so **if you follow the Quick Start there is no separate install step at all** — `-y` just skips the "install this package?" prompt.
+
+### Option B — Global install
 
 ```bash
 npm install -g @yanhuifair/godot-mcp
+
+# then run it by name anywhere
+godot-mcp -p /path/to/your/godot/project
 ```
 
-### From Source
+If you install globally, change your client config from `"command": "npx"` to `"command": "godot-mcp"` and drop the `-y` and package name from `args`:
+
+```json
+{ "command": "godot-mcp", "args": ["-p", "."] }
+```
+
+Update later with `npm update -g @yanhuifair/godot-mcp`.
+
+### Option C — From source
 
 ```bash
 git clone https://github.com/yanhuifair/Godot-MCP.git
-cd godot-mcp
+cd Godot-MCP
 npm install
-npm run build
+npm run build       # compiles TypeScript into dist/
+
+node dist/index.js -p /path/to/your/godot/project
+```
+
+Point your client at the built entry file:
+
+```json
+{ "command": "node", "args": ["/absolute/path/to/Godot-MCP/dist/index.js", "-p", "."] }
+```
+
+### Command-Line Options
+
+| Flag | What it does |
+|---|---|
+| `-p, --project-path <path>` | Your Godot project folder — the one containing `project.godot`. Auto-detected if omitted. |
+| `-g, --godot-path <path>` | Path to the Godot executable. Auto-detected if omitted (see the detection order below). |
+| `--enable-plugin` | Copy the editor plugin into `addons/` **and** switch it on in `project.godot`. Requires `-p`. **This is the one you want.** |
+| `--install-addons` | Copy the plugin files only — you enable it yourself in Godot's Plugins tab. |
+| `--read-only` | Safe mode: rejects the ~140 tools that write files or cause side effects. Great for letting an AI explore an unfamiliar project. |
+| `-t, --transport <mode>` | `stdio` (default) · `sse` · `streamable-http` · `all`. See [Transport Modes](#transport-modes). |
+| `--port <number>` | HTTP port for `sse` / `streamable-http`. Default `3000`. |
+| `--host <string>` | HTTP bind address. Default `127.0.0.1`. Binding anything else **requires** `GODOT_MCP_TOKEN`. |
+| `--no-sse` / `--no-streamable-http` | Disable an individual endpoint when running `-t all`. |
+| `-h, --help` | Print all options and sample client configs. |
+
+```bash
+# a few real examples
+npx @yanhuifair/godot-mcp --enable-plugin -p .          # one-time setup for a project
+npx @yanhuifair/godot-mcp -p . --read-only              # let the AI look, not touch
+npx @yanhuifair/godot-mcp -p . -t streamable-http --port 8080
 ```
 
 ### Environment Variables
@@ -413,11 +599,36 @@ Godot auto-detection order: `GODOT_PATH` -> `/Applications/Godot.app` -> `PATH` 
 
 ## AI Client Configuration
 
-### VS Code / GitHub Copilot
+Godot MCP is a **plain stdio MCP server** — anything that speaks MCP can drive it. Below are step-by-step setups for the most popular AI agents, IDEs and CLIs.
 
-**Method 1: Project-level config (recommended)**
+> **In a hurry?** Nearly every client wants the same six lines of JSON. Copy [the universal snippet](#the-universal-snippet), drop it into the file listed for your client, restart, then ask the AI to run `get_status`. Done.
 
-Create `.vscode/mcp.json` in your Godot project root:
+### Pick Your Client
+
+| Client | Where the config lives | Top-level key |
+|---|---|---|
+| [Claude Code](#claude-code) | `claude mcp add` → `.mcp.json` | `mcpServers` |
+| [Cursor](#cursor) | `.cursor/mcp.json` · `~/.cursor/mcp.json` | `mcpServers` |
+| [VS Code / GitHub Copilot](#vs-code--github-copilot) | `.vscode/mcp.json` | `servers` |
+| [Codex CLI](#codex-cli-openai) | `~/.codex/config.toml` | `[mcp_servers.*]` |
+| [Gemini CLI](#gemini-cli-google) | `.gemini/settings.json` · `~/.gemini/settings.json` | `mcpServers` |
+| [Windsurf](#windsurf) | `~/.codeium/windsurf/mcp_config.json` | `mcpServers` |
+| [Cline](#cline-vs-code-extension) | `cline_mcp_settings.json` (open via UI) | `mcpServers` |
+| [Roo Code](#roo-code-vs-code-extension) | `.roo/mcp.json` · global `mcp_settings.json` | `mcpServers` |
+| [Trae](#trae) | AI panel → MCP (UI) | `mcpServers` |
+| [Zed](#zed) | `~/.config/zed/settings.json` | `context_servers` |
+| [JetBrains (Rider / IntelliJ)](#jetbrains-ides-rider-intellij-goland) | Settings → AI Assistant → MCP | `mcpServers` |
+| [OpenCode](#opencode) | `opencode.json` | `mcp` |
+| [Claude Desktop](#claude-desktop) | `claude_desktop_config.json` | `mcpServers` |
+| [Continue](#continue) | `~/.continue/config.yaml` | `mcpServers` |
+| [Cherry Studio](#cherry-studio) | Settings → MCP servers (UI) | `mcpServers` |
+| [Goose](#goose) | `~/.config/goose/config.yaml` | `extensions` |
+| [Aider](#aider) | `.aider.conf.yml` | `mcp-servers-file` |
+| [Anything else](#any-other-mcp-client) | — | see below |
+
+### The Universal Snippet
+
+This is the config ~80% of clients accept verbatim:
 
 ```json
 {
@@ -431,42 +642,83 @@ Create `.vscode/mcp.json` in your Godot project root:
 }
 ```
 
-After saving, reload VS Code (`Cmd+Shift+P` -> `Developer: Reload Window`). Open Copilot Chat (`Cmd+Shift+I`), look for the tools indicator in the chat input. Send a test message:
+What each part means:
 
-> "List all scenes in the project"
+| Field | Why it's there |
+|---|---|
+| `"godot-mcp"` | The name your AI will see. Rename it freely — nothing depends on it. |
+| `"type": "stdio"` | The server runs as a local child process. Some clients omit this field entirely; both are fine. |
+| `"command": "npx"` | On Windows, if you hit `spawn ENOENT`, change this to `"npx.cmd"`. |
+| `"-y"` | Skips npx's "install this package?" prompt. Without it the server hangs on first run. |
+| `"-p", "."` | Your Godot project folder. `.` means "wherever the client launched the server from". |
 
-Tip: Commit `.vscode/mcp.json` to your repository so every team member gets the MCP server automatically.
+**When to use `.` and when to use a full path:**
 
-**Method 2: User-level config**
+- Editors that open a folder (VS Code, Cursor, Windsurf, Zed, Trae, JetBrains) launch the server *inside* that folder → `"."` works, and the config stays portable across machines.
+- Desktop apps and global CLIs (Claude Desktop, Cherry Studio, a user-scope Claude Code entry) have no project folder → use an absolute path like `"/Users/you/Games/MyGame"` or `"C:/Users/you/Games/MyGame"`.
+- **Windows: always use forward slashes** (`C:/Users/...`) or escaped backslashes (`C:\\Users\\...`) in JSON.
 
-Open VS Code settings (`Cmd+Shift+P` -> `Preferences: Open User Settings (JSON)`) and add:
+**Two useful variants:**
 
 ```jsonc
-{
-  "mcp": {
-    "servers": {
-      "godot-mcp": {
-        "command": "npx",
-        "args": ["-y", "@yanhuifair/godot-mcp", "-p", "/path/to/your/godot/project"]
-      }
-    }
-  }
-}
+// Read-only — the AI can inspect everything but cannot modify a single file
+"args": ["-y", "@yanhuifair/godot-mcp", "-p", ".", "--read-only"]
+
+// Pin the Godot binary when auto-detection fails
+"env": { "GODOT_PATH": "/Applications/Godot.app/Contents/MacOS/Godot" }
 ```
 
-**Method 3: Install via `--enable-plugin`**
+---
+
+### Claude Code
+
+**1. Register the server.** Run this from inside your Godot project folder:
 
 ```bash
-npx @yanhuifair/godot-mcp --enable-plugin -p /path/to/your/godot/project
+cd /path/to/your/godot/project
+claude mcp add godot-mcp -- npx -y @yanhuifair/godot-mcp -p .
 ```
 
-This installs the editor plugin and auto-enables it. Combined with the MCP config above, you get full file-based tools + live editor control.
+Everything after `--` is the command Claude Code will spawn. The `--` separator is required — without it Claude Code eats the `-y` and `-p` flags as its own.
+
+**2. Pick a scope** (optional — the default is fine for one project):
+
+| Command | Stored in | Who gets it |
+|---|---|---|
+| `claude mcp add godot-mcp -- …` | `~/.claude.json`, keyed by folder | Just you, just this project |
+| `claude mcp add -s project godot-mcp -- …` | `.mcp.json` in the project root | **Everyone who clones the repo** — commit this |
+| `claude mcp add -s user godot-mcp -- …` | `~/.claude.json`, global | You, in every project (use an absolute `-p` path) |
+
+Adding an environment variable:
+
+```bash
+claude mcp add godot-mcp -e GODOT_PATH=/Applications/Godot.app/Contents/MacOS/Godot \
+  -- npx -y @yanhuifair/godot-mcp -p .
+```
+
+**3. Verify.** Start `claude`, then type `/mcp`. You should see `godot-mcp` with a **connected** status. Press Enter on it to browse the 358 tools.
+
+**4. First prompt:**
+
+> Run `get_status` and tell me what the Godot MCP server can currently reach, then list every scene in the project.
+
+**Managing it later:**
+
+```bash
+claude mcp list              # all registered servers + connection status
+claude mcp get godot-mcp     # full details of one server
+claude mcp remove godot-mcp  # unregister
+```
+
+> If you used `-s project`, Claude Code will ask you to approve `.mcp.json` the first time you open the project. That's a security prompt, not an error — answer yes.
+
+---
 
 ### Cursor
 
-Cursor supports both project-level and user-level MCP configuration.
+**1. Create the config.** Project-level is best — it travels with the repo:
 
-**Project-level** — `.cursor/mcp.json` in your project root:
+`.cursor/mcp.json` in your Godot project root:
 
 ```json
 {
@@ -480,74 +732,137 @@ Cursor supports both project-level and user-level MCP configuration.
 }
 ```
 
-**User-level** — `~/.cursor/mcp.json` (macOS/Linux) or `%USERPROFILE%\.cursor\mcp.json` (Windows):
+Prefer it everywhere? Use `~/.cursor/mcp.json` (Windows: `%USERPROFILE%\.cursor\mcp.json`) with an absolute `-p` path instead.
+
+You can also let Cursor create the file for you: **Settings → Tools & Integrations → Add Custom MCP**.
+
+**2. Verify.** Open **Cursor Settings → Tools & Integrations**. `godot-mcp` should appear with a **green dot** and a tool count. Cursor hot-reloads this file, so no restart is needed — if the dot is red, click the refresh icon and check the JSON for a trailing comma.
+
+**3. Switch the chat to Agent mode** (`Cmd/Ctrl+I`). Ask mode cannot call tools.
+
+**4. First prompt:**
+
+> Use `search_tools` to find the tileset tools, then tell me which TileSets exist in this project.
+
+> **Tool limit warning:** Cursor only sends ~40–80 tools to the model at a time. Godot MCP ships 358. Keep `search_tools` in your rules file (see [Make Your Agent Use the Tools Well](#make-your-agent-use-the-tools-well)) so the model looks a tool up instead of hallucinating one.
+
+---
+
+### VS Code / GitHub Copilot
+
+**1. Create `.vscode/mcp.json`** in your Godot project root. Note that VS Code's own key is `servers`, not `mcpServers`:
 
 ```json
 {
-  "mcpServers": {
+  "servers": {
     "godot-mcp": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@yanhuifair/godot-mcp", "-p", "/path/to/your/godot/project"]
+      "args": ["-y", "@yanhuifair/godot-mcp", "-p", "."]
     }
   }
 }
 ```
 
-After configuring, open Cursor Settings -> MCP to verify the server appears with a green status indicator. Use Agent mode in chat (Cmd+L) to invoke MCP tools.
+Shortcut: run `MCP: Add Server…` from the Command Palette (`Cmd/Ctrl+Shift+P`) and pick **Command (stdio)** — VS Code writes the file for you.
 
-### Claude Desktop
+**2. Start it.** VS Code shows a small **Start** codelens directly above the `"godot-mcp"` line in the JSON. Click it. (Or run `MCP: List Servers` → `godot-mcp` → `Start Server`.)
 
-**macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
-**Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+**3. Switch Copilot Chat to Agent mode.** Open Chat (`Cmd/Ctrl+Shift+I`), then choose **Agent** in the mode dropdown. Ask and Edit modes don't call MCP tools.
+
+**4. Verify.** Click the **tools icon (🛠)** in the chat input — `godot-mcp` should be listed. If you see "0 tools", run `MCP: List Servers` → `godot-mcp` → `Show Output` to read the startup log.
+
+**5. First prompt:**
+
+> #godot-mcp Run get_status, then list all scenes.
+
+> **Team tip:** commit `.vscode/mcp.json`. Everyone who clones the repo gets the server automatically — VS Code just asks each person to trust it once.
+>
+> **User-level instead:** Command Palette → `MCP: Open User Configuration`, and use an absolute `-p` path.
+
+---
+
+### Codex CLI (OpenAI)
+
+**1. Add the server** with the built-in command (writes `~/.codex/config.toml` for you):
+
+```bash
+codex mcp add godot-mcp -- npx -y @yanhuifair/godot-mcp -p .
+```
+
+Or edit `~/.codex/config.toml` by hand — note this is **TOML**, not JSON:
+
+```toml
+[mcp_servers.godot-mcp]
+command = "npx"
+args = ["-y", "@yanhuifair/godot-mcp", "-p", "."]
+startup_timeout_sec = 30
+
+[mcp_servers.godot-mcp.env]
+GODOT_PATH = "/Applications/Godot.app/Contents/MacOS/Godot"
+```
+
+`startup_timeout_sec` matters here: `npx` may need to download the package on the very first run, which can exceed Codex's default startup window.
+
+**2. Verify:**
+
+```bash
+codex mcp list
+```
+
+**3. Use it** — always launch Codex from inside the Godot project so `-p .` resolves correctly:
+
+```bash
+cd /path/to/your/godot/project
+codex                                        # interactive
+codex exec "Run get_status and list all scenes"   # one-shot
+```
+
+---
+
+### Gemini CLI (Google)
+
+**1. Add the server:**
+
+```bash
+cd /path/to/your/godot/project
+gemini mcp add godot-mcp npx -y @yanhuifair/godot-mcp -p .
+```
+
+Default scope is **project** → written to `.gemini/settings.json`. Add `-s user` to write `~/.gemini/settings.json` instead (then use an absolute `-p` path).
+
+Equivalent hand-written config:
 
 ```json
 {
   "mcpServers": {
     "godot-mcp": {
-      "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@yanhuifair/godot-mcp", "-p", "/path/to/your/godot/project"]
+      "args": ["-y", "@yanhuifair/godot-mcp", "-p", "."],
+      "timeout": 600000,
+      "trust": false
     }
   }
 }
 ```
 
-After saving, fully quit and restart Claude Desktop. Look for the hammer icon in the chat input to confirm MCP tools are loaded. Send a test:
+- `trust: true` skips the per-call confirmation prompt. Convenient, but it also means the AI can write files without asking — pair it with `--read-only` if you want a safety net.
+- `includeTools` / `excludeTools` accept arrays of tool names if you want to hand the model a curated subset instead of all 358.
 
-> "Get the Godot version"
+**2. Verify.** Run `gemini`, then `/mcp` — it lists connected servers and their tools. `gemini mcp list` works outside a session.
 
-### Claude CLI (`claude`)
+**3. First prompt:**
 
-Install the Claude CLI first, then register the MCP server:
+> Call get_status, then use search_tools to find animation-related tools.
 
-```bash
-# One-time registration
-claude mcp add godot-mcp -- npx -y @yanhuifair/godot-mcp -p /path/to/your/godot/project
-
-# With environment variables (e.g., custom Godot path)
-claude mcp add godot-mcp -e GODOT_PATH=/path/to/godot -- npx -y @yanhuifair/godot-mcp -p .
-
-# List registered servers
-claude mcp list
-
-# Remove if needed
-claude mcp remove godot-mcp
-```
-
-Then use interactively or non-interactively:
-
-```bash
-# Interactive session
-claude
-
-# Non-interactive (pipe mode)
-echo "List all scenes in my Godot project" | claude -p
-```
+---
 
 ### Windsurf
 
-`~/.codeium/windsurf/mcp_config.json` (macOS/Linux) or `%USERPROFILE%\.codeium\windsurf\mcp_config.json` (Windows):
+**1. Open the config.** Either click **Cascade → the hammer icon → Configure**, or edit the file directly:
+
+- macOS/Linux: `~/.codeium/windsurf/mcp_config.json`
+- Windows: `%USERPROFILE%\.codeium\windsurf\mcp_config.json`
 
 ```json
 {
@@ -561,156 +876,212 @@ echo "List all scenes in my Godot project" | claude -p
 }
 ```
 
-Restart Windsurf after saving. Open Cascade (Cmd+L) and verify tools appear in the MCP panel.
+This file is global, so give it an **absolute** project path.
 
-### OpenAI Codex CLI
+**2. Refresh.** Back in Cascade, click the hammer icon → **Refresh**. `godot-mcp` should turn green.
 
-Codex uses `.codex.toml` or `.codex.yaml` in your project root, or `~/.codex/config.yaml` for user-level config.
+**3. First prompt** (Cascade is `Cmd/Ctrl+L`):
 
-**Project-level** (`.codex.toml` in your Godot project):
+> Run get_status, then read the main scene.
 
-```yaml
-mcp_servers:
-  godot-mcp:
-    type: stdio
-    command: npx
-    args:
-      - "-y"
-      - "@yanhuifair/godot-mcp"
-      - "-p"
-      - "."
-```
-
-**Global install** (if you ran `npm install -g @yanhuifair/godot-mcp`):
-
-```yaml
-mcp_servers:
-  godot-mcp:
-    type: stdio
-    command: godot-mcp
-    args:
-      - "-p"
-      - "."
-```
-
-Run Codex in your Godot project directory:
-
-```bash
-# Interactive session
-codex
-
-# Non-interactive
-codex exec "List all scenes in the project"
-codex exec "Create a new CharacterBody2D script for the player"
-
-# Verify MCP tools are loaded
-codex exec "Get the Godot version"
-```
+---
 
 ### Cline (VS Code Extension)
 
-Cline reads MCP servers from VS Code user settings. Open `Cmd+Shift+P` -> `Preferences: Open User Settings (JSON)` and add:
+**1. Open Cline's MCP settings** — don't hunt for the file, use the UI: click the **Cline icon** in the sidebar → **MCP Servers** (the server rack icon at the top) → **Installed** tab → **Configure MCP Servers**. That opens `cline_mcp_settings.json`.
 
-```jsonc
-{
-  "cline.mcpServers": {
-    "godot-mcp": {
-      "command": "npx",
-      "args": ["-y", "@yanhuifair/godot-mcp", "-p", "/path/to/your/godot/project"]
-    }
-  }
-}
-```
+<details>
+<summary>Where that file actually lives</summary>
 
-After saving, click the Cline extension icon in the sidebar, then click "Restart MCP Servers" in the Cline panel. The server should show as connected. Use Cline in any VS Code window — MCP tools are available automatically.
+- macOS: `~/Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json`
+- Windows: `%APPDATA%\Code\User\globalStorage\saoudrizwan.claude-dev\settings\cline_mcp_settings.json`
+- Linux: `~/.config/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json`
 
-### Roo Code (VS Code Extension)
+</details>
 
-Roo Code also reads MCP servers from VS Code user settings:
-
-```jsonc
-{
-  "rooCode.mcpServers": {
-    "godot-mcp": {
-      "command": "npx",
-      "args": ["-y", "@yanhuifair/godot-mcp", "-p", "/path/to/your/godot/project"]
-    }
-  }
-}
-```
-
-After saving, open Roo Code and the MCP tools will be available in the tool selection menu. If the server doesn't appear, click the refresh button in the Roo Code MCP settings panel.
-
-### Continue (VS Code / JetBrains)
-
-Continue uses `~/.continue/config.json` (macOS/Linux) or `%USERPROFILE%\.continue\config.json` (Windows).
-
-Add a new entry to the `mcpServers` array. If the array doesn't exist, create it:
+**2. Add the entry:**
 
 ```json
 {
-  "models": [...],
-  "mcpServers": [
-    {
-      "name": "godot-mcp",
-      "transport": {
-        "type": "stdio",
-        "command": "npx",
-        "args": ["-y", "@yanhuifair/godot-mcp", "-p", "/path/to/your/godot/project"]
-      }
+  "mcpServers": {
+    "godot-mcp": {
+      "command": "npx",
+      "args": ["-y", "@yanhuifair/godot-mcp", "-p", "/path/to/your/godot/project"],
+      "disabled": false,
+      "autoApprove": []
     }
-  ]
+  }
 }
 ```
 
-After saving, open Continue in VS Code (Cmd+L or Cmd+I). Tools are discovered automatically. Send:
+`autoApprove` takes tool names that should run without a confirmation click — e.g. `["get_status", "search_tools", "list_scenes"]` for read-only convenience.
 
-> "List all .tscn files in my project"
+**3. Restart.** Cline usually reloads on save; if not, click **Restart Server** next to `godot-mcp` in the MCP Servers panel. Wait for the dot to go green.
 
-### Aider
+**4. First prompt** in Plan or Act mode:
 
-Aider supports MCP servers via `.aider.conf.yml` (project root or home directory) or command-line flags.
+> Run get_status and summarize this Godot project's structure.
 
-**Config file** (`.aider.conf.yml`):
+---
 
-```yaml
-mcp_servers:
-  - name: godot-mcp
-    command: npx
-    args:
-      - "-y"
-      - "@yanhuifair/godot-mcp"
-      - "-p"
-      - "."
-```
+### Roo Code (VS Code Extension)
 
-**Command-line**:
+Roo Code supports both a project file and a global file — the project file wins on conflicts.
 
-```bash
-# Single project
-aider --mcp-server "godot-mcp=npx -y @yanhuifair/godot-mcp -p ."
+**1a. Project-level (recommended):** create `.roo/mcp.json` in your Godot project root:
 
-# With custom Godot path
-aider --mcp-server "godot-mcp=npx -y @yanhuifair/godot-mcp -p /path/to/project"
-
-# With global install
-aider --mcp-server "godot-mcp=godot-mcp -p ."
-```
-
-Aider's `/tools` command lists all available MCP tools. Use them directly in chat:
-
-```
-/tools                    # List all 345 tools
-Create a new Node2D scene called "MainMenu"
-```
-
-### Cody (Sourcegraph)
-
-Cody is available as a VS Code extension. Add MCP config to VS Code user settings:
-
-```jsonc
+```json
 {
-  "cody.mcpServers": {
+  "mcpServers": {
+    "godot-mcp": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@yanhuifair/godot-mcp", "-p", "."]
+    }
+  }
+}
+```
+
+**1b. Global:** Roo Code panel → **MCP** icon → **Edit Global MCP** (file lives at `…/globalStorage/rooveterinaryinc.roo-cline/settings/mcp_settings.json`). Use an absolute `-p` path there.
+
+**2. Enable it.** In the Roo Code MCP panel, make sure the `godot-mcp` toggle is on and the status dot is green. Hit the refresh icon if it isn't.
+
+**3. First prompt:**
+
+> Use search_tools to find shader tools, then list every .gdshader file.
+
+---
+
+### Trae
+
+Trae has two steps most people miss: adding the server **and** attaching it to an agent.
+
+**1. Add the server.** Open the AI side panel → **Settings (gear) → MCP → Add → Add manually** (or **Import from JSON**), then paste:
+
+```json
+{
+  "mcpServers": {
+    "godot-mcp": {
+      "command": "npx",
+      "args": ["-y", "@yanhuifair/godot-mcp", "-p", "."]
+    }
+  }
+}
+```
+
+Wait for the status to become **Connected/available** before continuing.
+
+**2. Attach it to an agent.** This is the step that trips people up — Trae agents only see MCP servers you explicitly grant them. Go to **Agents → create or edit an agent → Tools → tick `godot-mcp`**, then save.
+
+**3. Select that agent** in the chat's agent dropdown.
+
+**4. First prompt:**
+
+> Run get_status, then list all scenes in this project.
+
+> If the tools never fire, check **MCP → godot-mcp → View logs** — Trae surfaces the raw stdio startup output there.
+
+---
+
+### Zed
+
+**1. Add a local server.** Either use the UI — **Settings → AI → MCP Servers → Add Server → Add Local Server** — or run `zed: open settings file` from the Command Palette and add:
+
+```json
+{
+  "context_servers": {
+    "godot-mcp": {
+      "command": "npx",
+      "args": ["-y", "@yanhuifair/godot-mcp", "-p", "."],
+      "env": {}
+    }
+  }
+}
+```
+
+Zed calls MCP servers **context servers** — the key is `context_servers`, not `mcpServers`. Everything else is the same.
+
+**2. Verify.** Go back to **Settings → AI → MCP Servers**. The dot next to `godot-mcp` should be **green** with the tooltip *"Server is active"*.
+
+**3. First prompt** in the Agent Panel:
+
+> Use the godot-mcp tools: run get_status, then list the scenes.
+
+> Mentioning the server by name meaningfully improves tool-selection accuracy in Zed. For guaranteed usage, create an [agent profile](https://zed.dev/docs/ai/agent-profiles) that turns off the built-in tools and leaves only `godot-mcp` on.
+
+---
+
+### JetBrains IDEs (Rider, IntelliJ, GoLand…)
+
+Relevant if you write **C# in Rider** against a Godot project. Requires a 2025.1+ IDE with the AI Assistant plugin (Junie shares the same MCP config).
+
+**1. Open** `Settings/Preferences → Tools → AI Assistant → Model Context Protocol (MCP)`.
+
+**2. Click `+`**, switch the dialog to **As JSON**, and paste:
+
+```json
+{
+  "mcpServers": {
+    "godot-mcp": {
+      "command": "npx",
+      "args": ["-y", "@yanhuifair/godot-mcp", "-p", "."]
+    }
+  }
+}
+```
+
+If your IDE launches processes without your shell's `PATH`, replace `"npx"` with the absolute path (`which npx` / `where npx`).
+
+**3. Apply**, then wait for the row to report a tool count instead of an error.
+
+**4. Use it** in the AI Assistant chat with **Codebase/Agent mode** enabled — plain chat mode does not call tools.
+
+---
+
+### OpenCode
+
+**1. Create `opencode.json`** in your project root (or `~/.config/opencode/opencode.json` for all projects):
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "godot-mcp": {
+      "type": "local",
+      "command": ["npx", "-y", "@yanhuifair/godot-mcp", "-p", "."],
+      "enabled": true,
+      "timeout": 30000
+    }
+  }
+}
+```
+
+Two OpenCode-specific gotchas:
+
+- `command` is a **single array**, not `command` + `args`.
+- The default tool-discovery `timeout` is **5000 ms**. Listing 358 tools plus a cold `npx` download regularly blows past that — bump it to `30000` as shown or the server will silently show zero tools.
+
+**2. Verify.** Start `opencode` in that folder. The MCP server appears at startup; tools are namespaced `godot-mcp_*`.
+
+**3. First prompt:**
+
+> use godot-mcp to run get_status and list all scenes
+
+---
+
+### Claude Desktop
+
+**1. Edit the config file:**
+
+- macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- Windows: `%APPDATA%\Claude\claude_desktop_config.json`
+- Linux: `~/.config/Claude/claude_desktop_config.json`
+
+Easier route: **Settings → Developer → Edit Config** opens the file directly.
+
+```json
+{
+  "mcpServers": {
     "godot-mcp": {
       "command": "npx",
       "args": ["-y", "@yanhuifair/godot-mcp", "-p", "/path/to/your/godot/project"]
@@ -719,15 +1090,25 @@ Cody is available as a VS Code extension. Add MCP config to VS Code user setting
 }
 ```
 
-After saving, open Cody chat (Cmd+Shift+/). Click the MCP icon in the chat input to see available tools. If tools don't appear, reload the VS Code window.
+Claude Desktop has no project folder, so the **absolute path is mandatory**.
 
-### Goose
+**2. Fully quit and relaunch.** Not "close the window" — quit the app (`Cmd+Q` / tray → Exit). Claude Desktop reads this file only at startup.
 
-Goose uses `~/.config/goose/config.yaml` (macOS/Linux) or `%APPDATA%\goose\config.yaml` (Windows):
+**3. Verify.** A **tools icon** appears in the chat input showing the tool count. If it's missing, check the log: `~/Library/Logs/Claude/mcp-server-godot-mcp.log` (macOS) or `%APPDATA%\Claude\logs\` (Windows).
+
+**4. First prompt:**
+
+> Get the Godot version and list all scenes in my project.
+
+---
+
+### Continue
+
+Continue (VS Code + JetBrains) reads `~/.continue/config.yaml`:
 
 ```yaml
-mcp_servers:
-  godot-mcp:
+mcpServers:
+  - name: godot-mcp
     command: npx
     args:
       - "-y"
@@ -736,23 +1117,157 @@ mcp_servers:
       - "/path/to/your/godot/project"
 ```
 
-After saving, restart Goose. Use `/mcp` to list available servers and `/tools` to browse tools:
+Older Continue installs use `~/.continue/config.json` with a `mcpServers` **array** instead — check which file exists before editing. Save, then reopen the Continue panel; tools are discovered automatically. MCP tools only fire in **Agent mode**.
+
+---
+
+### Cherry Studio
+
+Popular cross-platform desktop MCP client, fully GUI-driven.
+
+1. **Settings → MCP Servers → Add Server → Quick create**.
+2. Name: `godot-mcp` · Type: **STDIO** · Command: `npx`
+3. Arguments — **one per line**, not space-separated:
+   ```
+   -y
+   @yanhuifair/godot-mcp
+   -p
+   /path/to/your/godot/project
+   ```
+4. Save and toggle the server on. A green indicator plus a tool count means it's live.
+5. In a chat, enable the MCP server via the toolbox icon under the input box, then ask it to run `get_status`.
+
+> **Import from JSON** also works — paste [the universal snippet](#the-universal-snippet) with an absolute `-p` path.
+
+---
+
+### Goose
+
+**Interactive (recommended):**
+
+```bash
+goose configure
+# → Add Extension → Command-line Extension
+#   Name:    godot-mcp
+#   Command: npx -y @yanhuifair/godot-mcp -p /path/to/your/godot/project
+#   Timeout: 300
+```
+
+**Or edit `~/.config/goose/config.yaml` directly:**
+
+```yaml
+extensions:
+  godot-mcp:
+    name: godot-mcp
+    type: stdio
+    cmd: npx
+    args:
+      - "-y"
+      - "@yanhuifair/godot-mcp"
+      - "-p"
+      - "/path/to/your/godot/project"
+    enabled: true
+    timeout: 300
+```
+
+Goose calls MCP servers **extensions** and uses `cmd`, not `command`. Restart Goose, then run `/mcp` to confirm the connection.
+
+---
+
+### Aider
+
+Aider's MCP support is version-dependent — run `aider --help | grep -i mcp` first to see which flags your build has.
+
+```bash
+# Point Aider at a standard MCP JSON file
+aider --mcp-servers-file ./mcp.json
+
+# Or inline
+aider --mcp-servers '{"mcpServers":{"godot-mcp":{"command":"npx","args":["-y","@yanhuifair/godot-mcp","-p","."]}}}'
+```
+
+`./mcp.json` is just [the universal snippet](#the-universal-snippet). Persist it in `.aider.conf.yml`:
+
+```yaml
+mcp-servers-file: ./mcp.json
+```
+
+---
+
+### Any Other MCP Client
+
+If your client accepts a **local command**, give it:
 
 ```
-/mcp                      # List connected MCP servers
-/tools                    # Browse available tools
-List all scenes           # Direct tool invocation
+command: npx
+args:    -y  @yanhuifair/godot-mcp  -p  /path/to/your/godot/project
 ```
+
+If your client only accepts a **URL** (n8n, Dify, browser-based agents, hosted connectors), run the server yourself and point the client at the HTTP endpoint:
+
+```bash
+export GODOT_MCP_TOKEN="$(openssl rand -hex 32)"   # required for non-loopback binds
+npx -y @yanhuifair/godot-mcp -p /path/to/your/godot/project -t all --port 3000
+```
+
+| Endpoint | URL |
+|---|---|
+| Streamable HTTP (MCP 2025) | `http://127.0.0.1:3000/mcp` |
+| SSE (legacy clients) | `http://127.0.0.1:3000/sse` |
+| Health check | `http://127.0.0.1:3000/health` |
+
+See [Transport Modes](#transport-modes) for the full details.
+
+---
+
+### Make Your Agent Use the Tools Well
+
+358 tools is more than most models can keep straight, and many clients only forward a slice of them to the model. Two minutes of setup fixes this.
+
+**1. Drop a rules file in your project.** Agents auto-read these: `AGENTS.md` (Codex, OpenCode, Cursor, Gemini CLI, Zed), `CLAUDE.md` (Claude Code), `.cursor/rules/*.mdc` (Cursor), `.clinerules` (Cline / Roo Code), `.github/copilot-instructions.md` (Copilot).
+
+```markdown
+## Godot MCP
+
+This project has the `godot-mcp` server attached (358 tools).
+
+- Never guess a tool name. Call `search_tools` with a keyword first —
+  e.g. search_tools("tileset"), search_tools("animation"), search_tools("navmesh").
+- On `EDITOR_NOT_REACHABLE` or `RUNTIME_NOT_REACHABLE`, call `get_status`
+  and tell me what's missing instead of retrying blindly.
+- Prefer the file tools (read_scene, write_script, create_resource…).
+  They work with Godot closed and are the fastest path.
+- Use `editor_*` tools only when the change must show up in a live editor.
+- Use `runtime_*` tools only after the game is actually running (F5).
+- Always `read_scene` before `add_node` so the parent NodePath is correct.
+- Read a script before rewriting it; never blank a file you haven't read.
+```
+
+**2. Let it look before it touches.** For a first run on an unfamiliar project, add `--read-only` to `args`. The server then rejects every write tool at the boundary, so no amount of enthusiasm from the model can damage your project.
+
+**3. Two prompts worth memorizing:**
+
+> `get_status` — what is currently reachable (editor? running game?) and how many tools are loaded.
+> `search_tools("<keyword>")` — the right tool name, ranked, without burning context on a 358-item list.
+
+---
 
 ### Troubleshooting
 
-| Problem | Solution |
+| Symptom | Cause & fix |
 |---|---|
-| Server not starting | Ensure Node.js >= 18: `node -v` |
-| "Command not found" | Use `npx` method or `npm install -g @yanhuifair/godot-mcp` |
-| Plugin not showing in Godot | Click Restart in the Plugins tab, or reopen the project |
-| Editor process won't start | Ensure Godot is installed and in PATH, or set `GODOT_PATH` |
-| Tools not appearing in chat | Reload VS Code: `Cmd+Shift+P` -> `Developer: Reload Window` |
+| No tools show up at all | The client is in Ask/Chat mode. Switch to **Agent** mode — most clients don't call tools otherwise. |
+| Server "fails to start", no error | JSON syntax. A trailing comma or a smart quote from a copy-paste is the usual culprit — validate the file. |
+| `spawn npx ENOENT` (Windows) | Change `"command": "npx"` to `"npx.cmd"`, or use the absolute path from `where npx`. |
+| `spawn npx ENOENT` (macOS/Linux GUI apps) | The app launched without your shell `PATH`. Use the absolute path from `which npx`. |
+| Server times out on first launch | `npx` is downloading the package. Run `npx -y @yanhuifair/godot-mcp --help` once in a terminal to warm the cache, and raise the client's startup timeout. |
+| `Project not found` | `-p .` only works when the client's working directory *is* the Godot project. Switch to an absolute path. |
+| Connected, but 0 tools | Tool-discovery timeout too low (notably OpenCode's 5 s default). Raise it to 30 s. |
+| File tools work, `editor_*` tools fail | The editor plugin isn't running. Run `--enable-plugin`, reload the project in Godot, and check `get_status`. |
+| `RUNTIME_NOT_REACHABLE` | The game isn't running, or the runtime autoload isn't registered. See [Tool Discovery & Live Game Runtime](#tool-discovery--live-game-runtime). |
+| Godot can't be found | Set `GODOT_PATH` in the config's `env` block to the Godot binary. |
+| Model picks the wrong tool | Add the rules file above, and tell it to call `search_tools` first. |
+| Node.js too old | `node -v` must be **≥ 18**. |
 
 ---
 
@@ -848,7 +1363,7 @@ npx @yanhuifair/godot-mcp --enable-plugin -p /path/to/your/godot/project
 
 This installs the plugin to `addons/godot-mcp/` and auto-enables it in `project.godot`. No manual steps required.
 
-### Editor Commands (89 tools)
+### Editor Commands (123 tools)
 
 **View & Selection:** `editor_get_selection` `editor_set_selection` `editor_get_open_scene` `editor_read_current_scene` `editor_get_info` `editor_get_rect` `editor_focus` `editor_show_in_filesystem` `editor_open_dock`
 
@@ -882,12 +1397,72 @@ This installs the plugin to `addons/godot-mcp/` and auto-enables it in `project.
 
 ---
 
+## Tool Discovery & Live Game Runtime
+
+Most MCP servers can only touch the editor. Godot MCP can also **drive the game you are actually playing** — a tier no other public Godot MCP offers. This enables AI-driven playtesting, runtime-state debugging, automated gameplay verification, and live screenshots.
+
+### Enable the Runtime Autoload
+
+The runtime bridge is a separate, lightweight autoload — it does not modify the editor plugin. Add it once per project:
+
+1. Make sure the editor plugin is installed (`npx @yanhuifair/godot-mcp --enable-plugin -p .`). The runtime bridge script ships inside the same `addons/godot-mcp/` folder.
+2. In the Godot editor, open **Project → Project Settings → Globals → Autoload**.
+3. Add `addons/godot-mcp/runtime_bridge.gd` with the autoload name **`godot_mcp_runtime`** and enable it.
+4. Run the game from the editor (F5). The autoload prints `[godot-mcp-runtime] Listening on 127.0.0.1:9877` to the output log.
+
+> **Security**: the bridge binds `127.0.0.1` only — it is never reachable from the LAN. It runs with `process_mode = PROCESS_MODE_ALWAYS`, so pausing the game (via `runtime_freeze` or the editor) does not stop the bridge from receiving commands.
+
+### Runtime Tools (11)
+
+| Tool | Description |
+|---|---|
+| `runtime_ping` | Check if the live-game runtime bridge is reachable. |
+| `runtime_get_tree` | Read the running game scene tree (live, inside the played game). |
+| `runtime_get_node` | Read live properties of a node in the running game. |
+| `runtime_set_node` | Set properties on a node in the running game (live mutation). |
+| `runtime_call_method` | Call a method on a node in the running game. |
+| `runtime_emit_signal` | Emit a signal on a node in the running game. |
+| `runtime_input` | Inject a key input event into the running game (keycode + press/release). |
+| `runtime_freeze` | Pause (freeze) the running game. |
+| `runtime_resume` | Resume (unpause) the running game. |
+| `runtime_step` | Advance the running game by N frames deterministically while paused (frame stepping). |
+| `runtime_screenshot` | Capture a screenshot of the running game viewport. |
+
+### Example workflow
+
+```
+"Run the game, freeze it, then step 5 frames and screenshot"
+  → runtime_ping → runtime_freeze → runtime_step { frames: 5 } → runtime_screenshot
+
+"Set the Player's health to 0 and emit died"
+  → runtime_set_node { path: "Player", properties: { "health": "0" } }
+  → runtime_emit_signal { path: "Player", signal: "died" }
+```
+
+If the runtime tools return a `RUNTIME_NOT_REACHABLE` error, run `get_status` — it reports whether the autoload is reachable and how to enable it.
+
+### Tool Discovery & Diagnostics (Meta, 2 tools)
+
+With 358 tools, guessing the right name wastes tokens. Two discovery tools help:
+
+| Tool | Description |
+|---|---|
+| `search_tools` | Search all tools by keyword/description to discover the right tool name. AND-combines space-separated words; name matches rank higher. |
+| `get_status` | System status / diagnostics: editor bridge, live-game runtime bridge, and tool count. Use to debug connection issues. |
+
+```
+"Find tools that deal with collision shapes"  → search_tools { keyword: "collision shape" }
+"What subsystems are available right now?"    → get_status
+```
+
+---
+
 ## All Tools
 
 Click each category to expand and see all tools with descriptions.
 
 <details>
-<summary>Editor (89 tools) — Live editor control</summary>
+<summary>Editor (123 tools) — Live editor control</summary>
 
 | Tool | Description |
 |---|---|
@@ -1180,6 +1755,35 @@ Click each category to expand and see all tools with descriptions.
 </details>
 
 <details>
+<summary>Meta / Discovery (2 tools) — Tool search + system diagnostics</summary>
+
+| Tool | Description |
+|---|---|
+| `search_tools` | Search all tools by keyword/description to discover the right tool name. Use this instead of guessing among 350+ tools. |
+| `get_status` | System status / diagnostics: editor bridge, live-game runtime bridge, and tool count. Use to debug connection issues. |
+
+</details>
+
+<details>
+<summary>Runtime (game) (11 tools) — Control the running game</summary>
+
+| Tool | Description |
+|---|---|
+| `runtime_ping` | Check if the live-game runtime bridge is reachable. |
+| `runtime_get_tree` | Read the running game scene tree (live, inside the played game). |
+| `runtime_get_node` | Read live properties of a node in the running game. |
+| `runtime_set_node` | Set properties on a node in the running game (live mutation). |
+| `runtime_call_method` | Call a method on a node in the running game. |
+| `runtime_emit_signal` | Emit a signal on a node in the running game. |
+| `runtime_input` | Inject a key input event into the running game. |
+| `runtime_freeze` | Pause (freeze) the running game. |
+| `runtime_resume` | Resume (unpause) the running game. |
+| `runtime_step` | Advance the running game by N frames deterministically while paused (frame stepping). |
+| `runtime_screenshot` | Capture a screenshot of the running game viewport. |
+
+</details>
+
+<details>
 <summary>Remaining Categories</summary>
 
 **Domain (11):** `read_curve`, `create_curve`, `read_gradient`, `create_gradient`, `list_paths`, `read_path`, `list_skeletons`, `read_skeleton`, `read_reflection_probe`, `read_multimesh`, `create_noise_texture`
@@ -1284,13 +1888,13 @@ npm run test:watch   # Watch mode
 
 ```bash
 npm run vsix
-# Output: godot-mcp-1.7.0.vsix
+# Output: godot-mcp-1.9.0.vsix
 ```
 
 Install in VS Code:
 
 ```bash
-code --install-extension godot-mcp-1.7.0.vsix
+code --install-extension godot-mcp-1.9.0.vsix
 ```
 
 ---
@@ -1304,9 +1908,37 @@ code --install-extension godot-mcp-1.7.0.vsix
 
 ---
 
+## FAQ
+
+**Do I need to keep Godot open?**
+No. Every file-based tool — scenes, resources, scripts, shaders, project settings — uses native parsers and runs instantly against files on disk. Only the live editor tools (123) and live game runtime tools (11) need Godot running, and the server can launch it for you automatically.
+
+**Does it support Godot 3?**
+No. Godot **4.x** only. Godot 3's file formats and editor APIs differ too much to support cleanly.
+
+**Which AI clients work with it?**
+Any MCP-compatible client. Verified with Claude Desktop, Claude Code, Cursor, VS Code (Copilot), Windsurf, Codex, Cline, Roo Code, Aider, Cody, Goose, and Continue.
+
+**How does the AI pick the right tool out of 358?**
+Use `search_tools` — it ranks the catalog by keyword against tool names and descriptions, so the AI can find `add_audio_bus_effect` without loading all 358 schemas into context. `get_status` reports which subsystems (editor bridge, game runtime) are currently reachable.
+
+**What makes the runtime tools different from the editor tools?**
+Editor tools talk to the Godot **editor**. Runtime tools talk to the **running game** through a lightweight autoload on `127.0.0.1:9877`. That's what enables freezing the game, stepping an exact number of frames, and screenshotting a precise gameplay moment.
+
+**Is it safe to let an AI edit my project?**
+Destructive file operations write `.bak` backups, tools are classified read-only vs. write, and every failure returns a typed error code with a repair hint rather than silently corrupting a file. Use version control anyway.
+
+---
+
+## Keywords
+
+Godot MCP · Godot MCP server · Model Context Protocol Godot · Godot AI assistant · Godot AI agent · Godot Engine 4 MCP · GDScript AI · AI game development · Godot Copilot · Claude Godot integration · Cursor Godot · VS Code Godot MCP · Windsurf Godot · Cline Godot · Godot automation · Godot scene editing API · `.tscn` parser · `.tres` parser · Godot shader AI · VisualShader automation · Godot debugging AI · Godot runtime inspection · AI game engine tooling · MCP server for game engines · Godot编辑器 AI · Godot 自动化 · Godot 智能体
+
+---
+
 ## License
 
-MIT
+AGPL-3.0-or-later
 
 ## Tip
 ![alt text](tip.JPG)

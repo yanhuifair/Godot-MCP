@@ -1,4 +1,24 @@
 # Changelog
+## v1.9.0 (2026-08-05)
+
+### License
+- **Switched from MIT to AGPL-3.0-or-later.** `LICENSE.md` now carries the full GNU AGPL v3.0 text; all source/addon SPDX headers, `package.json`, and `package-lock.json` updated accordingly. (AGPL strengthens the network-use copyleft clause — anyone offering godot-mcp as a network service must share their corresponding source.)
+
+### Docs
+- **Rewrote "AI Client Configuration"** into a step-by-step guide covering **18 clients** (Claude Code, Cursor, VS Code / GitHub Copilot, Codex, Gemini, Windsurf, Cline, Roo Code, Trae, Zed, JetBrains, OpenCode, Claude Desktop, Continue, Cherry Studio, Goose, Aider, and a generic catch-all) — each with config snippet, verify step, and a starter prompt. Includes a universal `mcpServers` snippet, client-specific gotchas (OpenCode 30s timeout, Goose `cmd`, Trae two-step attach, etc.), an `AGENTS.md` rules-file template, and a troubleshooting table.
+- **Corrected documentation counts** that had drifted from the registry: **358 tools across 29 categories** (was "26 categories") and **123 editor tools** (was "89"). The Feature Overview table was rebuilt to match `src/tools/register.ts` exactly (29 rows summing to 358).
+
+## v1.8.0 (2026-08-04)
+
+### New Tools (+13, total 358 across 29 categories)
+- **Meta / Discovery (2)** — `search_tools` (keyword search across the full tool catalog so an agent never has to guess among 350+ tools) and `get_status` (system diagnostics: editor-bridge health, live-game runtime-bridge health, tool count + subsystem list).
+- **Live-game Runtime tier (11)** — control the *running* game via a new `runtime_bridge.gd` autoload (enable it as an autoload named `godot_mcp_runtime`): `runtime_ping`, `runtime_get_tree`, `runtime_get_node`, `runtime_set_node`, `runtime_call_method`, `runtime_emit_signal`, `runtime_input`, `runtime_freeze`, `runtime_resume`, `runtime_step` (deterministic frame-stepping), `runtime_screenshot`. Enables deterministic playtesting instead of the flaky "wait + screenshot" loop.
+
+### DX / Reliability
+- Global registry singleton so meta/discovery tools can search the catalog.
+- New `RUNTIME_NOT_REACHABLE` error code with setup hints.
+- Added `addons/godot-mcp/runtime_bridge.gd` (game-side autoload, loopback TCP :9877).
+
 ## v1.7.0 (2026-08-04)
 
 ### New Tools (+63, total 345 across 26 categories)

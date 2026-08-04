@@ -1,16 +1,35 @@
-# <div align="center">Godot MCP</div>
+<div align="center">
 
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+# Godot MCP
+
+### 功能最完整的 Godot 引擎 MCP 服务器——**358 个工具**，让 AI 助手真正"上手"操作你的游戏项目。
+
+[![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE.md)
 [![CI](https://github.com/yanhuifair/Godot-MCP/actions/workflows/ci.yml/badge.svg)](https://github.com/yanhuifair/Godot-MCP/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/@yanhuifair/godot-mcp)](https://www.npmjs.com/package/@yanhuifair/godot-mcp)
+[![npm downloads](https://img.shields.io/npm/dm/@yanhuifair/godot-mcp)](https://www.npmjs.com/package/@yanhuifair/godot-mcp)
+[![Tools](https://img.shields.io/badge/tools-358-orange)](#全部工具列表)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-green)](.)
 [![Godot](https://img.shields.io/badge/godot-4.x-blue)](https://godotengine.org)
 
 [English](README.md) | [中文文档](README-zh.md)
 
+</div>
+
 ---
 
-**Model Context Protocol (MCP) 服务器**，使 AI 助手能够与 Godot Engine 项目交互。AI 可以读取、检查、修改 Godot 项目的各个方面——从场景文件和脚本到材质、动画、音频总线和实时编辑器。**345 个工具、26 个分类、支持 12 种 AI 客户端。**
+**Godot MCP** 是一个 [Model Context Protocol](https://modelcontextprotocol.io) 服务器，把任意 AI 助手——**Claude、Cursor、VS Code Copilot、Windsurf、Cline、Codex、Aider**——直接接入 **Godot Engine 4.x**。AI 不再靠猜测理解你的项目，而是真正地*操作*它。
+
+- 📂 **原生读写项目文件** — `.tscn` 场景、`.tres` 资源、GDScript、C#、`.gdshader`、`project.godot`。自研解析器，无需启动 Godot 进程，响应即时。
+- 🎛️ **驱动实时编辑器** — 选择节点、连接信号、编写可视化着色器、烘焙光照贴图、设置断点、单步调试、运行与停止游戏。
+- 🎮 **深入正在运行的游戏** — 检查实时场景树、调用方法、注入输入，**冻结游戏、逐帧步进、并对结果截图**。这是目前唯一能做到这一点的公开 Godot MCP。
+- 🔎 **规模化仍然好用** — `search_tools` 从 358 个工具中精准定位，`get_status` 直接告诉你哪些子系统已连接，每个错误都返回类型化错误码和修复建议。
+
+**358 个工具 · 29 个分类 · 18 种 AI 客户端 · 4 条通信路径 · 一条命令完成配置。**
+
+```bash
+npx @yanhuifair/godot-mcp --enable-plugin -p .
+```
 
 | 依赖 | |
 |---|---|
@@ -20,37 +39,83 @@
 
 ---
 
+## 为什么选择 Godot MCP
+
+| | **Godot MCP** | 其他 Godot MCP 服务器 |
+|---|---|---|
+| **工具数量** | **358 个**，29 个分类 | 16 – 156 个 |
+| **无需 Godot 运行** | ✅ 原生 `.tscn` / `.tres` / `.godot` 解析器 | ⚠️ 通常必须开着编辑器 |
+| **实时编辑器控制** | ✅ 123 个工具——运行、调试、断点、视口、烘焙 | 部分支持 |
+| **控制_正在运行的游戏_** | ✅ **11 个工具**——实时场景树、方法调用、输入注入 | ❌ 无 |
+| **确定性逐帧步进** | ✅ `runtime_freeze` → `runtime_step` → `runtime_screenshot` | ❌ 无 |
+| **大规模工具发现** | ✅ `search_tools` + `get_status` | ❌ 无 |
+| **错误信息** | ✅ 类型化错误码 + 可执行的修复建议 | 原始堆栈 |
+| **传输方式** | Stdio · SSE · Streamable HTTP | 通常仅 stdio |
+| **编辑器插件安装** | ✅ 一条命令，自动启用 | 手动拷贝 |
+| **引擎自省** | ✅ 实时 ClassDB——类、方法、属性、信号、文档 | 少见 |
+
+如果你曾经想说一句 *"运行游戏，在玩家落地那一刻冻结，把碰撞状态给我看看"*——这就是真正能做到的那个服务器。
+
+---
+
 ## 目录
 
-1. [快速开始](#快速开始)
-2. [功能](#功能)
-3. [架构](#架构)
-4. [实现原理](#实现原理)
-5. [传输模式](#传输模式)
-6. [安装](#安装)
-7. [配置 AI 客户端](#配置-ai-客户端)
-8. [使用示例](#使用示例)
-9. [编辑器插件](#编辑器插件)
-10. [全部工具列表](#全部工具列表)
-11. [支持格式](#支持格式)
-12. [开发](#开发)
-13. [构建 VSIX](#构建-vsix)
+1. [为什么选择 Godot MCP](#为什么选择-godot-mcp)
+2. [快速开始](#快速开始)
+3. [功能](#功能)
+4. [架构](#架构)
+5. [实现原理](#实现原理)
+6. [传输模式](#传输模式)
+7. [安装](#安装)
+8. [配置 AI 客户端](#配置-ai-客户端)
+9. [使用示例](#使用示例)
+10. [编辑器插件](#编辑器插件)
+11. [工具发现与实时游戏运行时](#工具发现与实时游戏运行时)
+12. [全部工具列表](#全部工具列表)
+13. [支持格式](#支持格式)
+14. [开发](#开发)
+15. [构建 VSIX](#构建-vsix)
 
 ---
 
 ## 快速开始
 
-### 第 1 步：安装编辑器插件
+**两步配置，约两分钟。** 你**不需要**全局安装任何东西，也**不需要**一直开着终端——AI 客户端会自动帮你把服务器拉起来。
+
+### 开始之前
+
+| 需要准备 | 怎么确认 |
+|---|---|
+| **Godot 4.x** | 打开 Godot，标题栏会显示版本号。*（不支持 Godot 3）* |
+| **Node.js 18 或更高** | 终端里执行 `node -v`。若提示 `command not found`，去 [nodejs.org](https://nodejs.org) 安装。 |
+| **一个支持 MCP 的 AI 客户端** | VS Code + Copilot、Cursor、Claude Desktop、Windsurf、Cline……[完整列表在这里](#配置-ai-客户端)。 |
+
+### 第 1 步 —— 安装编辑器插件
+
+打开终端，`cd` 进入你的 Godot 项目目录（也就是含有 `project.godot` 的那个文件夹），执行：
 
 ```bash
-npx @yanhuifair/godot-mcp --enable-plugin -p /path/to/your/godot/project
+npx @yanhuifair/godot-mcp --enable-plugin -p .
 ```
 
-此命令将插件复制到 `addons/godot-mcp/` 并自动在 `project.godot` 中启用。无需手动操作 Godot。
+> `-p .` 表示"当前这个目录"。你也可以在任意位置用绝对路径：
+> `npx @yanhuifair/godot-mcp --enable-plugin -p /Users/me/games/my-game`
 
-### 第 2 步：配置 AI 客户端
+**这条命令做了什么：** 把插件复制到 `addons/godot-mcp/`，并直接在 `project.godot` 里把它打开。不需要你在 Godot 里点任何按钮。
 
-在项目根目录创建 `.vscode/mcp.json`：
+**怎么确认成功：** 项目里应该出现了 `addons/godot-mcp/` 目录。如果 Godot 已经开着，重新加载一下项目（项目 → 重新加载当前项目）让它识别插件。
+
+<details>
+<summary>这一步是必须的吗？</summary>
+
+只有在你需要**实时编辑器**和**实时游戏**能力时才必须——比如运行场景、读取当前选中节点、打断点、烘焙光照贴图、冻结正在跑的游戏……
+
+358 个工具中有 **220 多个**（所有读写 `.tscn`、`.tres`、`.gd`、着色器、项目设置的工具）**不需要插件，甚至不需要打开 Godot** 就能用。如果这些已经够用，可以直接跳到第 2 步。
+</details>
+
+### 第 2 步 —— 让 AI 客户端连上服务器
+
+在项目根目录创建 `.vscode/mcp.json`（这份配置可直接用于 **VS Code / GitHub Copilot**）：
 
 ```json
 {
@@ -64,23 +129,47 @@ npx @yanhuifair/godot-mcp --enable-plugin -p /path/to/your/godot/project
 }
 ```
 
-参见[配置 AI 客户端](#配置-ai-客户端)了解 Cursor、Claude Desktop、Windsurf、Codex、Cline、Aider、Cody、Goose 等客户端的配置方法。
+然后**重启 AI 客户端**，让它读取新配置。
 
-### 第 3 步：开始对话
+> 用的是别的客户端？配置文件的名字和位置各不相同，但 `command` / `args` 部分基本完全一样。**Cursor、Claude Desktop、Claude CLI、Windsurf、OpenAI Codex、Cline、Roo Code、Continue、Aider、Cody、Goose、Zed** 的可直接复制的配置块都在[配置 AI 客户端](#配置-ai-客户端)。
 
-AI 客户端自动启动 MCP 服务器。基于文件的工具（.tscn、.tres、.gd）立即可用。编辑器工具（运行、选择节点、调试）会触发 MCP 自动启动 Godot。
+### 第 3 步 —— 先验证，再开聊
+
+对 AI 说：
+
+```
+"运行 get_status"
+```
+
+它应该会返回工具总数，以及编辑器桥 / 运行时桥是否连通。看到这个就说明全部接好了。接着试试：
 
 ```
 "列出项目中所有场景"
-"找到所有 CharacterBody2D 节点"
+"找到所有 CharacterBody2D 节点，并告诉我它们的碰撞层"
 "运行游戏并截图"
 ```
+
+358 个工具无法一次性全塞给 AI——当它不确定有哪些能力时，让它 **`search_tools`** 就行（例如："search_tools 搜一下 animation"）。
+
+<details>
+<summary>不工作？看这里</summary>
+
+| 现象 | 解决办法 |
+|---|---|
+| 客户端里看不到 `godot-mcp` 的工具 | 重启客户端。配置文件只在启动时读取一次。 |
+| `npx: command not found` | Node.js 没装，或者不在 `PATH` 里。执行 `node -v` 确认。 |
+| 报 `Project not found` | `-p` 必须指向含有 `project.godot` 的目录。`"."` 只在客户端的工作目录**就是**你的项目时才有效，否则请用绝对路径。 |
+| 文件类工具正常，编辑器工具失败 | 插件没装或没启用。重跑第 1 步，然后在 Godot 里重新加载项目。 |
+| `EDITOR_NOT_REACHABLE` | Godot 没在运行，或插件未启用。服务器会尝试自己拉起 Godot；若失败，请手动用 Godot 打开项目，并检查 项目 → 项目设置 → 插件 → **Godot MCP** 是否已勾选。 |
+| 找不到 Godot 可执行文件 | 设置环境变量 `GODOT_PATH` 指向 Godot 可执行文件，参见[环境变量](#环境变量)。 |
+
+</details>
 
 ---
 
 ## 功能
 
-Godot MCP 通过 345 个工具、26 个分类，全面覆盖 Godot 4.x 引擎。
+Godot MCP 通过 358 个工具、29 个分类，全面覆盖 Godot 4.x 引擎。
 
 ### 快速演示
 
@@ -100,34 +189,37 @@ npx @yanhuifair/godot-mcp --enable-plugin -p .
 
 | 分类 | 工具数 | 说明 |
 |---|---|---|
-| Editor | 89 | 实时编辑器控制——选择、播放、撤销、保存、断点、文件操作、性能 |
-| Scene | 22 | 场景 CRUD——节点、信号、变换、碰撞、精灵 |
-| Project | 21 | 配置文件、输入映射、文件操作、自动加载、验证、无用资源检测 |
-| Script | 21 | GDScript/Shader CRUD、结构分析、代码注入、验证 |
-| Domain | 11 | 曲线、渐变、路径、骨骼、反射探针、MultiMesh、噪声纹理 |
-| Animation | 10 | AnimationPlayer/AnimationTree——轨道、关键帧、参数 |
-| Godot Engine | 9 | 引擎检测、启动编辑器、运行/导出项目、截图 |
-| Coverage | 18 | 网格图元、2D 灯光、车辆、弹簧臂、贴花、遮挡器、网格地图 |
-| Nodes | 8 | CharacterBody、AnimatedSprite、Audio、Video、Parallax、RichText、Container、Tab |
-| Resource | 8 | .tres CRUD、PBR 材质、主题、14 种模板 |
-| Audio | 7 | 音频总线布局、效果器、音量 |
-| Shader Graph | 8 | VisualShader 图——40+ 节点类型、连接、参数 |
-| Utility | 6 | 信号目录、StyleBox、AtlasTexture、弹窗列表、内聚报告 |
-| Rendering | 5 | MeshInstance、Viewport、Area、RayCast/ShapeCast |
-| Environment | 4 | Environment 读写、4 种预设 |
-| Inspector | 5 | Camera、Light、Particle 节点检查 |
-| Physics | 4 | PhysicsMaterial CRUD、碰撞层 |
-| Import | 3 | .import 文件读写 |
-| TileMap | 3 | TileSet 资源、TileMapLayer 检查 |
-| Navigation | 3 | NavigationRegion、NavigationMesh |
-| Translation | 3 | CSV/PO 翻译文件 |
-| Joints | 3 | 物理关节——创建、配置、列表 |
-| UID | 3 | 文件 UID 查询、批量更新、缺失检测 |
-| 2D Geometry | 2 | CollisionPolygon2D、形状点编辑 |
-| Diff | 2 | 场景与资源对比 |
-| Other | 4 | GDExtension、C#、World3D、Texture |
+| Editor | 123 | 实时编辑器控制——选择、播放、撤销、保存、断点、文件操作、性能 |
+| 项目 | 21 | 配置文件、输入映射、文件操作、自动加载、验证、无用资源检测 |
+| 场景 | 22 | 场景 CRUD——节点、信号、变换、碰撞、精灵 |
+| 脚本 + 着色器 | 21 | GDScript/着色器 CRUD、结构分析、代码注入、验证 |
+| 域对象 | 14 | 曲线、渐变、路径、骨骼、反射探针、MultiMesh、噪声纹理 |
+| 动画 | 10 | AnimationPlayer/AnimationTree——轨道、关键帧、参数 |
+| Godot 引擎 | 9 | 引擎检测、启动编辑器、运行/导出项目、截图 |
+| 覆盖工具 | 18 | 网格图元、2D 灯光、车辆、弹簧臂、贴花、遮挡器、网格地图 |
+| 节点检查器 | 8 | CharacterBody、AnimatedSprite、Audio、Video、Parallax、RichText、Container、Tab |
+| 资源 | 8 | .tres CRUD、PBR 材质、主题、14 种模板 |
+| 音频 | 7 | 音频总线布局、效果器、音量 |
+| 着色器图 | 8 | VisualShader 图——40+ 节点类型、连接、参数 |
+| 工具集 | 9 | 信号目录、StyleBox、AtlasTexture、弹窗列表、内聚报告 |
+| 渲染 | 5 | MeshInstance、Viewport、Area、RayCast/ShapeCast |
+| 环境 | 6 | Environment 读写、预设 |
+| 检查器 | 5 | Camera、Light、Particle 节点检查 |
+| 物理 | 5 | PhysicsMaterial CRUD、碰撞层 |
+| 导入 | 3 | .import 文件读写 |
+| 瓦片地图 | 5 | TileSet 资源、TileMapLayer 检查 |
+| 导航 | 6 | NavigationRegion、NavigationMesh |
+| 翻译 | 5 | CSV/PO 翻译文件 |
+| 关节 | 5 | 物理关节——创建、配置、列表 |
+| UID | 4 | 文件 UID 查询、批量更新、缺失检测 |
+| 2D 几何 | 4 | CollisionPolygon2D、形状点编辑 |
+| 差异对比 | 5 | 场景与资源对比 |
+| 纹理 | 4 | 纹理导入/读写、图集、噪声 |
+| 扩展/世界/C# | 5 | GDExtension、C#、World3D、CSProj |
+| 元信息 / 内省 | 2 | 工具搜索（search_tools）+ 系统诊断（get_status） |
+| 运行时（游戏） | 11 | 控制正在运行的游戏——场景树、属性、方法、信号、输入、冻结/步进、截图 |
 
-**总计：345 个工具，26 个分类**
+**总计：358 个工具，29 个分类**
 
 ### 核心能力详解
 
@@ -155,11 +247,17 @@ npx @yanhuifair/godot-mcp --enable-plugin -p .
 **渲染与环境**
 检查 MeshInstance3D、Viewport、Area 和 RayCast 节点。创建和配置 Environment 资源（4 种预设）。管理 2D 灯光、贴花和遮挡器。读取 3D 网格图元（Box、Sphere、Capsule、Cylinder、Torus 等）。
 
-**实时编辑器控制（89 个工具）**
+**实时编辑器控制（123 个工具）**
 通过 TCP 或 stdio 桥与 Godot 编辑器实时交互：选择节点、运行/停止/暂停项目、撤销/重做、保存场景、创建和附加脚本、设置断点、单步调试、求值表达式、控制 3D 视口相机、烘焙光照贴图和导航网格、管理插件、模拟按键。
+
+**实时游戏运行时控制（11 个工具）**
+超越编辑器，直接深入**正在运行的游戏**。检查带真实坐标的实时场景树，在运行时读写节点属性，调用任意方法，发射信号，注入键盘输入——以及最核心的能力：`runtime_freeze` 冻结游戏、`runtime_step` 精确前进指定帧数、`runtime_screenshot` 截取结果。这让 AI 驱动的玩法调试变得确定且可复现。
 
 **可视着色器图**
 以编程方式创建和修改 VisualShader 图。从 40+ 类型的目录（常量、数学运算、纹理、输入）中添加节点，连接节点端口，设置节点参数，列出可用节点类型及其默认输入/输出配置。
+
+**引擎自省（ClassDB）**
+查询实时引擎的 ClassDB：列出全部类，检查任意 Godot 类型的方法、属性和信号，读取内置类文档，搜索帮助系统。AI 基于事实工作，而不是凭空臆造 API。
 
 **TileMap、导航和翻译**
 检查 TileSet 资源和 TileMapLayer 节点。列出和读取 NavigationRegion 节点，创建 NavigationMesh 资源。读取和创建带搜索功能的 CSV/PO 翻译文件。
@@ -178,7 +276,7 @@ npx @yanhuifair/godot-mcp --enable-plugin -p .
   |   Claude 等)     |                                        |                  |
   +-----------------+                                        |  +-------------+ |
                                                              |  | 工具注册表    | |
-                                                             |  |  (345 工具)  | |
+                                                             |  |  (358 工具)  | |
                                                              |  +------+------+ |
                                                              |         |        |
                                                              |    +----v-----+  |
@@ -200,7 +298,7 @@ npx @yanhuifair/godot-mcp --enable-plugin -p .
 
 ### 通信路径
 
-服务器根据操作类型使用三种不同的通信路径：
+服务器根据操作类型使用四种不同的通信路径：
 
 1. **直接文件 I/O** — 对于基于文件的工具（read_scene、write_script、create_resource 等），服务器使用自定义解析器直接读写磁盘上的 Godot 项目文件。无需启动 Godot 进程。这是最快的路径。
 
@@ -210,6 +308,8 @@ npx @yanhuifair/godot-mcp --enable-plugin -p .
    - **TCP 模式**（默认）：连接到已在 `localhost:9876` 上运行的 Godot。编辑器插件监听此端口。
    - **Stdio 模式**（回退）：以 `--editor --path <project>` 启动 Godot 子进程，设置 `MCP_STDIO=true`，通过 stdin/stdout 使用 JSON-RPC 通信，响应以 `__MCP__:` 前缀标记。此模式根据需要自动启动和重新启动 Godot（最多 3 次）。
 
+4. **实时游戏运行时桥** — 对于运行时工具（`runtime_*`，如 `runtime_get_tree`、`runtime_set_node`、`runtime_step`），MCP 服务器与运行在你**正在游玩的游戏内部**的一个小型 Autoload 通信，地址为 `127.0.0.1:9877`。该 Autoload（`addons/godot-mcp/runtime_bridge.gd`，命名为 `godot_mcp_runtime`）需添加到你的项目中，且仅监听本机回环地址。这让 AI 能够检查并修改实时场景树、注入输入、暂停/恢复、确定性地逐帧步进，以及对运行中的游戏截图——这是其他公开 Godot MCP 都未开箱提供的层级。
+
 ### 项目结构
 
 ```
@@ -218,7 +318,7 @@ godot-mcp/
 │   ├── index.ts              # CLI 入口点，参数解析，传输调度
 │   ├── server.ts             # MCP 服务器工厂，工具注册，请求路由
 │   ├── tools/                # 29 个工具处理文件（每个分类一个）
-│   │   ├── register.ts       # 集中注册（345 个工具）
+│   │   ├── register.ts       # 集中注册（358 个工具）
 │   │   ├── project.ts        # 项目管理工具
 │   │   ├── scene.ts          # 场景编辑工具
 │   │   ├── script.ts         # 脚本和着色器工具
@@ -398,32 +498,85 @@ npx @yanhuifair/godot-mcp -t all --port 3000 -p /path/to/your/godot/project
 
 ```bash
 curl http://127.0.0.1:3000/health
-# {"status":"ok","version":"1.7.0","projectRoot":"/path/to/project","endpoints":{...}}
+# {"status":"ok","version":"1.9.0","projectRoot":"/path/to/project","endpoints":{...}}
 ```
 
 ---
 
 ## 安装
 
-### npx（推荐，无需预安装）
+> **先看这句。** 日常使用中你**不需要**自己去启动这个服务器——AI 客户端会用配置文件里的 `command` 在后台把它拉起来。下面这些命令是用于**安装包本体**，以及**手动/进阶场景**（HTTP 传输、调试、CI）。
+
+### 我该用哪种方式？
+
+| 方式 | 适合谁 | 代价 |
+|---|---|---|
+| **npx**（推荐） | 绝大多数人 | 无需安装，永远拿到最新版。首次运行会稍慢一点。 |
+| **全局安装** | 网络慢/离线、需要锁版本、想直接敲 `godot-mcp` 命令 | 要靠自己 `npm update -g` 才能升级。 |
+| **从源码构建** | 参与开发，或需要尚未发布的改动 | 每次 `git pull` 后都要重新 build。 |
+
+### 方式 A —— npx（推荐，无需预安装）
 
 ```bash
 npx -y @yanhuifair/godot-mcp -p /path/to/your/godot/project
 ```
 
-### 全局安装
+`npx` 会按需下载并缓存这个包。[配置 AI 客户端](#配置-ai-客户端)里的所有配置片段用的都是这种方式，所以**只要照着快速开始走，压根不存在单独的"安装"步骤**——`-y` 只是跳过"是否安装该包"的确认提示。
+
+### 方式 B —— 全局安装
 
 ```bash
 npm install -g @yanhuifair/godot-mcp
+
+# 之后在任意位置都能直接用命令名调用
+godot-mcp -p /path/to/your/godot/project
 ```
 
-### 从源码构建
+选择全局安装后，把客户端配置里的 `"command": "npx"` 改成 `"command": "godot-mcp"`，并把 `args` 里的 `-y` 和包名去掉：
+
+```json
+{ "command": "godot-mcp", "args": ["-p", "."] }
+```
+
+后续升级：`npm update -g @yanhuifair/godot-mcp`。
+
+### 方式 C —— 从源码构建
 
 ```bash
 git clone https://github.com/yanhuifair/Godot-MCP.git
-cd godot-mcp
+cd Godot-MCP
 npm install
-npm run build
+npm run build       # 把 TypeScript 编译到 dist/
+
+node dist/index.js -p /path/to/your/godot/project
+```
+
+然后把客户端指向编译产物：
+
+```json
+{ "command": "node", "args": ["/absolute/path/to/Godot-MCP/dist/index.js", "-p", "."] }
+```
+
+### 命令行参数
+
+| 参数 | 作用 |
+|---|---|
+| `-p, --project-path <path>` | 你的 Godot 项目目录，即含有 `project.godot` 的那个文件夹。不填则自动检测。 |
+| `-g, --godot-path <path>` | Godot 可执行文件路径。不填则自动检测（顺序见下方）。 |
+| `--enable-plugin` | 把编辑器插件复制进 `addons/`**并**在 `project.godot` 中自动启用。需要配合 `-p`。**通常你要的就是这个。** |
+| `--install-addons` | 只复制插件文件，需要你自己去 Godot 的插件面板里勾选启用。 |
+| `--read-only` | 安全模式：拒绝约 140 个会写文件或产生副作用的工具。让 AI 探索一个陌生项目时非常好用。 |
+| `-t, --transport <mode>` | `stdio`（默认）· `sse` · `streamable-http` · `all`。详见[传输模式](#传输模式)。 |
+| `--port <number>` | `sse` / `streamable-http` 的 HTTP 端口，默认 `3000`。 |
+| `--host <string>` | HTTP 监听地址，默认 `127.0.0.1`。绑定其他地址**必须**设置 `GODOT_MCP_TOKEN`。 |
+| `--no-sse` / `--no-streamable-http` | 在 `-t all` 时单独关掉某个端点。 |
+| `-h, --help` | 打印全部参数和客户端配置示例。 |
+
+```bash
+# 几个真实例子
+npx @yanhuifair/godot-mcp --enable-plugin -p .          # 项目的一次性初始化
+npx @yanhuifair/godot-mcp -p . --read-only              # 只让 AI 看，不让它改
+npx @yanhuifair/godot-mcp -p . -t streamable-http --port 8080
 ```
 
 ### 环境变量
@@ -445,11 +598,36 @@ Godot 自动检测顺序：`GODOT_PATH` -> `/Applications/Godot.app` -> `PATH` -
 
 ## 配置 AI 客户端
 
-### VS Code / GitHub Copilot
+Godot MCP 是一个**标准的 stdio MCP 服务器**——任何支持 MCP 的客户端都能驱动它。下面是各主流 AI Agent、IDE 和 CLI 的分步配置。
 
-**方式 1：项目级配置（推荐）**
+> **赶时间？** 几乎所有客户端要的都是同样那六行 JSON。复制[通用配置片段](#通用配置片段)，粘贴到你的客户端对应的文件里，重启，然后让 AI 执行 `get_status` 验证。结束。
 
-在 Godot 项目根目录创建 `.vscode/mcp.json`：
+### 找到你的客户端
+
+| 客户端 | 配置文件位置 | 顶层字段 |
+|---|---|---|
+| [Claude Code](#claude-code) | `claude mcp add` → `.mcp.json` | `mcpServers` |
+| [Cursor](#cursor) | `.cursor/mcp.json` · `~/.cursor/mcp.json` | `mcpServers` |
+| [VS Code / GitHub Copilot](#vs-code--github-copilot) | `.vscode/mcp.json` | `servers` |
+| [Codex CLI](#codex-cli-openai) | `~/.codex/config.toml` | `[mcp_servers.*]` |
+| [Gemini CLI](#gemini-cli-google) | `.gemini/settings.json` · `~/.gemini/settings.json` | `mcpServers` |
+| [Windsurf](#windsurf) | `~/.codeium/windsurf/mcp_config.json` | `mcpServers` |
+| [Cline](#clinevs-code-扩展) | `cline_mcp_settings.json`（从 UI 打开） | `mcpServers` |
+| [Roo Code](#roo-codevs-code-扩展) | `.roo/mcp.json` · 全局 `mcp_settings.json` | `mcpServers` |
+| [Trae](#trae) | AI 面板 → MCP（图形界面） | `mcpServers` |
+| [Zed](#zed) | `~/.config/zed/settings.json` | `context_servers` |
+| [JetBrains（Rider / IntelliJ）](#jetbrains-系列riderintellijgoland) | 设置 → AI Assistant → MCP | `mcpServers` |
+| [OpenCode](#opencode) | `opencode.json` | `mcp` |
+| [Claude Desktop](#claude-desktop) | `claude_desktop_config.json` | `mcpServers` |
+| [Continue](#continue) | `~/.continue/config.yaml` | `mcpServers` |
+| [Cherry Studio](#cherry-studio) | 设置 → MCP 服务器（图形界面） | `mcpServers` |
+| [Goose](#goose) | `~/.config/goose/config.yaml` | `extensions` |
+| [Aider](#aider) | `.aider.conf.yml` | `mcp-servers-file` |
+| [其他任何客户端](#其他任何-mcp-客户端) | — | 见下文 |
+
+### 通用配置片段
+
+约 80% 的客户端可以原样接受这段配置：
 
 ```json
 {
@@ -463,34 +641,83 @@ Godot 自动检测顺序：`GODOT_PATH` -> `/Applications/Godot.app` -> `PATH` -
 }
 ```
 
-保存后，重新加载 VS Code（`Cmd+Shift+P` -> `Developer: Reload Window`）。打开 Copilot Chat（`Cmd+Shift+I`），在聊天输入框中查看工具指示器。发送测试消息：
+每个字段的含义：
 
-> "列出项目中所有场景"
+| 字段 | 为什么需要它 |
+|---|---|
+| `"godot-mcp"` | AI 看到的服务器名字，随便改，没有任何东西依赖它 |
+| `"type": "stdio"` | 服务器以本地子进程方式运行。部分客户端不需要这个字段，写不写都行 |
+| `"command": "npx"` | Windows 上如果报 `spawn ENOENT`，把它改成 `"npx.cmd"` |
+| `"-y"` | 跳过 npx 的"是否安装此包？"询问。不加这个，首次启动会一直卡住 |
+| `"-p", "."` | 你的 Godot 项目目录。`.` 表示"客户端在哪个目录启动服务器，就用哪个" |
 
-提示：将 `.vscode/mcp.json` 提交到仓库，团队每个成员都能自动获得 MCP 服务器。
+**什么时候用 `.`，什么时候用完整路径：**
 
-**方式 2：用户级配置**
+- **打开文件夹的编辑器**（VS Code、Cursor、Windsurf、Zed、Trae、JetBrains）会在该目录里启动服务器 → 用 `"."` 即可，配置还能跨机器通用。
+- **桌面应用和全局 CLI**（Claude Desktop、Cherry Studio、user 级的 Claude Code 条目）没有"项目目录"的概念 → 必须写绝对路径，例如 `"/Users/you/Games/MyGame"` 或 `"C:/Users/you/Games/MyGame"`。
+- **Windows 请务必用正斜杠**（`C:/Users/...`）或转义反斜杠（`C:\\Users\\...`），JSON 里单反斜杠是转义符。
 
-打开 VS Code 设置（`Cmd+Shift+P` -> `Preferences: Open User Settings (JSON)`）并添加：
+**两个实用变体：**
 
 ```jsonc
-{
-  "mcp": {
-    "servers": {
-      "godot-mcp": {
-        "command": "npx",
-        "args": ["-y", "@yanhuifair/godot-mcp", "-p", "/path/to/your/godot/project"]
-      }
-    }
-  }
-}
+// 只读模式 —— AI 能看遍整个项目，但一个文件都改不了
+"args": ["-y", "@yanhuifair/godot-mcp", "-p", ".", "--read-only"]
+
+// 自动探测不到 Godot 时，手动指定可执行文件
+"env": { "GODOT_PATH": "/Applications/Godot.app/Contents/MacOS/Godot" }
 ```
+
+---
+
+### Claude Code
+
+**第 1 步：注册服务器。** 在 Godot 项目目录里执行：
+
+```bash
+cd /path/to/your/godot/project
+claude mcp add godot-mcp -- npx -y @yanhuifair/godot-mcp -p .
+```
+
+`--` 后面的内容是 Claude Code 要启动的命令。**这个 `--` 分隔符不能省**，否则 `-y` 和 `-p` 会被 Claude Code 当成自己的参数吃掉。
+
+**第 2 步：选择作用域**（可选，单项目用默认的就行）：
+
+| 命令 | 保存位置 | 谁能用到 |
+|---|---|---|
+| `claude mcp add godot-mcp -- …` | `~/.claude.json`，按目录区分 | 只有你，只在这个项目 |
+| `claude mcp add -s project godot-mcp -- …` | 项目根目录的 `.mcp.json` | **所有 clone 仓库的人**——建议提交进 git |
+| `claude mcp add -s user godot-mcp -- …` | `~/.claude.json` 全局 | 你的所有项目（`-p` 要写绝对路径） |
+
+带环境变量：
+
+```bash
+claude mcp add godot-mcp -e GODOT_PATH=/Applications/Godot.app/Contents/MacOS/Godot \
+  -- npx -y @yanhuifair/godot-mcp -p .
+```
+
+**第 3 步：验证。** 启动 `claude`，输入 `/mcp`。应该能看到 `godot-mcp` 显示为 **connected**，回车进去可以浏览全部 358 个工具。
+
+**第 4 步：第一条提示词：**
+
+> 执行 `get_status`，告诉我 Godot MCP 现在能连上什么，然后列出项目里所有场景。
+
+**后续管理：**
+
+```bash
+claude mcp list              # 列出所有已注册服务器及连接状态
+claude mcp get godot-mcp     # 查看某个服务器的完整信息
+claude mcp remove godot-mcp  # 移除
+```
+
+> 用了 `-s project` 的话，第一次打开项目时 Claude Code 会要求你批准 `.mcp.json`。这是安全确认，不是报错，选"是"即可。
+
+---
 
 ### Cursor
 
-支持项目级和用户级两种 MCP 配置。
+**第 1 步：创建配置。** 推荐项目级——配置会跟着仓库走。
 
-**项目级** — 项目根目录下的 `.cursor/mcp.json`：
+在 Godot 项目根目录创建 `.cursor/mcp.json`：
 
 ```json
 {
@@ -504,74 +731,137 @@ Godot 自动检测顺序：`GODOT_PATH` -> `/Applications/Godot.app` -> `PATH` -
 }
 ```
 
-**用户级** — `~/.cursor/mcp.json`（macOS/Linux）或 `%USERPROFILE%\.cursor\mcp.json`（Windows）：
+想所有项目都能用？改写 `~/.cursor/mcp.json`（Windows：`%USERPROFILE%\.cursor\mcp.json`），并把 `-p` 换成绝对路径。
+
+也可以让 Cursor 帮你建文件：**Settings → Tools & Integrations → Add Custom MCP**。
+
+**第 2 步：验证。** 打开 **Cursor Settings → Tools & Integrations**，`godot-mcp` 应显示**绿点**和工具数量。Cursor 会热重载这个文件，不需要重启——如果是红点，点刷新图标，并检查 JSON 有没有多余的逗号。
+
+**第 3 步：把对话切到 Agent 模式**（`Cmd/Ctrl+I`）。Ask 模式不会调用工具。
+
+**第 4 步：第一条提示词：**
+
+> 用 `search_tools` 找出瓦片地图相关的工具，然后告诉我这个项目里有哪些 TileSet。
+
+> **工具数量上限提醒：** Cursor 一次只会把大约 40–80 个工具发给模型，而 Godot MCP 有 358 个。请务必在规则文件里写上"先用 `search_tools`"（见[让你的 Agent 用好这些工具](#让你的-agent-用好这些工具)），否则模型会凭空编工具名。
+
+---
+
+### VS Code / GitHub Copilot
+
+**第 1 步：在项目根目录创建 `.vscode/mcp.json`。** 注意 VS Code 自己的字段叫 `servers`，不是 `mcpServers`：
 
 ```json
 {
-  "mcpServers": {
+  "servers": {
     "godot-mcp": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@yanhuifair/godot-mcp", "-p", "/path/to/your/godot/project"]
+      "args": ["-y", "@yanhuifair/godot-mcp", "-p", "."]
     }
   }
 }
 ```
 
-配置完成后，打开 Cursor Settings -> MCP 验证服务器以绿色状态指示器显示。在聊天中使用 Agent 模式（Cmd+L）调用 MCP 工具。
+快捷做法：命令面板（`Cmd/Ctrl+Shift+P`）执行 `MCP: Add Server…`，选 **Command (stdio)**，VS Code 会自动生成这个文件。
 
-### Claude Desktop
+**第 2 步：启动它。** VS Code 会在 JSON 里 `"godot-mcp"` 那一行正上方显示一个 **Start** 小按钮（codelens），点它。也可以执行 `MCP: List Servers` → `godot-mcp` → `Start Server`。
 
-**macOS**：`~/Library/Application Support/Claude/claude_desktop_config.json`
-**Windows**：`%APPDATA%\Claude\claude_desktop_config.json`
+**第 3 步：把 Copilot Chat 切到 Agent 模式。** 打开聊天（`Cmd/Ctrl+Shift+I`），在模式下拉里选 **Agent**。Ask 和 Edit 模式不调用 MCP 工具。
+
+**第 4 步：验证。** 点聊天输入框里的**工具图标（🛠）**，应该能看到 `godot-mcp`。如果显示 0 个工具，执行 `MCP: List Servers` → `godot-mcp` → `Show Output` 查看启动日志。
+
+**第 5 步：第一条提示词：**
+
+> #godot-mcp 执行 get_status，然后列出所有场景。
+
+> **团队提示：** 把 `.vscode/mcp.json` 提交进仓库，团队里每个 clone 的人都会自动拿到这个服务器，VS Code 只会让他们各自确认一次信任。
+>
+> **改成用户级：** 命令面板 → `MCP: Open User Configuration`，`-p` 用绝对路径。
+
+---
+
+### Codex CLI (OpenAI)
+
+**第 1 步：用内置命令添加**（会自动写入 `~/.codex/config.toml`）：
+
+```bash
+codex mcp add godot-mcp -- npx -y @yanhuifair/godot-mcp -p .
+```
+
+或者手动编辑 `~/.codex/config.toml`——注意这是 **TOML，不是 JSON/YAML**：
+
+```toml
+[mcp_servers.godot-mcp]
+command = "npx"
+args = ["-y", "@yanhuifair/godot-mcp", "-p", "."]
+startup_timeout_sec = 30
+
+[mcp_servers.godot-mcp.env]
+GODOT_PATH = "/Applications/Godot.app/Contents/MacOS/Godot"
+```
+
+`startup_timeout_sec` 在这里很关键：首次运行时 `npx` 需要下载包，很容易超过 Codex 的默认启动超时。
+
+**第 2 步：验证：**
+
+```bash
+codex mcp list
+```
+
+**第 3 步：使用**——一定要在 Godot 项目目录里启动 Codex，`-p .` 才能正确解析：
+
+```bash
+cd /path/to/your/godot/project
+codex                                        # 交互式
+codex exec "执行 get_status 并列出所有场景"    # 一次性
+```
+
+---
+
+### Gemini CLI (Google)
+
+**第 1 步：添加服务器：**
+
+```bash
+cd /path/to/your/godot/project
+gemini mcp add godot-mcp npx -y @yanhuifair/godot-mcp -p .
+```
+
+默认作用域是 **project** → 写入 `.gemini/settings.json`。加 `-s user` 则写入 `~/.gemini/settings.json`（此时 `-p` 要用绝对路径）。
+
+等价的手写配置：
 
 ```json
 {
   "mcpServers": {
     "godot-mcp": {
-      "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@yanhuifair/godot-mcp", "-p", "/path/to/your/godot/project"]
+      "args": ["-y", "@yanhuifair/godot-mcp", "-p", "."],
+      "timeout": 600000,
+      "trust": false
     }
   }
 }
 ```
 
-保存后，完全退出并重启 Claude Desktop。查看聊天输入框中的锤子图标以确认 MCP 工具已加载。发送测试：
+- `trust: true` 会跳过每次调用的确认弹窗。方便，但也意味着 AI 可以不打招呼直接写文件——想要安全网就配合 `--read-only` 一起用。
+- `includeTools` / `excludeTools` 接受工具名数组，可以只把精选的一部分工具交给模型，而不是全部 358 个。
 
-> "获取 Godot 版本"
+**第 2 步：验证。** 运行 `gemini`，输入 `/mcp` 查看已连接的服务器和工具。会话外可以用 `gemini mcp list`。
 
-### Claude CLI (`claude`)
+**第 3 步：第一条提示词：**
 
-先安装 Claude CLI，然后注册 MCP 服务器：
+> 调用 get_status，然后用 search_tools 找出动画相关的工具。
 
-```bash
-# 一次性注册
-claude mcp add godot-mcp -- npx -y @yanhuifair/godot-mcp -p /path/to/your/godot/project
-
-# 带环境变量（例如自定义 Godot 路径）
-claude mcp add godot-mcp -e GODOT_PATH=/path/to/godot -- npx -y @yanhuifair/godot-mcp -p .
-
-# 列出已注册的服务器
-claude mcp list
-
-# 如需删除
-claude mcp remove godot-mcp
-```
-
-然后交互式或非交互式使用：
-
-```bash
-# 交互式会话
-claude
-
-# 非交互式（管道模式）
-echo "列出我 Godot 项目中的所有场景" | claude -p
-```
+---
 
 ### Windsurf
 
-`~/.codeium/windsurf/mcp_config.json`（macOS/Linux）或 `%USERPROFILE%\.codeium\windsurf\mcp_config.json`（Windows）：
+**第 1 步：打开配置。** 点 **Cascade → 锤子图标 → Configure**，或者直接编辑文件：
+
+- macOS/Linux：`~/.codeium/windsurf/mcp_config.json`
+- Windows：`%USERPROFILE%\.codeium\windsurf\mcp_config.json`
 
 ```json
 {
@@ -585,144 +875,212 @@ echo "列出我 Godot 项目中的所有场景" | claude -p
 }
 ```
 
-保存后重启 Windsurf。打开 Cascade（Cmd+L），在 MCP 面板中验证工具已出现。
+这个文件是全局的，所以项目路径必须写**绝对路径**。
 
-### OpenAI Codex CLI
+**第 2 步：刷新。** 回到 Cascade，点锤子图标 → **Refresh**，`godot-mcp` 应该变绿。
 
-Codex 使用项目根目录下的 `.codex.toml` 或 `.codex.yaml`，或 `~/.codex/config.yaml` 作为用户级配置。
+**第 3 步：第一条提示词**（Cascade 快捷键 `Cmd/Ctrl+L`）：
 
-**项目级**（Godot 项目中的 `.codex.toml`）：
+> 执行 get_status，然后读取主场景。
 
-```yaml
-mcp_servers:
-  godot-mcp:
-    type: stdio
-    command: npx
-    args:
-      - "-y"
-      - "@yanhuifair/godot-mcp"
-      - "-p"
-      - "."
-```
-
-**全局安装**（如果运行了 `npm install -g @yanhuifair/godot-mcp`）：
-
-```yaml
-mcp_servers:
-  godot-mcp:
-    type: stdio
-    command: godot-mcp
-    args:
-      - "-p"
-      - "."
-```
-
-在 Godot 项目目录中运行 Codex：
-
-```bash
-# 交互式会话
-codex
-
-# 非交互式
-codex exec "列出项目中所有场景"
-codex exec "为玩家创建一个新的 CharacterBody2D 脚本"
-
-# 验证 MCP 工具已加载
-codex exec "获取 Godot 版本"
-```
+---
 
 ### Cline（VS Code 扩展）
 
-Cline 从 VS Code 用户设置中读取 MCP 服务器。打开 `Cmd+Shift+P` -> `Preferences: Open User Settings (JSON)` 并添加：
+**第 1 步：打开 Cline 的 MCP 设置。** 别去翻文件路径，用界面：侧边栏点 **Cline 图标** → 顶部 **MCP Servers**（服务器机架图标）→ **Installed** 标签 → **Configure MCP Servers**，会直接打开 `cline_mcp_settings.json`。
 
-```jsonc
-{
-  "cline.mcpServers": {
-    "godot-mcp": {
-      "command": "npx",
-      "args": ["-y", "@yanhuifair/godot-mcp", "-p", "/path/to/your/godot/project"]
-    }
-  }
-}
-```
+<details>
+<summary>这个文件的真实路径</summary>
 
-保存后，点击侧边栏中的 Cline 扩展图标，然后在 Cline 面板中点击「重启 MCP 服务器」。服务器应显示为已连接。
+- macOS：`~/Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json`
+- Windows：`%APPDATA%\Code\User\globalStorage\saoudrizwan.claude-dev\settings\cline_mcp_settings.json`
+- Linux：`~/.config/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json`
 
-### Roo Code（VS Code 扩展）
+</details>
 
-```jsonc
-{
-  "rooCode.mcpServers": {
-    "godot-mcp": {
-      "command": "npx",
-      "args": ["-y", "@yanhuifair/godot-mcp", "-p", "/path/to/your/godot/project"]
-    }
-  }
-}
-```
-
-保存后打开 Roo Code，MCP 工具将在工具选择菜单中可用。
-
-### Continue（VS Code / JetBrains）
-
-Continue 使用 `~/.continue/config.json`（macOS/Linux）或 `%USERPROFILE%\.continue\config.json`（Windows）。
-
-在 `mcpServers` 数组中添加新条目。如果数组不存在，请创建：
+**第 2 步：添加条目：**
 
 ```json
 {
-  "models": [...],
-  "mcpServers": [
-    {
-      "name": "godot-mcp",
-      "transport": {
-        "type": "stdio",
-        "command": "npx",
-        "args": ["-y", "@yanhuifair/godot-mcp", "-p", "/path/to/your/godot/project"]
-      }
+  "mcpServers": {
+    "godot-mcp": {
+      "command": "npx",
+      "args": ["-y", "@yanhuifair/godot-mcp", "-p", "/path/to/your/godot/project"],
+      "disabled": false,
+      "autoApprove": []
     }
-  ]
+  }
 }
 ```
 
-保存后在 VS Code 中打开 Continue（Cmd+L 或 Cmd+I）。工具会自动发现。发送：
+`autoApprove` 里填的工具名会免确认直接执行，例如填 `["get_status", "search_tools", "list_scenes"]` 让只读操作不再弹窗。
 
-> "列出项目中所有 .tscn 文件"
+**第 3 步：重启。** Cline 一般保存即生效；如果没有，在 MCP Servers 面板里点 `godot-mcp` 旁边的 **Restart Server**，等状态点变绿。
 
-### Aider
+**第 4 步：第一条提示词**（Plan 或 Act 模式）：
 
-Aider 通过 `.aider.conf.yml`（项目根目录或家目录）或命令行标志支持 MCP 服务器。
+> 执行 get_status，然后总结这个 Godot 项目的结构。
 
-**配置文件**（`.aider.conf.yml`）：
+---
 
-```yaml
-mcp_servers:
-  - name: godot-mcp
-    command: npx
-    args:
-      - "-y"
-      - "@yanhuifair/godot-mcp"
-      - "-p"
-      - "."
-```
+### Roo Code（VS Code 扩展）
 
-**命令行**：
+Roo Code 同时支持项目级和全局配置，冲突时项目级优先。
 
-```bash
-# 单个项目
-aider --mcp-server "godot-mcp=npx -y @yanhuifair/godot-mcp -p ."
+**第 1a 步（推荐，项目级）：** 在 Godot 项目根目录创建 `.roo/mcp.json`：
 
-# 带自定义 Godot 路径
-aider --mcp-server "godot-mcp=npx -y @yanhuifair/godot-mcp -p /path/to/project"
-```
-
-Aider 的 `/tools` 命令列出所有可用 MCP 工具。
-
-### Cody（Sourcegraph）
-
-```jsonc
+```json
 {
-  "cody.mcpServers": {
+  "mcpServers": {
+    "godot-mcp": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@yanhuifair/godot-mcp", "-p", "."]
+    }
+  }
+}
+```
+
+**第 1b 步（全局）：** Roo Code 面板 → **MCP** 图标 → **Edit Global MCP**（文件位于 `…/globalStorage/rooveterinaryinc.roo-cline/settings/mcp_settings.json`），`-p` 用绝对路径。
+
+**第 2 步：启用。** 在 Roo Code 的 MCP 面板里确认 `godot-mcp` 的开关是打开的、状态点是绿的，不是的话点刷新图标。
+
+**第 3 步：第一条提示词：**
+
+> 用 search_tools 找出着色器相关的工具，然后列出所有 .gdshader 文件。
+
+---
+
+### Trae
+
+Trae 有两步，很多人只做了第一步就以为配好了：**添加服务器**之后还要**把它挂到智能体上**。
+
+**第 1 步：添加服务器。** 打开 AI 侧边栏 → **设置（齿轮）→ MCP → 添加 → 手动添加**（或**从 JSON 导入**），粘贴：
+
+```json
+{
+  "mcpServers": {
+    "godot-mcp": {
+      "command": "npx",
+      "args": ["-y", "@yanhuifair/godot-mcp", "-p", "."]
+    }
+  }
+}
+```
+
+等状态变成**已连接／可用**再继续。
+
+**第 2 步：挂到智能体上。** 这一步最容易被漏掉——Trae 的智能体只能看到你明确授权给它的 MCP 服务器。进入**智能体 → 新建或编辑一个智能体 → 工具 → 勾选 `godot-mcp`**，保存。
+
+**第 3 步：在对话框的智能体下拉里选中该智能体。**
+
+**第 4 步：第一条提示词：**
+
+> 执行 get_status，然后列出这个项目里的所有场景。
+
+> 如果工具一直不触发，去 **MCP → godot-mcp → 查看日志**，Trae 会把原始 stdio 启动输出打在那里。
+
+---
+
+### Zed
+
+**第 1 步：添加本地服务器。** 用界面：**Settings → AI → MCP Servers → Add Server → Add Local Server**；或者命令面板执行 `zed: open settings file`，加入：
+
+```json
+{
+  "context_servers": {
+    "godot-mcp": {
+      "command": "npx",
+      "args": ["-y", "@yanhuifair/godot-mcp", "-p", "."],
+      "env": {}
+    }
+  }
+}
+```
+
+Zed 把 MCP 服务器叫做 **context server**，所以字段是 `context_servers` 而不是 `mcpServers`，其余完全一致。
+
+**第 2 步：验证。** 回到 **Settings → AI → MCP Servers**，`godot-mcp` 旁边的指示点应该是**绿色**，悬停提示 *"Server is active"*。
+
+**第 3 步：在 Agent Panel 里发第一条提示词：**
+
+> 用 godot-mcp 的工具：先执行 get_status，然后列出所有场景。
+
+> 在 Zed 里点名服务器名字能明显提高工具选中率。想 100% 确保用到它，可以建一个 [agent profile](https://zed.dev/docs/ai/agent-profiles)，把内置工具全关掉、只留 `godot-mcp`。
+
+---
+
+### JetBrains 系列（Rider、IntelliJ、GoLand…）
+
+如果你在 **Rider 里写 Godot 的 C#**，这一节对你有用。需要 2025.1+ 版本并安装 AI Assistant 插件（Junie 共用同一份 MCP 配置）。
+
+**第 1 步：** 打开 `设置/Preferences → Tools → AI Assistant → Model Context Protocol (MCP)`。
+
+**第 2 步：** 点 `+`，把对话框切到 **As JSON**，粘贴：
+
+```json
+{
+  "mcpServers": {
+    "godot-mcp": {
+      "command": "npx",
+      "args": ["-y", "@yanhuifair/godot-mcp", "-p", "."]
+    }
+  }
+}
+```
+
+如果你的 IDE 启动进程时没有继承 shell 的 `PATH`，把 `"npx"` 换成绝对路径（`which npx` / `where npx` 查）。
+
+**第 3 步：** 点 Apply，等这一行显示出工具数量而不是报错。
+
+**第 4 步：** 在 AI Assistant 聊天里开启 **Codebase/Agent 模式**再用——普通聊天模式不调用工具。
+
+---
+
+### OpenCode
+
+**第 1 步：在项目根目录创建 `opencode.json`**（或 `~/.config/opencode/opencode.json` 全局生效）：
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "godot-mcp": {
+      "type": "local",
+      "command": ["npx", "-y", "@yanhuifair/godot-mcp", "-p", "."],
+      "enabled": true,
+      "timeout": 30000
+    }
+  }
+}
+```
+
+两个 OpenCode 专有的坑：
+
+- `command` 是**一个数组**，没有单独的 `args` 字段。
+- 工具发现的 `timeout` 默认只有 **5000 毫秒**。要列出 358 个工具、外加首次冷启动 `npx` 下载，经常超时——按上面写成 `30000`，否则服务器会静默显示 0 个工具。
+
+**第 2 步：验证。** 在该目录下启动 `opencode`，MCP 服务器会在启动时加载，工具名带 `godot-mcp_` 前缀。
+
+**第 3 步：第一条提示词：**
+
+> use godot-mcp 执行 get_status 并列出所有场景
+
+---
+
+### Claude Desktop
+
+**第 1 步：编辑配置文件：**
+
+- macOS：`~/Library/Application Support/Claude/claude_desktop_config.json`
+- Windows：`%APPDATA%\Claude\claude_desktop_config.json`
+- Linux：`~/.config/Claude/claude_desktop_config.json`
+
+更省事的方式：**Settings → Developer → Edit Config** 直接打开该文件。
+
+```json
+{
+  "mcpServers": {
     "godot-mcp": {
       "command": "npx",
       "args": ["-y", "@yanhuifair/godot-mcp", "-p", "/path/to/your/godot/project"]
@@ -731,15 +1089,25 @@ Aider 的 `/tools` 命令列出所有可用 MCP 工具。
 }
 ```
 
-保存后打开 Cody 聊天（Cmd+Shift+/）。点击聊天输入框中的 MCP 图标查看可用工具。
+Claude Desktop 没有"项目目录"概念，**必须写绝对路径**。
 
-### Goose
+**第 2 步：完全退出并重启。** 不是"关窗口"，是退出应用（`Cmd+Q` / 托盘 → Exit）。Claude Desktop 只在启动时读一次这个文件。
 
-Goose 使用 `~/.config/goose/config.yaml`（macOS/Linux）或 `%APPDATA%\goose\config.yaml`（Windows）：
+**第 3 步：验证。** 聊天输入框会出现**工具图标**并显示工具数量。没有的话去看日志：macOS `~/Library/Logs/Claude/mcp-server-godot-mcp.log`，Windows `%APPDATA%\Claude\logs\`。
+
+**第 4 步：第一条提示词：**
+
+> 获取 Godot 版本，并列出我项目中的所有场景。
+
+---
+
+### Continue
+
+Continue（VS Code + JetBrains）读取 `~/.continue/config.yaml`：
 
 ```yaml
-mcp_servers:
-  godot-mcp:
+mcpServers:
+  - name: godot-mcp
     command: npx
     args:
       - "-y"
@@ -748,23 +1116,157 @@ mcp_servers:
       - "/path/to/your/godot/project"
 ```
 
-保存后重启 Goose。使用 `/mcp` 列出已连接的服务器，使用 `/tools` 浏览工具：
+旧版 Continue 用的是 `~/.continue/config.json` 里的 `mcpServers` **数组**——编辑前先看哪个文件存在。保存后重新打开 Continue 面板即可自动发现工具。MCP 工具只在 **Agent 模式**下生效。
+
+---
+
+### Cherry Studio
+
+流行的跨平台桌面 MCP 客户端，全程图形界面。
+
+1. **设置 → MCP 服务器 → 添加服务器 → 快速创建**。
+2. 名称：`godot-mcp` · 类型：**STDIO** · 命令：`npx`
+3. 参数——**每行一个**，不要写成一行用空格隔开：
+   ```
+   -y
+   @yanhuifair/godot-mcp
+   -p
+   /path/to/your/godot/project
+   ```
+4. 保存并打开服务器开关。出现绿色指示和工具数量即表示已连通。
+5. 在对话里通过输入框下方的工具箱图标启用该 MCP 服务器，然后让它执行 `get_status`。
+
+> 也可以用**从 JSON 导入**，粘贴[通用配置片段](#通用配置片段)并把 `-p` 改成绝对路径。
+
+---
+
+### Goose
+
+**交互式配置（推荐）：**
+
+```bash
+goose configure
+# → Add Extension → Command-line Extension
+#   名称：   godot-mcp
+#   命令：   npx -y @yanhuifair/godot-mcp -p /path/to/your/godot/project
+#   超时：   300
+```
+
+**或者直接编辑 `~/.config/goose/config.yaml`：**
+
+```yaml
+extensions:
+  godot-mcp:
+    name: godot-mcp
+    type: stdio
+    cmd: npx
+    args:
+      - "-y"
+      - "@yanhuifair/godot-mcp"
+      - "-p"
+      - "/path/to/your/godot/project"
+    enabled: true
+    timeout: 300
+```
+
+Goose 把 MCP 服务器叫做 **extension**，而且字段是 `cmd` 不是 `command`。重启 Goose 后用 `/mcp` 确认连接。
+
+---
+
+### Aider
+
+Aider 的 MCP 支持跟版本相关，先跑一下 `aider --help | grep -i mcp` 看你的版本有哪些参数。
+
+```bash
+# 指向一个标准 MCP JSON 文件
+aider --mcp-servers-file ./mcp.json
+
+# 或者直接内联
+aider --mcp-servers '{"mcpServers":{"godot-mcp":{"command":"npx","args":["-y","@yanhuifair/godot-mcp","-p","."]}}}'
+```
+
+这里的 `./mcp.json` 就是[通用配置片段](#通用配置片段)。想固化下来，写进 `.aider.conf.yml`：
+
+```yaml
+mcp-servers-file: ./mcp.json
+```
+
+---
+
+### 其他任何 MCP 客户端
+
+如果你的客户端支持**本地命令**，填：
 
 ```
-/mcp                      # 列出已连接的 MCP 服务器
-/tools                    # 浏览可用工具
-列出所有场景              # 直接调用工具
+command（命令）: npx
+args（参数）:    -y  @yanhuifair/godot-mcp  -p  /path/to/your/godot/project
 ```
+
+如果你的客户端**只接受 URL**（n8n、Dify、纯网页版 Agent、托管型连接器），那就自己把服务器跑起来，让客户端连 HTTP 端点：
+
+```bash
+export GODOT_MCP_TOKEN="$(openssl rand -hex 32)"   # 绑定非回环地址时必须设置
+npx -y @yanhuifair/godot-mcp -p /path/to/your/godot/project -t all --port 3000
+```
+
+| 端点 | URL |
+|---|---|
+| Streamable HTTP（MCP 2025） | `http://127.0.0.1:3000/mcp` |
+| SSE（旧版客户端） | `http://127.0.0.1:3000/sse` |
+| 健康检查 | `http://127.0.0.1:3000/health` |
+
+详见[传输模式](#传输模式)。
+
+---
+
+### 让你的 Agent 用好这些工具
+
+358 个工具超出了大多数模型能同时记住的量，而且不少客户端只会把其中一部分转发给模型。花两分钟做下面两件事就能解决。
+
+**1. 在项目里放一个规则文件。** 各家 Agent 会自动读取这些文件：`AGENTS.md`（Codex、OpenCode、Cursor、Gemini CLI、Zed）、`CLAUDE.md`（Claude Code）、`.cursor/rules/*.mdc`（Cursor）、`.clinerules`（Cline / Roo Code）、`.github/copilot-instructions.md`（Copilot）。
+
+```markdown
+## Godot MCP
+
+本项目已接入 `godot-mcp` 服务器（358 个工具）。
+
+- 不要凭记忆猜工具名。先用关键词调用 `search_tools`，
+  例如 search_tools("tileset")、search_tools("animation")、search_tools("navmesh")。
+- 遇到 `EDITOR_NOT_REACHABLE` 或 `RUNTIME_NOT_REACHABLE` 时，先调用 `get_status`，
+  把缺什么告诉我，不要盲目重试。
+- 优先使用文件类工具（read_scene、write_script、create_resource…）。
+  它们在 Godot 没打开时也能用，而且最快。
+- 只有当改动必须在运行中的编辑器里体现时，才用 `editor_*` 工具。
+- 只有游戏真的在运行（F5 已按下）时，才用 `runtime_*` 工具。
+- 调 `add_node` 之前一定先 `read_scene`，确保父节点 NodePath 正确。
+- 改脚本前先读脚本；绝不覆盖没读过的文件。
+```
+
+**2. 先让它只看不碰。** 首次在陌生项目上跑，给 `args` 加上 `--read-only`。服务器会在入口层面拒绝所有写操作工具，模型再热情也伤不到你的项目。
+
+**3. 两条值得背下来的提示词：**
+
+> `get_status` —— 当前能连上什么（编辑器？运行中的游戏？），加载了多少工具。
+> `search_tools("<关键词>")` —— 直接拿到排好序的正确工具名，不用把 358 条列表塞进上下文。
+
+---
 
 ### 故障排除
 
-| 问题 | 解决方案 |
+| 现象 | 原因与解决 |
 |---|---|
-| 服务器未启动 | 确保 Node.js >= 18：`node -v` |
-| "命令未找到" | 使用 `npx` 方式或 `npm install -g @yanhuifair/godot-mcp` |
-| 插件未在 Godot 中显示 | 在插件标签页中点击重启，或重新打开项目 |
-| 编辑器进程无法启动 | 确保 Godot 已安装且在 PATH 中，或设置 `GODOT_PATH` |
-| 工具未在聊天中出现 | 重新加载 VS Code：`Cmd+Shift+P` -> `Developer: Reload Window` |
+| 完全看不到工具 | 客户端在 Ask/Chat 模式。切到 **Agent 模式**——大多数客户端只有 Agent 模式才调工具 |
+| 服务器"启动失败"但没有报错信息 | JSON 语法问题。多半是多了个尾逗号，或者复制粘贴带进了中文引号——找个工具校验一下 |
+| `spawn npx ENOENT`（Windows） | 把 `"command": "npx"` 改成 `"npx.cmd"`，或者用 `where npx` 查到的绝对路径 |
+| `spawn npx ENOENT`（macOS/Linux 图形应用） | 应用启动时没继承 shell 的 `PATH`。用 `which npx` 的绝对路径 |
+| 首次启动超时 | `npx` 正在下载包。先在终端跑一次 `npx -y @yanhuifair/godot-mcp --help` 预热缓存，并调大客户端的启动超时 |
+| `Project not found` | `-p .` 只有在客户端工作目录就是 Godot 项目时才成立。改成绝对路径 |
+| 已连接但工具数为 0 | 工具发现超时太短（OpenCode 默认只有 5 秒）。调到 30 秒 |
+| 文件类工具正常，`editor_*` 报错 | 编辑器插件没在跑。执行 `--enable-plugin`，在 Godot 里重新加载项目，再看 `get_status` |
+| `RUNTIME_NOT_REACHABLE` | 游戏没运行，或运行时 autoload 没注册。见[工具发现与实时游戏运行时](#工具发现与实时游戏运行时) |
+| 找不到 Godot | 在配置的 `env` 里设置 `GODOT_PATH` 指向 Godot 可执行文件 |
+| 模型总是选错工具 | 加上上面的规则文件，并明确要求它先调 `search_tools` |
+| Node.js 版本太低 | `node -v` 必须 **≥ 18** |
 
 ---
 
@@ -860,7 +1362,7 @@ npx @yanhuifair/godot-mcp --enable-plugin -p /path/to/your/godot/project
 
 此命令将插件安装到 `addons/godot-mcp/` 并自动在 `project.godot` 中启用。无需手动操作。
 
-### 编辑器命令（89 个工具）
+### 编辑器命令（123 个工具）
 
 **视图和选择：** `editor_get_selection` `editor_set_selection` `editor_get_open_scene` `editor_read_current_scene` `editor_get_info` `editor_get_rect` `editor_focus` `editor_show_in_filesystem` `editor_open_dock`
 
@@ -894,12 +1396,72 @@ npx @yanhuifair/godot-mcp --enable-plugin -p /path/to/your/godot/project
 
 ---
 
+## 工具发现与实时游戏运行时
+
+大多数 MCP 服务器只能操作编辑器。Godot MCP 还能**驱动你真正在运行的游戏**——这是目前其他公开 Godot MCP 都不具备的能力。适用于 AI 驱动的自动化测试（playtesting）、调试运行时状态、自动化玩法验证，以及生成实时截图。
+
+### 启用运行时自动加载（Autoload）
+
+运行时桥是一个独立、轻量的 Autoload（不会修改编辑器插件）。每个项目只需添加一次：
+
+1. 确保已安装编辑器插件（`npx @yanhuifair/godot-mcp --enable-plugin -p .`）。运行时桥脚本随附在同一个 `addons/godot-mcp/` 目录中。
+2. 在 Godot 编辑器中打开 **项目 → 项目设置 → 全局 → 自动加载（Autoload）**。
+3. 添加 `addons/godot-mcp/runtime_bridge.gd`，Autoload 名称设为 **`godot_mcp_runtime`** 并启用。
+4. 从编辑器运行游戏（F5）。Autoload 会在输出日志中打印 `[godot-mcp-runtime] Listening on 127.0.0.1:9877`。
+
+> **安全**：桥仅绑定 `127.0.0.1`，绝不暴露到局域网。它以 `process_mode = PROCESS_MODE_ALWAYS` 运行，因此即使通过 `runtime_freeze` 暂停游戏，桥仍能持续接收命令。
+
+### 运行时工具（11 个）
+
+| 工具 | 描述 |
+|---|---|
+| `runtime_ping` | 检查实时游戏运行时桥是否可达。 |
+| `runtime_get_tree` | 读取运行中的游戏场景树（游戏实际运行时的实时状态）。 |
+| `runtime_get_node` | 读取运行中游戏里某个节点的实时属性。 |
+| `runtime_set_node` | 设置运行中游戏里某个节点的属性（实时变更）。 |
+| `runtime_call_method` | 调用运行中游戏里某个节点的方法。 |
+| `runtime_emit_signal` | 在运行中游戏里某个节点上发射信号。 |
+| `runtime_input` | 向运行中的游戏注入按键输入事件（keycode + 按下/释放）。 |
+| `runtime_freeze` | 暂停（冻结）运行中的游戏。 |
+| `runtime_resume` | 恢复（取消暂停）运行中的游戏。 |
+| `runtime_step` | 在暂停状态下确定性地推进 N 帧（逐帧步进）。 |
+| `runtime_screenshot` | 截取运行中游戏视口的屏幕截图。 |
+
+### 示例工作流
+
+```
+"运行游戏，冻结它，然后步进 5 帧并截图"
+  → runtime_ping → runtime_freeze → runtime_step { frames: 5 } → runtime_screenshot
+
+"把 Player 的 health 设为 0 并触发 died 信号"
+  → runtime_set_node { path: "Player", properties: { "health": "0" } }
+  → runtime_emit_signal { path: "Player", signal: "died" }
+```
+
+如果运行时工具返回 `RUNTIME_NOT_REACHABLE` 错误，请调用 `get_status`——它会报告 Autoload 是否可达，并提示如何启用。
+
+### 工具发现与诊断（Meta，2 个工具）
+
+面对 358 个工具，盲目猜测名称会浪费大量 token。两个发现工具可提供帮助：
+
+| 工具 | 描述 |
+|---|---|
+| `search_tools` | 按关键词/描述搜索所有工具以发现正确的工具名。空格分隔的词为 AND 组合；名称匹配优先级更高。 |
+| `get_status` | 系统状态/诊断：编辑器桥、实时游戏运行时桥，以及工具总数。用于排查连接问题。 |
+
+```
+"找处理碰撞形状的工具"  → search_tools { keyword: "collision shape" }
+"现在哪些子系统可用？"  → get_status
+```
+
+---
+
 ## 全部工具列表
 
 点击每个分类展开查看所有工具及其描述。
 
 <details>
-<summary>Editor（89 个工具）— 实时编辑器控制</summary>
+<summary>Editor（123 个工具）— 实时编辑器控制</summary>
 
 | 工具 | 描述 |
 |---|---|
@@ -1192,6 +1754,35 @@ npx @yanhuifair/godot-mcp --enable-plugin -p /path/to/your/godot/project
 </details>
 
 <details>
+<summary>Meta / Discovery（2 个工具）— 工具搜索 + 系统诊断</summary>
+
+| 工具 | 描述 |
+|---|---|
+| `search_tools` | 按关键词/描述搜索所有工具以发现正确的工具名，避免在 350+ 个工具中盲目猜测。 |
+| `get_status` | 系统状态/诊断：编辑器桥、实时游戏运行时桥，以及工具总数。用于排查连接问题。 |
+
+</details>
+
+<details>
+<summary>Runtime（游戏）（11 个工具）— 控制运行中的游戏</summary>
+
+| 工具 | 描述 |
+|---|---|
+| `runtime_ping` | 检查实时游戏运行时桥是否可达。 |
+| `runtime_get_tree` | 读取运行中的游戏场景树（游戏实际运行时的实时状态）。 |
+| `runtime_get_node` | 读取运行中游戏里某个节点的实时属性。 |
+| `runtime_set_node` | 设置运行中游戏里某个节点的属性（实时变更）。 |
+| `runtime_call_method` | 调用运行中游戏里某个节点的方法。 |
+| `runtime_emit_signal` | 在运行中游戏里某个节点上发射信号。 |
+| `runtime_input` | 向运行中的游戏注入按键输入事件。 |
+| `runtime_freeze` | 暂停（冻结）运行中的游戏。 |
+| `runtime_resume` | 恢复（取消暂停）运行中的游戏。 |
+| `runtime_step` | 在暂停状态下确定性地推进 N 帧（逐帧步进）。 |
+| `runtime_screenshot` | 截取运行中游戏视口的屏幕截图。 |
+
+</details>
+
+<details>
 <summary>其他分类</summary>
 
 **Domain（11）：** `read_curve`、`create_curve`、`read_gradient`、`create_gradient`、`list_paths`、`read_path`、`list_skeletons`、`read_skeleton`、`read_reflection_probe`、`read_multimesh`、`create_noise_texture`
@@ -1296,13 +1887,13 @@ npm run test:watch   # 监听模式
 
 ```bash
 npm run vsix
-# 输出: godot-mcp-1.7.0.vsix
+# 输出: godot-mcp-1.9.0.vsix
 ```
 
 在 VS Code 中安装：
 
 ```bash
-code --install-extension godot-mcp-1.7.0.vsix
+code --install-extension godot-mcp-1.9.0.vsix
 ```
 
 ---
@@ -1316,9 +1907,37 @@ code --install-extension godot-mcp-1.7.0.vsix
 
 ---
 
+## 常见问题
+
+**必须一直开着 Godot 吗？**
+不需要。所有基于文件的工具——场景、资源、脚本、着色器、项目设置——都使用原生解析器直接读写磁盘文件，瞬时完成。只有实时编辑器工具（123 个）和实时游戏运行时工具（11 个）需要 Godot 运行，而且服务器可以自动帮你启动。
+
+**支持 Godot 3 吗？**
+不支持，仅支持 **Godot 4.x**。Godot 3 的文件格式与编辑器 API 差异过大，无法干净地兼容。
+
+**支持哪些 AI 客户端？**
+任何兼容 MCP 的客户端。已验证：Claude Desktop、Claude Code、Cursor、VS Code（Copilot）、Windsurf、Codex、Cline、Roo Code、Aider、Cody、Goose、Continue。
+
+**AI 怎么从 358 个工具里挑对的那个？**
+用 `search_tools`——它按关键词对工具名和描述排序检索，AI 无需把 358 个 schema 全塞进上下文就能找到 `add_audio_bus_effect` 这样的工具。`get_status` 则报告当前哪些子系统（编辑器桥、游戏运行时）可达。
+
+**运行时工具和编辑器工具有什么区别？**
+编辑器工具与 Godot **编辑器**通信；运行时工具通过 `127.0.0.1:9877` 上的轻量 autoload 与**正在运行的游戏**通信。正因如此才能冻结游戏、精确步进指定帧数、并截取某个精确的玩法瞬间。
+
+**让 AI 改我的项目安全吗？**
+破坏性文件操作会写入 `.bak` 备份，工具区分只读与写入两类，任何失败都返回类型化错误码与修复建议，而不是悄悄损坏文件。当然，仍然建议使用版本控制。
+
+---
+
+## 关键词
+
+Godot MCP · Godot MCP 服务器 · Godot AI 助手 · Godot AI 智能体 · Model Context Protocol Godot · Godot 引擎 4 · GDScript AI · AI 游戏开发 · Godot 自动化 · Godot Copilot · Claude 接入 Godot · Cursor Godot · VS Code Godot MCP · Windsurf Godot · Cline Godot · Godot 场景编辑 API · `.tscn` 解析器 · `.tres` 解析器 · Godot 着色器 AI · VisualShader 自动化 · Godot 调试 AI · Godot 运行时检查 · 游戏引擎 AI 工具链 · MCP server for game engines
+
+---
+
 ## 协议
 
-MIT
+AGPL-3.0-or-later
 
 ## 打赏
 ![alt text](tip.JPG)

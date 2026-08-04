@@ -1,5 +1,5 @@
 // Copyright (c) 2026 FairYan
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // ============================================================
 // Godot MCP Server - Centralized Tool Registration
 // ============================================================
@@ -7,7 +7,7 @@
 // Each category is a self-contained block.
 
 import { z } from 'zod';
-import { ToolRegistry } from '../utils/registry.js';
+import { ToolRegistry, setActiveRegistry } from '../utils/registry.js';
 
 // Project tools
 import {
@@ -174,6 +174,22 @@ import {
   handleEditorCreateCsgCylinder, handleEditorCreateCsgMerge, handleEditorCreateCsgPolygon,
   handleEditorCreateGpuParticles,
 } from './editor.js';
+
+// Meta / Discovery / Diagnostics tools
+import {
+  handleSearchTools, handleGetStatus,
+  searchToolsSchema, getStatusSchema,
+} from './meta.js';
+
+// Live Game Runtime tools (control the running game via the runtime_bridge autoload)
+import {
+  handleRuntimePing, handleRuntimeGetTree, handleRuntimeGetNode, handleRuntimeSetNode,
+  handleRuntimeCallMethod, handleRuntimeEmitSignal, handleRuntimeInput,
+  handleRuntimeFreeze, handleRuntimeResume, handleRuntimeStep, handleRuntimeScreenshot,
+  runtimePingSchema, runtimeGetTreeSchema, runtimeGetNodeSchema, runtimeSetNodeSchema,
+  runtimeCallMethodSchema, runtimeEmitSignalSchema, runtimeInputSchema,
+  runtimeFreezeSchema, runtimeResumeSchema, runtimeStepSchema, runtimeScreenshotSchema,
+} from './runtime.js';
 
 // Animation tools
 import {
@@ -769,4 +785,24 @@ export function registerAllTools(registry: ToolRegistry): void {
   registry.register({ name: 'create_theme', description: 'Create a Theme .tres resource.', schema: createThemeSchema, handler: handleCreateTheme });
   registry.register({ name: 'add_theme_type', description: 'Add a control type (font size/color) to a Theme.', schema: addThemeTypeSchema, handler: handleAddThemeType });
   registry.register({ name: 'set_stylebox', description: 'Attach a StyleBoxFlat to a Theme type/state.', schema: setStyleboxSchema, handler: handleSetStylebox });
+
+  // Meta / Introspection (2)
+  registry.register({ name: 'search_tools', description: 'Search all tools by keyword/description to discover the right tool name. Use this instead of guessing among 350+ tools.', schema: searchToolsSchema, handler: (_, args) => handleSearchTools(args) });
+  registry.register({ name: 'get_status', description: 'System status / diagnostics: editor bridge, live-game runtime bridge, and tool count. Use to debug connection issues.', schema: getStatusSchema, handler: (_, args) => handleGetStatus(args) });
+
+  // Runtime (game) (11)
+  registry.register({ name: 'runtime_ping', description: 'Check if the live-game runtime bridge is reachable.', schema: runtimePingSchema, handler: (_) => handleRuntimePing() });
+  registry.register({ name: 'runtime_get_tree', description: 'Read the running game scene tree (live, inside the played game).', schema: runtimeGetTreeSchema, handler: (_) => handleRuntimeGetTree() });
+  registry.register({ name: 'runtime_get_node', description: 'Read live properties of a node in the running game.', schema: runtimeGetNodeSchema, handler: (_, args) => handleRuntimeGetNode(args) });
+  registry.register({ name: 'runtime_set_node', description: 'Set properties on a node in the running game (live mutation).', schema: runtimeSetNodeSchema, handler: (_, args) => handleRuntimeSetNode(args) });
+  registry.register({ name: 'runtime_call_method', description: 'Call a method on a node in the running game.', schema: runtimeCallMethodSchema, handler: (_, args) => handleRuntimeCallMethod(args) });
+  registry.register({ name: 'runtime_emit_signal', description: 'Emit a signal on a node in the running game.', schema: runtimeEmitSignalSchema, handler: (_, args) => handleRuntimeEmitSignal(args) });
+  registry.register({ name: 'runtime_input', description: 'Inject a key input event into the running game.', schema: runtimeInputSchema, handler: (_, args) => handleRuntimeInput(args) });
+  registry.register({ name: 'runtime_freeze', description: 'Pause (freeze) the running game.', schema: runtimeFreezeSchema, handler: (_) => handleRuntimeFreeze() });
+  registry.register({ name: 'runtime_resume', description: 'Resume (unpause) the running game.', schema: runtimeResumeSchema, handler: (_) => handleRuntimeResume() });
+  registry.register({ name: 'runtime_step', description: 'Advance the running game by N frames deterministically while paused (frame stepping).', schema: runtimeStepSchema, handler: (_, args) => handleRuntimeStep(args) });
+  registry.register({ name: 'runtime_screenshot', description: 'Capture a screenshot of the running game viewport.', schema: runtimeScreenshotSchema, handler: (_, args) => handleRuntimeScreenshot(args) });
+
+  // Expose the registry globally so meta/discovery tools can search it.
+  setActiveRegistry(registry);
 }

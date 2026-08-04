@@ -2,10 +2,10 @@
 extends EditorPlugin
 
 # Copyright (c) 2026 FairYan
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: AGPL-3.0-or-later
 
 # ============================================================
-# Godot MCP Editor Plugin v1.7.0
+# Godot MCP Editor Plugin v1.9.0
 # ============================================================
 # ⚠️  Godot 4.x only. Godot 3 is NOT supported.
 # Dual-mode communication with the MCP server:
@@ -20,7 +20,7 @@ const DEFAULT_PORT = 9876
 const MAX_OUTPUT_LINES = 500
 const BUFFER_SIZE = 65536
 const RESPONSE_MARKER = "__MCP__:"
-const PLUGIN_VERSION = "1.7.0"
+const PLUGIN_VERSION = "1.9.0"
 
 # TCP 接收缓冲上限：超过且无完整行时丢弃，防止恶意客户端灌数据撑爆内存
 const TCP_BUFFER_LIMIT = 1024 * 1024
