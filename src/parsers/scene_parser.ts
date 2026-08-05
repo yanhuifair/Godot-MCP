@@ -30,6 +30,8 @@ import {
   splitHeaderParts,
   parseKeyValuePairs,
   unquote,
+  unquoteId,
+  unquoteAttr,
   isValueBalanced,
 } from './parser_helpers.js';
 
@@ -147,32 +149,32 @@ function parseSceneHeader(props: Record<string, string>): SceneHeader {
   return {
     load_steps: props.load_steps ? parseInt(props.load_steps, 10) : undefined,
     format: props.format ? parseInt(props.format, 10) : 3,
-    uid: props.uid ? unquote(props.uid) : undefined,
+    uid: props.uid ? unquoteAttr(props.uid) : undefined,
   };
 }
 
 function parseExtResource(props: Record<string, string>): ExtResource {
   return {
-    type: props.type ? unquote(props.type) : '',
-    uid: props.uid ? unquote(props.uid) : undefined,
-    path: unquote(props.path || ''),
-    id: props.id || '',
+    type: unquoteAttr(props.type),
+    uid: props.uid ? unquoteAttr(props.uid) : undefined,
+    path: unquoteAttr(props.path),
+    id: unquoteId(props.id),
   };
 }
 
 function parseSubResource(props: Record<string, string>): SubResource {
   return {
-    type: props.type ? unquote(props.type) : '',
-    id: props.id || '',
+    type: unquoteAttr(props.type),
+    id: unquoteId(props.id),
     properties: {},
   };
 }
 
 function parseNodeDefinition(props: Record<string, string>): NodeDefinition {
   const node: NodeDefinition = {
-    name: unquote(props.name || ''),
-    type: props.type ? unquote(props.type) : '',
-    parent: props.parent ? unquote(props.parent) : undefined,
+    name: unquoteAttr(props.name),
+    type: unquoteAttr(props.type),
+    parent: props.parent ? unquoteAttr(props.parent) : undefined,
     instance: props.instance,
     properties: {},
     children: [],
@@ -255,30 +257,71 @@ function setProperty(doc: GodotDocument, sectionType: string, sectionIdx: number
 // Node Hierarchy Building
 // ============================================================
 
+/**
+ * Rebuild the node tree from the flat `[node ...]` list.
+ *
+ * Godot's .tscn parent convention (paths are relative to the scene root):
+ *   root node          -> no `parent` attribute at all
+ *   direct child       -> parent="."
+ *   grandchild         -> parent="Child"
+ *   great-grandchild   -> parent="Child/Grandchild"
+ *
+ * A `.tscn` has exactly ONE root. Treating parent="." as "is a root" (the old
+ * behaviour) flattened the whole tree and, on the way back out, dropped the
+ * `parent=` attribute entirely — producing a multi-root scene Godot cannot load.
+ */
 function buildNodeHierarchy(flatNodes: NodeDefinition[]): NodeDefinition[] {
   if (flatNodes.length === 0) return [];
 
-  // Find root nodes (no parent or parent is ".")
-  const roots: NodeDefinition[] = [];
+  // The root is the only node without a `parent` attribute.
+  const rootName = flatNodes.find(n => n.parent === undefined || n.parent === '')?.name;
+
+  /**
+   * Canonicalise a parent value to Godot's root-relative form.
+   * Also accepts the root-prefixed variant ("Root", "Root/Child") that some
+   * hand-written scenes and older tooling emit.
+   */
+  function canonicalParent(raw: string): string {
+    if (raw === '.' || raw === '') return '.';
+    if (rootName) {
+      if (raw === rootName) return '.';
+      if (raw.startsWith(`${rootName}/`)) return raw.slice(rootName.length + 1);
+    }
+    return raw;
+  }
+
   const childrenByParent: Map<string, NodeDefinition[]> = new Map();
+  const roots: NodeDefinition[] = [];
 
   for (const node of flatNodes) {
-    if (!node.parent || node.parent === '.') {
+    node.children = [];
+    if (node.parent === undefined || node.parent === '') {
       roots.push(node);
     } else {
-      // Normalize parent path
-      const parentPath = node.parent;
-      if (!childrenByParent.has(parentPath)) {
-        childrenByParent.set(parentPath, []);
-      }
-      childrenByParent.get(parentPath)!.push(node);
+      const key = canonicalParent(node.parent);
+      node.parent = key; // normalise in-place so serialization emits Godot's form
+      if (!childrenByParent.has(key)) childrenByParent.set(key, []);
+      childrenByParent.get(key)!.push(node);
     }
   }
 
-  // Attach children recursively
+  // Malformed input with no explicit root: promote the first node so nothing is lost.
+  if (roots.length === 0) {
+    const first = flatNodes[0];
+    const bucket = childrenByParent.get(first.parent!);
+    if (bucket) {
+      const i = bucket.indexOf(first);
+      if (i >= 0) bucket.splice(i, 1);
+    }
+    first.parent = undefined;
+    roots.push(first);
+  }
+
+  const attached = new Set<NodeDefinition>(roots);
+
+  // `path` is the parent key used by children, in Godot's root-relative form.
   function attachChildren(node: NodeDefinition, path: string): void {
     const children = childrenByParent.get(path) || [];
-    // Sort by index if present
     children.sort((a, b) => {
       if (a.index !== undefined && b.index !== undefined) return a.index - b.index;
       if (a.index !== undefined) return -1;
@@ -288,13 +331,21 @@ function buildNodeHierarchy(flatNodes: NodeDefinition[]): NodeDefinition[] {
     node.children = children;
 
     for (const child of children) {
-      const childPath = `${path}/${child.name}`;
-      attachChildren(child, childPath);
+      attached.add(child);
+      attachChildren(child, path === '.' ? child.name : `${path}/${child.name}`);
     }
   }
 
-  for (const root of roots) {
-    attachChildren(root, root.name);
+  // Only the real root owns the `parent="."` bucket.
+  attachChildren(roots[0], '.');
+
+  // Orphans (parent path points at a node that does not exist) must not vanish —
+  // keep them addressable rather than silently deleting user data.
+  for (const node of flatNodes) {
+    if (!attached.has(node)) {
+      attached.add(node);
+      roots.push(node);
+    }
   }
 
   return roots;
@@ -331,28 +382,22 @@ export function serializeScene(doc: GodotDocument): string {
   }
   if (doc.extResources.length > 0) lines.push('');
 
-  // Sub resources
-  for (const sub of doc.subResources) {
-    let line = `[sub_resource type="${sub.type}" id="${sub.id}"]`;
-    lines.push(line);
+  // Sub resources — blank line between blocks, matching Godot's own writer.
+  doc.subResources.forEach((sub, i) => {
+    if (i > 0) lines.push('');
+    lines.push(`[sub_resource type="${sub.type}" id="${sub.id}"]`);
     for (const [key, value] of Object.entries(sub.properties)) {
       lines.push(`${key} = ${value}`);
     }
-  }
+  });
   if (doc.subResources.length > 0) lines.push('');
 
-  // Nodes (depth-first traversal)
-  function emitNode(node: NodeDefinition, depth: number): void {
-    const indent = '\t'.repeat(depth);
-    // Gather flat nodes list from tree
-  }
-
-  // We need flat node list for serialization - use the stored order
-  // Since we built hierarchy, we need to flatten back preserving order
-  const flatNodes = flattenNodes(doc.nodes, doc.nodes); // use original flat order tracking
-  for (const node of flatNodes) {
+  // Nodes, depth-first in Godot's document order.
+  const flatNodes = flattenNodes(doc.nodes);
+  flatNodes.forEach((node, i) => {
+    if (i > 0) lines.push('');
     emitFlatNode(lines, node);
-  }
+  });
 
   if (flatNodes.length > 0) lines.push('');
 
@@ -371,31 +416,35 @@ export function serializeScene(doc: GodotDocument): string {
 interface FlatNodeEntry {
   node: NodeDefinition;
   depth: number;
-  parentPath: string;
+  /** Root-relative parent path in Godot's own form ("." for direct children); undefined for the root. */
+  parentPath: string | undefined;
 }
 
-function flattenNodes(roots: NodeDefinition[], _originalFlat: NodeDefinition[]): FlatNodeEntry[] {
+/**
+ * Depth-first flatten producing Godot's root-relative `parent=` values:
+ * root -> undefined, direct child -> ".", deeper -> "Child/Grandchild".
+ */
+function flattenNodes(roots: NodeDefinition[], _originalFlat?: NodeDefinition[]): FlatNodeEntry[] {
   const result: FlatNodeEntry[] = [];
 
-  function walk(node: NodeDefinition, depth: number, parentPath: string): void {
+  function walk(node: NodeDefinition, depth: number, parentPath: string | undefined, selfPath: string): void {
     result.push({ node, depth, parentPath });
-    const fullPath = parentPath ? `${parentPath}/${node.name}` : node.name;
     for (const child of node.children) {
-      walk(child, depth + 1, fullPath);
+      walk(child, depth + 1, selfPath, selfPath === '.' ? child.name : `${selfPath}/${child.name}`);
     }
   }
 
   for (const root of roots) {
-    walk(root, 0, '');
+    walk(root, 0, undefined, '.');
   }
 
   return result;
 }
 
 function emitFlatNode(lines: string[], entry: FlatNodeEntry): void {
-  const { node, depth } = entry;
+  const { node } = entry;
   let line = `[node name="${node.name}" type="${node.type}"`;
-  if (depth > 0) {
+  if (entry.parentPath !== undefined) {
     line += ` parent="${entry.parentPath}"`;
   }
   if (node.instance) line += ` instance="${node.instance}"`;
@@ -424,49 +473,110 @@ export function editScene(content: string, operations: SceneOperation[]): string
 
   // Flatten nodes for operation targeting
   const flatMap = new Map<string, { node: NodeDefinition; parentPath: string }>();
+  // Bare-name index: only usable when the name is unambiguous scene-wide.
+  const byName = new Map<string, { node: NodeDefinition; parentPath: string }[]>();
   function indexNodes(nodes: NodeDefinition[], parentPath: string): void {
     for (const node of nodes) {
       const fullPath = parentPath ? `${parentPath}/${node.name}` : node.name;
-      flatMap.set(fullPath, { node, parentPath });
+      const entry = { node, parentPath };
+      flatMap.set(fullPath, entry);
+      if (!byName.has(node.name)) byName.set(node.name, []);
+      byName.get(node.name)!.push(entry);
       indexNodes(node.children, fullPath);
     }
   }
   indexNodes(doc.nodes, '');
 
+  const rootName = doc.nodes[0]?.name;
+
+  /**
+   * Resolve a node reference tolerantly. Callers in the wild use several forms:
+   *   "Player/Col"      full path from the scene root  (canonical)
+   *   "Col"             root-relative path, as written in the .tscn `parent=`
+   *   "."  / ""         the scene root itself
+   *   "/root/Player/Col" absolute runtime path
+   */
+  function resolveNode(path: string | undefined): { node: NodeDefinition; parentPath: string } | undefined {
+    if (path === undefined) return undefined;
+    let p = path.trim();
+    if (p === '' || p === '.') return rootName ? flatMap.get(rootName) : undefined;
+    if (p.startsWith('/root/')) p = p.slice('/root/'.length);
+    p = p.replace(/^\.\//, '').replace(/\/+$/, '');
+
+    const direct = flatMap.get(p);
+    if (direct) return direct;
+    // Root-relative form ("Col" meaning "<Root>/Col").
+    if (rootName) {
+      const prefixed = flatMap.get(`${rootName}/${p}`);
+      if (prefixed) return prefixed;
+    }
+    // Unique bare name anywhere in the tree.
+    const leaf = p.split('/').pop()!;
+    const candidates = byName.get(leaf);
+    if (candidates && candidates.length === 1) return candidates[0];
+    return undefined;
+  }
+
+  /** Resolve an add/clone target parent. "." and the root name both mean the scene root. */
+  function resolveParent(path: string | undefined): { node: NodeDefinition; parentPath: string } | undefined {
+    if (path === undefined || path === '' || path === '.') {
+      return rootName ? flatMap.get(rootName) : undefined;
+    }
+    return resolveNode(path);
+  }
+
+  /** Godot-relative parent value for a node located at `fullPath` (used for `parent=`). */
+  function godotParentValue(fullPath: string): string {
+    if (!rootName || fullPath === rootName) return '.';
+    return fullPath.startsWith(`${rootName}/`) ? fullPath.slice(rootName.length + 1) : fullPath;
+  }
+
+  /** Full path of an indexed entry. */
+  function fullPathOf(entry: { node: NodeDefinition; parentPath: string }): string {
+    return entry.parentPath ? `${entry.parentPath}/${entry.node.name}` : entry.node.name;
+  }
+
   // Apply operations
   for (const op of operations) {
     switch (op.action) {
       case 'add_node': {
+        const parentInfo = resolveParent(op.parent_path);
+        if (!parentInfo) {
+          // Empty scene (or unresolvable parent): the new node becomes the root.
+          const newRoot: NodeDefinition = {
+            name: op.name || 'NewNode',
+            type: op.type || 'Node2D',
+            properties: op.properties || {},
+            groups: op.groups,
+            children: [],
+          };
+          doc.nodes.push(newRoot);
+          doc.nodes = buildNodeHierarchy(doc.nodes);
+          break;
+        }
+
+        const parentFull = fullPathOf(parentInfo);
         const newNode: NodeDefinition = {
           name: op.name || 'NewNode',
           type: op.type || 'Node2D',
-          parent: op.parent_path || '.',
+          parent: godotParentValue(parentFull),
           properties: op.properties || {},
           groups: op.groups,
           children: [],
         };
-
-        // If parent_path is '.' or root, add to roots
-        if (!op.parent_path || op.parent_path === '.') {
-          doc.nodes.push(newNode);
-          // Rebuild hierarchy
-          doc.nodes = buildNodeHierarchy(doc.nodes);
-        } else {
-          // Add as child of existing node (requires hierarchy rebuild)
-          const parentInfo = flatMap.get(op.parent_path);
-          if (parentInfo) {
-            parentInfo.node.children.push(newNode);
-          } else {
-            doc.nodes.push(newNode);
-            doc.nodes = buildNodeHierarchy(doc.nodes);
-          }
-        }
+        parentInfo.node.children.push(newNode);
+        // Index the newcomer so later operations in the same batch can target it.
+        const newFull = `${parentFull}/${newNode.name}`;
+        const entry = { node: newNode, parentPath: parentFull };
+        flatMap.set(newFull, entry);
+        if (!byName.has(newNode.name)) byName.set(newNode.name, []);
+        byName.get(newNode.name)!.push(entry);
         break;
       }
 
       case 'modify_node': {
         if (!op.node_path) continue;
-        const info = flatMap.get(op.node_path);
+        const info = resolveNode(op.node_path);
         if (!info) continue;
         if (op.properties) {
           Object.assign(info.node.properties, op.properties);
@@ -482,7 +592,7 @@ export function editScene(content: string, operations: SceneOperation[]): string
 
       case 'remove_node': {
         if (!op.node_path) continue;
-        const info = flatMap.get(op.node_path);
+        const info = resolveNode(op.node_path);
         if (!info) continue;
 
         if (info.parentPath === '') {
@@ -522,27 +632,33 @@ export function editScene(content: string, operations: SceneOperation[]): string
 
       case 'clone_node': {
         if (!op.clone_source) continue;
-        const srcInfo = flatMap.get(op.clone_source);
+        const srcInfo = resolveNode(op.clone_source);
         if (!srcInfo) continue;
 
         // Deep clone the node
         const clone = deepCloneNode(srcInfo.node);
         clone.name = op.name || `${clone.name}_copy`;
 
-        // Add to same parent or specified parent
-        const targetParent = op.parent_path || srcInfo.parentPath;
-        if (!targetParent || targetParent === '.') {
+        // Default target: the source's own parent (siblings), else the scene root.
+        const parentInfo = op.parent_path !== undefined
+          ? resolveParent(op.parent_path)
+          : (srcInfo.parentPath ? flatMap.get(srcInfo.parentPath) : undefined);
+
+        if (!parentInfo) {
+          // Cloning the root itself has nowhere to go — keep it as a sibling root
+          // rather than dropping the operation silently.
+          clone.parent = undefined;
           doc.nodes.push(clone);
-          doc.nodes = buildNodeHierarchy(doc.nodes);
-        } else {
-          const parentInfo = flatMap.get(targetParent);
-          if (parentInfo) {
-            parentInfo.node.children.push(clone);
-          } else {
-            doc.nodes.push(clone);
-            doc.nodes = buildNodeHierarchy(doc.nodes);
-          }
+          break;
         }
+
+        const parentFull = fullPathOf(parentInfo);
+        clone.parent = godotParentValue(parentFull);
+        parentInfo.node.children.push(clone);
+        const cloneEntry = { node: clone, parentPath: parentFull };
+        flatMap.set(`${parentFull}/${clone.name}`, cloneEntry);
+        if (!byName.has(clone.name)) byName.set(clone.name, []);
+        byName.get(clone.name)!.push(cloneEntry);
         break;
       }
     }

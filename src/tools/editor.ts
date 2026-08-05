@@ -13,7 +13,7 @@ import { z } from 'zod';
 import net from 'node:net';
 import { spawn, ChildProcess } from 'node:child_process';
 import { ToolResult } from '../utils/types.js';
-import { ErrorCode, toolError, wrapError, plainError } from '../utils/errors.js';
+import { ErrorCode, toolError, wrapError, plainError, editorCommandError } from '../utils/errors.js';
 import { findGodotBinary } from '../utils/godot_cli.js';
 
 const EDITOR_PORT = 9876;
@@ -149,15 +149,35 @@ function getTcpConnection(): Promise<net.Socket> {
 
 // ---- Dual-mode send ----
 
+/**
+ * Godot 侧把业务失败放在 result 里（`{"error": "Node not found"}`），而不是
+ * JSON-RPC 的 error 字段。以前没人检查它，于是删除不存在的节点也会回报
+ * "Node removed"，AI 客户端拿到假成功后会继续往下错。这里统一拦截。
+ */
+function assertEditorOk(method: string, result: any): any {
+  if (result && typeof result === 'object' && typeof result.error === 'string' && result.error !== '') {
+    throw editorCommandError(method, result.error);
+  }
+  return result;
+}
+
 export function sendEditorCommand(method: string, params: Record<string, any> = {}): Promise<any> {
-  // If we already know which mode works, use it
+  const send = (): Promise<any> => {
+    // If we already know which mode works, use it
+    if (_useTcp === true) return sendViaTcp(method, params);
+    if (_useTcp === false) return sendViaSpawn(method, params);
+
+    // First call: try TCP first, fall back to spawn
+    return sendViaTcp(method, params).catch(() => sendViaSpawn(method, params));
+  };
+  return send().then((result) => assertEditorOk(method, result));
+}
+
+/** 绕过业务错误检查的原始通道（供本身就要读 result.error 的命令使用）。 */
+export function sendEditorCommandRaw(method: string, params: Record<string, any> = {}): Promise<any> {
   if (_useTcp === true) return sendViaTcp(method, params);
   if (_useTcp === false) return sendViaSpawn(method, params);
-
-  // First call: try TCP first, fall back to spawn
-  return sendViaTcp(method, params).catch(() => {
-    return sendViaSpawn(method, params);
-  });
+  return sendViaTcp(method, params).catch(() => sendViaSpawn(method, params));
 }
 
 // ---- TCP mode (persistent connection to already-running Godot) ----
@@ -464,13 +484,19 @@ export async function handleEditorStop(): Promise<ToolResult> {
 }
 
 export async function handleEditorUndo(): Promise<ToolResult> {
-  try { await sendEditorCommand('undo'); return { content: [{ type: 'text', text: 'Undo.' }] }; }
-  catch (err: any) { return wrapError(ErrorCode.EDITOR_NOT_REACHABLE, err); }
+  try {
+    const r = await sendEditorCommand('undo');
+    const text = r.undone ? `Undone: ${r.action || '(unnamed action)'}` : (r.message || 'Nothing to undo.');
+    return { content: [{ type: 'text', text }] };
+  } catch (err: any) { return wrapError(ErrorCode.EDITOR_NOT_REACHABLE, err); }
 }
 
 export async function handleEditorRedo(): Promise<ToolResult> {
-  try { await sendEditorCommand('redo'); return { content: [{ type: 'text', text: 'Redo.' }] }; }
-  catch (err: any) { return wrapError(ErrorCode.EDITOR_NOT_REACHABLE, err); }
+  try {
+    const r = await sendEditorCommand('redo');
+    const text = r.redone ? `Redone: ${r.action || '(unnamed action)'}` : (r.message || 'Nothing to redo.');
+    return { content: [{ type: 'text', text }] };
+  } catch (err: any) { return wrapError(ErrorCode.EDITOR_NOT_REACHABLE, err); }
 }
 
 export async function handleEditorSave(): Promise<ToolResult> {
@@ -543,14 +569,20 @@ export async function handleEditorAddNode(args: { type: string; name?: string; p
     const r = await sendEditorCommand('add_node', {
       type: args.type, name: args.name, parent: args.parent || '.', properties: args.properties || {},
     });
-    return { content: [{ type: 'text', text: `Node added: ${r.name} (${r.type}) at ${r.path}` }] };
+    const lines = [`Node added: ${r.name} (${r.type}) at ${r.path}`];
+    if (r.failed_properties?.length) {
+      lines.push(`Skipped unknown properties: ${r.failed_properties.join(', ')} — use editor_get_node_properties to list valid names.`);
+    }
+    if (r.undoable) lines.push('Undoable in the editor (Ctrl+Z / editor_undo).');
+    return { content: [{ type: 'text', text: lines.join('\n') }] };
   } catch (err: any) { return wrapError(ErrorCode.EDITOR_NOT_REACHABLE, err); }
 }
 
 export async function handleEditorRemoveNode(args: { path: string }): Promise<ToolResult> {
   try {
-    await sendEditorCommand('remove_node', { path: args.path });
-    return { content: [{ type: 'text', text: `Node removed: ${args.path}` }] };
+    const r = await sendEditorCommand('remove_node', { path: args.path });
+    const suffix = r.undoable ? ' (undoable via Ctrl+Z / editor_undo)' : '';
+    return { content: [{ type: 'text', text: `Node removed: ${args.path}${suffix}` }] };
   } catch (err: any) { return wrapError(ErrorCode.EDITOR_NOT_REACHABLE, err); }
 }
 
@@ -567,8 +599,17 @@ export async function handleEditorGetNodeProperties(args: { path: string }): Pro
 
 export async function handleEditorSetNodeProperties(args: { path: string; properties: Record<string, string> }): Promise<ToolResult> {
   try {
-    await sendEditorCommand('set_node_properties', { path: args.path, properties: args.properties });
-    return { content: [{ type: 'text', text: `Properties updated on ${args.path} (${Object.keys(args.properties).length} changes)` }] };
+    const r = await sendEditorCommand('set_node_properties', { path: args.path, properties: args.properties });
+    const applied = r.applied?.length ?? r.updated ?? 0;
+    const lines = [`Properties updated on ${args.path}: ${applied} applied` +
+      (r.applied?.length ? ` (${r.applied.join(', ')})` : '')];
+    if (r.failed_properties?.length) {
+      lines.push(`Skipped ${r.failed_properties.length} unknown propertie(s): ${r.failed_properties.join(', ')}`);
+      lines.push('Use editor_get_node_properties to list the valid property names for this node.');
+    }
+    // 全部属性都无效时按失败上报，否则 AI 会以为改动生效了。
+    const allFailed = applied === 0 && (r.failed_properties?.length ?? 0) > 0;
+    return { content: [{ type: 'text', text: lines.join('\n') }], isError: allFailed };
   } catch (err: any) { return wrapError(ErrorCode.EDITOR_NOT_REACHABLE, err); }
 }
 
@@ -816,7 +857,14 @@ export async function handleEditorListNodeSignals(args: { node: string }): Promi
   catch (err: any) { return wrapError(ErrorCode.EDITOR_NOT_REACHABLE, err); }
 }
 export async function handleEditorGetSceneChanges(): Promise<ToolResult> {
-  try { const r = await sendEditorCommand('get_scene_changes'); return { content: [{ type: 'text', text: `Scene: ${r.scene || 'none'} | Modified: ${r.modified}` }] }; }
+  try {
+    const r = await sendEditorCommand('get_scene_changes');
+    const parts = [`Scene: ${r.scene || 'none'}`, `Modified: ${r.modified}`];
+    if (r.last_action) parts.push(`Last action: ${r.last_action}`);
+    if (r.can_undo !== undefined) parts.push(`Undo: ${r.can_undo ? 'available' : 'empty'}`);
+    if (r.can_redo !== undefined) parts.push(`Redo: ${r.can_redo ? 'available' : 'empty'}`);
+    return { content: [{ type: 'text', text: parts.join(' | ') }] };
+  }
   catch (err: any) { return wrapError(ErrorCode.EDITOR_NOT_REACHABLE, err); }
 }
 export async function handleEditorGetRecentScenes(): Promise<ToolResult> {

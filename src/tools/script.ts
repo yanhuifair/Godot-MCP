@@ -15,6 +15,7 @@ import {
   resolveProjectPath,
 } from '../utils/file_utils.js';
 import { parseResource } from '../parsers/resource_parser.js';
+import { parseVisualShaderDoc, describeVisualShaderDoc } from './shader_graph.js';
 
 // ---- GDScript identifier validation ----
 // Names fed into generated GDScript must be valid identifiers so a caller (or
@@ -702,75 +703,12 @@ export function handleReadVisualShader(
   try {
     const absPath = resolveProjectPath(projectRoot, args.path);
     const { content } = readTextFile(absPath);
-    const doc = parseResource(content);
-
-    // Parse nodes
-    const nodes: { id: string; type: string; position: string }[] = [];
-    const nodePattern = /nodes\/(\d+)\/node\s*=\s*(.+)/g;
-    let match: RegExpExecArray | null;
-    while ((match = nodePattern.exec(content)) !== null) {
-      nodes.push({ id: match[1], type: match[2], position: '?' });
-    }
-
-    // Parse positions
-    const posPattern = /nodes\/(\d+)\/position\s*=\s*(.+)/g;
-    while ((match = posPattern.exec(content)) !== null) {
-      const node = nodes.find(n => n.id === match![1]);
-      if (node) node.position = match![2];
-    }
-
-    // Resolve sub_resource node types
-    for (const node of nodes) {
-      if (node.type.startsWith('SubResource(')) {
-        const subId = node.type.match(/SubResource\("([^"]+)"\)/)?.[1] || '';
-        for (const sub of doc.subResources) {
-          if (sub.id === subId) {
-            node.type = sub.type;
-            break;
-          }
-        }
-      }
-    }
-
-    // Parse connections
-    const connections: { from: string; from_port: string; to: string; to_port: string }[] = [];
-    const connMatch = content.match(/node_connections\s*=\s*\[([\s\S]*?)\]/);
-    if (connMatch) {
-      const entries = connMatch[1].match(/\{[^}]+\}/g) || [];
-      for (const entry of entries) {
-        const fm = entry.match(/"from_node":\s*(\d+)/);
-        const fp = entry.match(/"from_port":\s*(\d+)/);
-        const tm = entry.match(/"to_node":\s*(\d+)/);
-        const tp = entry.match(/"to_port":\s*(\d+)/);
-        if (fm && fp && tm && tp) {
-          connections.push({ from: fm[1], from_port: fp[1], to: tm[1], to_port: tp[1] });
-        }
-      }
-    }
-
-    const modeMatch = content.match(/shader_type\s*=\s*"(\w+)"/);
-    const lines: string[] = [];
-    lines.push(`Visual Shader: ${args.path}`);
-    lines.push(`Shader Type: ${modeMatch?.[1] || 'unknown'}`);
-    lines.push(`Nodes: ${nodes.length}  |  Connections: ${connections.length}`);
-    lines.push('');
-
-    if (nodes.length > 0) {
-      lines.push('Nodes:');
-      for (const node of nodes) {
-        lines.push(`  [#${node.id}] ${node.type}  @ ${node.position}`);
-      }
-      lines.push('');
-    }
-
-    if (connections.length > 0) {
-      lines.push('Connections:');
-      for (const conn of connections) {
-        lines.push(`  node#${conn.from}:${conn.from_port} → node#${conn.to}:${conn.to_port}`);
-      }
-    }
-
-    return { content: [{ type: 'text', text: lines.join('\n') }] };
+    // Godot serializes VisualShader graphs as `mode = <int>` plus stage-scoped
+    // `nodes/<stage>/<id>/...` keys and `nodes/<stage>/connections`
+    // (PackedInt32Array). Delegate to the shared model so reads and writes
+    // always agree on that layout.
+    const doc = parseVisualShaderDoc(content);
+    return { content: [{ type: 'text', text: describeVisualShaderDoc(args.path, doc) }] };
   } catch (err: any) {
     return toolError(ErrorCode.INTERNAL_ERROR, `Error reading visual shader: ${err.message}`);
   }

@@ -6,10 +6,15 @@
 // ============================================================
 // 用法: node scripts/sync-addons.js <目标工程路径>
 // 或作为 npm run build 的 postbuild 钩子
-// 仅在源版本与目标版本不匹配时才执行复制，避免不必要的写入
+// 仅在源与目标内容不一致时才执行复制，避免不必要的写入。
+//
+// 注意：这里必须按“内容”而不是按“版本号”判断。早期版本只比较 plugin.cfg
+// 的 version 字段，导致同一版本号内的插件修改永远不会同步到目标工程——
+// 你修好了一个 plugin.gd 的 bug、重新构建，测试工程里跑的还是旧代码。
 
 import fs from "node:fs";
 import path from "node:path";
+import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -23,24 +28,44 @@ function readPluginVersion(pluginCfgPath) {
   return match ? match[1] : null;
 }
 
-// --- 辅助：比较源与目标的 plugin.cfg 版本 ---
-function needsSync(srcCfgPath, dstCfgPath) {
-  const srcVersion = readPluginVersion(srcCfgPath);
-  const dstVersion = readPluginVersion(dstCfgPath);
-  if (!srcVersion) {
-    console.warn("[sync-addons] ⚠️  Source plugin.cfg has no version — will sync anyway");
-    return true;
+// --- 辅助：递归列出目录下所有文件的相对路径 ---
+function listFiles(dir, base = dir) {
+  if (!fs.existsSync(dir)) return [];
+  const out = [];
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) out.push(...listFiles(full, base));
+    else out.push(path.relative(base, full));
   }
-  if (!dstVersion) {
-    console.log(`[sync-addons] Target has no plugin.cfg or no version — will sync (source: ${srcVersion})`);
-    return true;
-  }
-  if (srcVersion !== dstVersion) {
-    console.log(`[sync-addons] Version mismatch: source=${srcVersion} vs target=${dstVersion} — will sync`);
-    return true;
-  }
-  console.log(`[sync-addons] Versions match (${srcVersion}) — skipping sync`);
-  return false;
+  return out.sort();
+}
+
+function hashFile(p) {
+  return crypto.createHash("sha1").update(fs.readFileSync(p)).digest("hex");
+}
+
+// --- 辅助：按内容比较源与目标，返回第一处差异的说明（相同则返回 null）---
+function diffReason(srcDir, dstDir) {
+  if (!fs.existsSync(dstDir)) return "target does not exist";
+
+  const srcFiles = listFiles(srcDir);
+  const dstFiles = listFiles(dstDir);
+
+  const missing = srcFiles.filter((f) => !dstFiles.includes(f));
+  if (missing.length) return `target is missing ${missing.length} file(s): ${missing.slice(0, 3).join(", ")}`;
+
+  // Godot 会在目标工程里自己生成 .uid / .import 等元文件，它们本来就不该
+  // 存在于源目录，不能当成“过期文件”，否则每次构建都会误判为需要同步。
+  const isEngineArtifact = (f) => /\.(uid|import)$/.test(f);
+  const extra = dstFiles.filter((f) => !srcFiles.includes(f) && !isEngineArtifact(f));
+  if (extra.length) return `target has ${extra.length} stale file(s): ${extra.slice(0, 3).join(", ")}`;
+
+  const changed = srcFiles.filter(
+    (f) => hashFile(path.join(srcDir, f)) !== hashFile(path.join(dstDir, f))
+  );
+  if (changed.length) return `${changed.length} file(s) changed: ${changed.slice(0, 3).join(", ")}`;
+
+  return null;
 }
 
 // 目标路径：命令行参数 > 环境变量 GODOT_PROJECT > 自动检测
@@ -75,10 +100,13 @@ const targetAddons = path.join(target, "addons", "godot-mcp");
 const srcPluginCfg = path.join(sourceAddons, "plugin.cfg");
 const dstPluginCfg = path.join(targetAddons, "plugin.cfg");
 
-// 版本匹配则跳过复制
-if (!needsSync(srcPluginCfg, dstPluginCfg)) {
+// 内容完全一致则跳过复制
+const reason = diffReason(sourceAddons, targetAddons);
+if (!reason) {
+  console.log(`[sync-addons] Already up to date (v${readPluginVersion(srcPluginCfg)}) — skipping sync`);
   process.exit(0);
 }
+console.log(`[sync-addons] Out of date — ${reason}`);
 
 // 复制目录
 fs.cpSync(sourceAddons, targetAddons, { recursive: true, force: true });

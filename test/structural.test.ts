@@ -160,7 +160,7 @@ describe('Scene Node Operations', () => {
       scene_path: 'main.tscn', node_path: 'Main/Player/CollisionShape2D',
       shape_type: 'RectangleShape2D', extents: [32, 32],
     });
-    expect(result.content[0].text).toContain('assigned');
+    expect(result.content[0].text).toMatch(/assigned/i);
   });
 
   it('connect_signal adds new connection', async () => {

@@ -22,6 +22,7 @@
 
 - 📂 **原生读写项目文件** — `.tscn` 场景、`.tres` 资源、GDScript、C#、`.gdshader`、`project.godot`。自研解析器，无需启动 Godot 进程，响应即时。
 - 🎛️ **驱动实时编辑器** — 选择节点、连接信号、编写可视化着色器、烘焙光照贴图、设置断点、单步调试、运行与停止游戏。
+- ↩️ **每一次场景修改都可撤销** — 添加、删除、重命名、移动、重设父节点、复制、实例化，全部注册进 Godot 原生撤销栈。AI 改错了，**Ctrl+Z** 就能还原。
 - 🎮 **深入正在运行的游戏** — 检查实时场景树、调用方法、注入输入，**冻结游戏、逐帧步进、并对结果截图**。这是目前唯一能做到这一点的公开 Godot MCP。
 - 🔎 **规模化仍然好用** — `search_tools` 从 358 个工具中精准定位，`get_status` 直接告诉你哪些子系统已连接，每个错误都返回类型化错误码和修复建议。
 
@@ -46,6 +47,7 @@ npx @yanhuifair/godot-mcp --enable-plugin -p .
 | **工具数量** | **358 个**，29 个分类 | 16 – 156 个 |
 | **无需 Godot 运行** | ✅ 原生 `.tscn` / `.tres` / `.godot` 解析器 | ⚠️ 通常必须开着编辑器 |
 | **实时编辑器控制** | ✅ 123 个工具——运行、调试、断点、视口、烘焙 | 部分支持 |
+| **AI 修改可撤销** | ✅ **任何场景改动都能一次 Ctrl+Z 撤销**——原生 `EditorUndoRedoManager` 动作 | ❌ 改了就回不去 |
 | **控制_正在运行的游戏_** | ✅ **11 个工具**——实时场景树、方法调用、输入注入 | ❌ 无 |
 | **确定性逐帧步进** | ✅ `runtime_freeze` → `runtime_step` → `runtime_screenshot` | ❌ 无 |
 | **大规模工具发现** | ✅ `search_tools` + `get_status` | ❌ 无 |
@@ -161,6 +163,8 @@ npx @yanhuifair/godot-mcp --enable-plugin -p .
 | 报 `Project not found` | `-p` 必须指向含有 `project.godot` 的目录。`"."` 只在客户端的工作目录**就是**你的项目时才有效，否则请用绝对路径。 |
 | 文件类工具正常，编辑器工具失败 | 插件没装或没启用。重跑第 1 步，然后在 Godot 里重新加载项目。 |
 | `EDITOR_NOT_REACHABLE` | Godot 没在运行，或插件未启用。服务器会尝试自己拉起 Godot；若失败，请手动用 Godot 打开项目，并检查 项目 → 项目设置 → 插件 → **Godot MCP** 是否已勾选。 |
+| `EDITOR_COMMAND_FAILED` | 编辑器收到了命令但拒绝执行——通常是节点路径写错、该节点类型上不存在这个属性，或目标非法。报错信息里带着 Godot 自己给出的原因。重试前可先用 `editor_get_scene_tree` / `get_class_properties` 核对。 |
+| AI 改了场景但你不想要 | 在 Godot 里按 **Ctrl+Z**，或调用 `editor_undo`。所有 MCP 场景改动都是原生撤销动作。 |
 | 找不到 Godot 可执行文件 | 设置环境变量 `GODOT_PATH` 指向 Godot 可执行文件，参见[环境变量](#环境变量)。 |
 
 </details>
@@ -350,14 +354,18 @@ godot-mcp/
 │   └── godot-mcp/            # Godot 编辑器插件
 │       ├── plugin.cfg         # 插件元数据
 │       └── plugin.gd          # stdin 读取器、TCP 服务器、102 个命令处理器
-├── test/                     # Vitest 套件（144 个测试：74 个可运行 + 70 个集成需要真实 Godot 项目）+ 旧版 .mjs 套件
-│   ├── test_all.mjs          # 旧版独立套件（167 项工具检查）
+├── test/                     # Vitest 套件（197 个测试：127 个可运行 + 70 个集成需要真实 Godot 项目）+ 旧版 .mjs 套件
+│   ├── test_all.mjs          # 旧版独立套件（176 项工具检查）
 │   ├── test_editor.mjs       # Editor 桥 TCP 测试
 │   ├── test_runner.mjs       # 早期集成测试
 │   ├── tools.test.ts         # Vitest 工具处理测试
 │   ├── parsers.test.ts       # Vitest 解析器测试
 │   ├── structural.test.ts    # Vitest 结构测试
 │   ├── integration_mcp_test.test.ts  # Vitest 集成测试
+│   ├── server_normalization.test.ts  # Vitest 参数归一化测试
+│   ├── scene_format.test.ts  # .tscn/.tres 磁盘格式契约（往返、层级、资源 id）
+│   ├── addon_bridges.test.ts # GDScript 桥不变量（保留名、poll()、返回类型）
+│   ├── editor_error_surface.test.ts  # Editor 错误标记 + 撤销/重做插件不变量
 │   ├── fixtures/             # 测试夹具文件（.tscn、.tres、.gd）
 │   └── test-project/         # 独立 Godot 测试项目
 ├── scripts/
@@ -411,7 +419,8 @@ godot-mcp/
 - **只读模式**：`--read-only`（或 `GODOT_MCP_READ_ONLY=true`）通过维护的白名单拒绝164 个写/副作用工具（write_、create_、delete_、move_、set_、edit_、editor_* 变更类、run/export/launch 等）——它们从 `tools/list` 中隐藏，直接调用时返回 `READ_ONLY` 错误
 - **TCP 仅限本机**：编辑器插件的 TCP 桥只绑定 `127.0.0.1`，绝不暴露到局域网
 - **可选令牌鉴权**：设置 `GODOT_MCP_TOKEN` 后，HTTP（`/mcp`、`/sse`）要求 Bearer 令牌，插件 TCP 桥要求 `auth` 握手；非 loopback 的 HTTP 绑定在没有令牌时拒绝启动
-- **结构化错误**：工具失败统一返回 `{ content, isError: true }` 结构；关键路径（只读、编辑器不可达）携带类型化错误码（`READ_ONLY`、`EDITOR_NOT_REACHABLE`、`NOT_FOUND` 等）
+- **编辑器改动可撤销**：所有会修改场景的编辑器命令（`editor_add_node`、`editor_remove_node`、`editor_set_node_properties`、`editor_rename_node`、`editor_move_node`、`editor_move_node_3d`、`editor_reparent_node`、`editor_duplicate_node`、`editor_delete_selected`、`editor_instantiate_scene` 等）都通过 Godot 原生 `EditorUndoRedoManager` 提交，一次 **Ctrl+Z**（或 `editor_undo`）即可撤回 AI 刚做的操作
+- **结构化错误**：工具失败统一返回 `{ content, isError: true }` 结构；关键路径携带类型化错误码（`READ_ONLY`、`EDITOR_NOT_REACHABLE`、`EDITOR_COMMAND_FAILED`、`NOT_FOUND` 等）。引擎侧失败绝不会被当作成功返回——编辑器拒绝了命令，工具就会带着引擎自己的报错信息抛出 `EDITOR_COMMAND_FAILED`
 
 ---
 
@@ -498,7 +507,7 @@ npx @yanhuifair/godot-mcp -t all --port 3000 -p /path/to/your/godot/project
 
 ```bash
 curl http://127.0.0.1:3000/health
-# {"status":"ok","version":"1.9.1","projectRoot":"/path/to/project","endpoints":{...}}
+# {"status":"ok","version":"1.10.0","projectRoot":"/path/to/project","endpoints":{...}}
 ```
 
 ---
@@ -1234,6 +1243,11 @@ npx -y @yanhuifair/godot-mcp -p /path/to/your/godot/project -t all --port 3000
   例如 search_tools("tileset")、search_tools("animation")、search_tools("navmesh")。
 - 遇到 `EDITOR_NOT_REACHABLE` 或 `RUNTIME_NOT_REACHABLE` 时，先调用 `get_status`，
   把缺什么告诉我，不要盲目重试。
+- 遇到 `EDITOR_COMMAND_FAILED` 说明编辑器拒绝了这条命令——先读引擎给出的原因，
+  用 `editor_get_scene_tree` 或 `get_class_properties` 核对节点路径/属性，再重试。
+  不要原样重复调用。
+- 所有 `editor_*` 场景改动都可撤销——我说"撤销刚才那步"时，
+  直接调用 `editor_undo`，不要试图手工还原旧状态。
 - 优先使用文件类工具（read_scene、write_script、create_resource…）。
   它们在 Godot 没打开时也能用，而且最快。
 - 只有当改动必须在运行中的编辑器里体现时，才用 `editor_*` 工具。
@@ -1410,6 +1424,8 @@ npx @yanhuifair/godot-mcp --enable-plugin -p /path/to/your/godot/project
 4. 从编辑器运行游戏（F5）。Autoload 会在输出日志中打印 `[godot-mcp-runtime] Listening on 127.0.0.1:9877`。
 
 > **安全**：桥仅绑定 `127.0.0.1`，绝不暴露到局域网。它以 `process_mode = PROCESS_MODE_ALWAYS` 运行，因此即使通过 `runtime_freeze` 暂停游戏，桥仍能持续接收命令。
+>
+> **它同时拒绝在导出版本中启动。** 这个桥可以在任意节点上调用任意方法，一旦随游戏发布就等于留了后门。因此它只在 `OS.has_feature("editor")` 为真时（也就是从编辑器运行游戏时）才监听端口。即使你导出前忘了移除这个 autoload，它也只会保持静默，不会开端口。若需要在 CI 中驱动导出版本，请设置环境变量 `GODOT_MCP_RUNTIME=1`。
 
 ### 运行时工具（11 个）
 
@@ -1479,8 +1495,8 @@ npx @yanhuifair/godot-mcp --enable-plugin -p /path/to/your/godot/project
 | `editor_run_specific_scene` | 运行特定场景（非主场景） |
 | `editor_get_running_scene_tree` | 游戏运行时获取实时场景树 |
 | `editor_get_performance` | 游戏运行时获取 FPS、绘制调用、内存使用 |
-| `editor_undo` | 撤销上一步编辑器操作 |
-| `editor_redo` | 重做上一步撤销的操作 |
+| `editor_undo` | 撤销上一步场景操作（包含所有 MCP 场景改动），并返回被撤销的动作名 |
+| `editor_redo` | 重做上一步被撤销的场景操作，并返回被重做的动作名 |
 | `editor_save` | 保存编辑器中的当前场景 |
 | `editor_save_all` | 保存所有打开的场景 |
 | `editor_reload_scene` | 保存并重新加载当前场景 |
@@ -1488,7 +1504,7 @@ npx @yanhuifair/godot-mcp --enable-plugin -p /path/to/your/godot/project
 | `editor_create_scene` | 在编辑器中创建并打开新场景 |
 | `editor_instantiate_scene` | 将 PackedScene 实例化到当前场景中 |
 | `editor_set_main_scene` | 设置项目主场景 |
-| `editor_get_scene_changes` | 检查当前场景是否有未保存的更改 |
+| `editor_get_scene_changes` | 检查未保存更改，并返回最后一次动作名与撤销/重做是否可用 |
 | `editor_add_node` | 向编辑器中当前打开的场景添加节点 |
 | `editor_remove_node` | 从当前打开的场景中删除节点 |
 | `editor_duplicate_node` | 复制节点及其子节点、脚本和信号 |
@@ -1851,8 +1867,10 @@ npx @yanhuifair/godot-mcp --enable-plugin -p /path/to/your/godot/project
 npm install          # 安装依赖
 npm run build        # 构建 TypeScript 到 dist/
 npm run dev          # 开发模式（tsx 热重载）
-npm test             # 运行 vitest 套件（144 个测试：74 个可运行 + 70 个集成需要真实 Godot 项目）；node test/test_all.mjs 运行 167 项旧版检查
+npm test             # 运行 vitest 套件（197 个测试：127 个可运行 + 70 个集成需要真实 Godot 项目）；node test/test_all.mjs 运行 176 项旧版检查
 npm run test:watch   # 监听模式
+npm run check:godot  # 在真实的无头 Godot 中加载全部测试资源，校验
+                     # ext_resource 路径、UID 与 SubResource 引用（需已安装 Godot）
 ```
 
 ### CLI 选项
@@ -1887,13 +1905,13 @@ npm run test:watch   # 监听模式
 
 ```bash
 npm run vsix
-# 输出: godot-mcp-1.9.1.vsix
+# 输出: godot-mcp-1.10.0.vsix
 ```
 
 在 VS Code 中安装：
 
 ```bash
-code --install-extension godot-mcp-1.9.1.vsix
+code --install-extension godot-mcp-1.10.0.vsix
 ```
 
 ---

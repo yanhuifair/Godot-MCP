@@ -5,7 +5,7 @@ extends EditorPlugin
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 # ============================================================
-# Godot MCP Editor Plugin v1.9.1
+# Godot MCP Editor Plugin v1.10.0
 # ============================================================
 # ⚠️  Godot 4.x only. Godot 3 is NOT supported.
 # Dual-mode communication with the MCP server:
@@ -20,7 +20,7 @@ const DEFAULT_PORT = 9876
 const MAX_OUTPUT_LINES = 500
 const BUFFER_SIZE = 65536
 const RESPONSE_MARKER = "__MCP__:"
-const PLUGIN_VERSION = "1.9.1"
+const PLUGIN_VERSION = "1.10.0"
 
 # TCP 接收缓冲上限：超过且无完整行时丢弃，防止恶意客户端灌数据撑爆内存
 const TCP_BUFFER_LIMIT = 1024 * 1024
@@ -167,6 +167,15 @@ func _process_tcp() -> void:
 	if not _tcp_server:
 		return
 
+	# Refresh the current peer's socket state FIRST.
+	# StreamPeerTCP.get_status() is only updated by poll(); without this the peer
+	# stays reported as CONNECTED forever after the client goes away, _peer is
+	# never cleared, and no further client can ever connect until Godot restarts.
+	if _peer:
+		_peer.poll()
+		if _peer.get_status() != StreamPeerTCP.STATUS_CONNECTED:
+			_disconnect_peer()
+
 	# Accept new connections
 	if not _peer:
 		if _tcp_server.is_connection_available():
@@ -174,6 +183,7 @@ func _process_tcp() -> void:
 			_tcp_connections.append(_peer)
 			_tcp_buffer = ""
 			_peer_authenticated = _auth_token == ""
+			_peer.poll()
 			print("[Godot MCP] TCP client connected (auth: ", "on" if _auth_token != "" else "off", ")")
 
 	# Read and handle messages
@@ -265,7 +275,7 @@ func _handle_message(raw: String) -> void:
 func _execute_command(method: String, params: Dictionary) -> Dictionary:
 	match method:
 		# ---- Health Check ----
-		"health_check": return {"ok": true, "version": PLUGIN_VERSION, "commands": 102}
+		"health_check": return {"ok": true, "version": PLUGIN_VERSION, "commands": 102, "undo_support": true}
 
 		# ---- Editor State ----
 		"get_open_scene": return _cmd_get_open_scene()
@@ -458,6 +468,15 @@ func _parse_value(raw: String):
 		var s = raw.trim_prefix("Color(").trim_suffix(")")
 		var p = s.split(",", false)
 		if p.size() >= 4: return Color(float(p[0]), float(p[1]), float(p[2]), float(p[3]))
+		# 3 参形式 Color(r, g, b) 视为不透明色，避免整条属性回退成字符串。
+		if p.size() == 3: return Color(float(p[0]), float(p[1]), float(p[2]), 1.0)
+		return raw
+
+	# 十六进制颜色：#RGB / #RGBA / #RRGGBB / #RRGGBBAA
+	if raw.begins_with("#"):
+		var hex = raw.substr(1)
+		if hex.is_valid_hex_number(false) and hex.length() in [3, 4, 6, 8]:
+			return Color(raw)
 		return raw
 
 	if raw.begins_with("Rect2("):
@@ -534,16 +553,66 @@ func _parse_value(raw: String):
 	return raw
 
 
-func _node_set_property(node: Node, key: String, raw_value: String) -> void:
+func _node_has_property(node: Node, key: String) -> bool:
+	# 只认节点真实存在的属性；否则 Object.set() 会静默失败，调用方无从感知。
+	for prop in node.get_property_list():
+		if prop["name"] == key:
+			return true
+	return false
+
+
+func _node_set_property(node: Node, key: String, raw_value: String) -> bool:
 	var value = _parse_value(raw_value)
 
 	if key == "transform" and value is String:
-		return
+		return false
 
 	if node.has_method("set_" + key):
 		node.call("set_" + key, value)
-	else:
-		node.set(key, value)
+		return true
+
+	if not _node_has_property(node, key):
+		return false
+
+	node.set(key, value)
+	return true
+
+
+# ============================================================
+# Undo/Redo & scene mutation helpers
+# ============================================================
+
+func _set_owner_recursive(node: Node, owner_node: Node) -> void:
+	# 复制/重挂节点时必须递归设置 owner，否则子节点不会被写入 .tscn（保存后丢失）。
+	node.set_owner(owner_node)
+	for child in node.get_children():
+		_set_owner_recursive(child, owner_node)
+
+
+func _collect_owner_map(node: Node) -> Array:
+	# 记录 node 及其所有后代当前的 owner，供 undo 时原样恢复。
+	var out: Array = [[node, node.owner]]
+	for child in node.get_children():
+		out.append_array(_collect_owner_map(child))
+	return out
+
+
+func _restore_owners(owner_map: Array) -> void:
+	for pair in owner_map:
+		var n = pair[0]
+		if is_instance_valid(n):
+			n.set_owner(pair[1])
+
+
+func _reparent_and_own(node: Node, new_parent: Node, owner_node: Node) -> void:
+	node.reparent(new_parent, true)
+	_set_owner_recursive(node, owner_node)
+
+
+func _maybe_save_scene(params: Dictionary) -> void:
+	# 变更类命令默认落盘（便于随后用文件级工具读取），传 save=false 可只改内存。
+	if params.get("save", true):
+		EditorInterface.save_scene()
 
 
 func _value_to_jsonable(val, _depth := 0):
@@ -731,18 +800,33 @@ func _cmd_run_specific_scene(params: Dictionary) -> Dictionary:
 # Edit Operations
 # ============================================================
 
+func _scene_history() -> UndoRedo:
+	# EditorUndoRedoManager 并没有绑定 undo()/redo()/get_current_action_name()，
+	# 必须先取出当前场景对应的 UndoRedo 历史对象才能真正撤销/重做。
+	var urm = EditorInterface.get_editor_undo_redo()
+	if not urm: return null
+	var hid := 0
+	var root = EditorInterface.get_edited_scene_root()
+	if root:
+		hid = urm.get_object_history_id(root)
+	return urm.get_history_undo_redo(hid)
+
+
 func _cmd_undo() -> Dictionary:
-	var ur = EditorInterface.get_editor_undo_redo()
-	if ur and ur.has_method("undo"):
-		ur.undo()
-	return {"ok": true}
+	var hist: UndoRedo = _scene_history()
+	if not hist: return {"error": "Undo history unavailable"}
+	if not hist.has_undo(): return {"ok": true, "undone": false, "message": "Nothing to undo"}
+	var action_name: String = hist.get_current_action_name()
+	hist.undo()
+	return {"ok": true, "undone": true, "action": action_name}
 
 
 func _cmd_redo() -> Dictionary:
-	var ur = EditorInterface.get_editor_undo_redo()
-	if ur and ur.has_method("redo"):
-		ur.redo()
-	return {"ok": true}
+	var hist: UndoRedo = _scene_history()
+	if not hist: return {"error": "Redo history unavailable"}
+	if not hist.has_redo(): return {"ok": true, "redone": false, "message": "Nothing to redo"}
+	hist.redo()
+	return {"ok": true, "redone": true, "action": hist.get_current_action_name()}
 
 
 func _cmd_cut_selected() -> Dictionary:
@@ -846,21 +930,25 @@ func _cmd_move_node(params: Dictionary) -> Dictionary:
 	var node = root.get_node(str(node_path))
 	if not node: return {"error": "Node not found"}
 
-	if position and node is Node2D:
-		var pos_str = str(position)
-		var parts = pos_str.replace("Vector2(", "").replace(")", "").split(",")
-		if parts.size() >= 2:
-			node.position = Vector2(float(parts[0]), float(parts[1]))
-			return {"ok": true, "new_position": str(node.position)}
+	if position == null: return {"error": "Missing position"}
+	if not (node is Node2D or node is Control):
+		return {"error": "Node is not Node2D/Control (use move_node_3d for Node3D)"}
 
-	if position and node is Control:
-		var pos_str = str(position)
-		var parts = pos_str.replace("Vector2(", "").replace(")", "").split(",")
-		if parts.size() >= 2:
-			node.position = Vector2(float(parts[0]), float(parts[1]))
-			return {"ok": true, "new_position": str(node.position)}
+	var target = _parse_value(str(position))
+	if not (target is Vector2):
+		# 兼容裸坐标写法 "10, 20"，避免调用方必须记住 Vector2(...) 前缀。
+		var parts = str(position).replace("Vector2(", "").replace("(", "").replace(")", "").split(",", false)
+		if parts.size() < 2: return {"error": "Cannot parse position: " + str(position)}
+		target = Vector2(float(parts[0]), float(parts[1]))
 
-	return {"error": "Node is not 2D/Control or missing position"}
+	var ur = get_undo_redo()
+	ur.create_action("MCP: Move %s" % node.name)
+	ur.add_do_property(node, "position", target)
+	ur.add_undo_property(node, "position", node.position)
+	ur.commit_action()
+
+	_maybe_save_scene(params)
+	return {"ok": true, "new_position": str(node.position), "undoable": true}
 
 
 func _cmd_move_node_3d(params: Dictionary) -> Dictionary:
@@ -872,13 +960,23 @@ func _cmd_move_node_3d(params: Dictionary) -> Dictionary:
 	var node = root.get_node(str(node_path))
 	if not node: return {"error": "Node not found"}
 
-	if position and node is Node3D:
-		var pos_str = str(position)
-		var parts = pos_str.replace("Vector3(", "").replace(")", "").split(",")
-		if parts.size() >= 3:
-			node.position = Vector3(float(parts[0]), float(parts[1]), float(parts[2]))
-			return {"ok": true, "new_position": str(node.position)}
-	return {"error": "Node is not 3D or missing position"}
+	if position == null: return {"error": "Missing position"}
+	if not (node is Node3D): return {"error": "Node is not Node3D (use move_node for 2D/Control)"}
+
+	var target = _parse_value(str(position))
+	if not (target is Vector3):
+		var parts = str(position).replace("Vector3(", "").replace("(", "").replace(")", "").split(",", false)
+		if parts.size() < 3: return {"error": "Cannot parse position: " + str(position)}
+		target = Vector3(float(parts[0]), float(parts[1]), float(parts[2]))
+
+	var ur = get_undo_redo()
+	ur.create_action("MCP: Move %s" % node.name)
+	ur.add_do_property(node, "position", target)
+	ur.add_undo_property(node, "position", node.position)
+	ur.commit_action()
+
+	_maybe_save_scene(params)
+	return {"ok": true, "new_position": str(node.position), "undoable": true}
 
 
 func _cmd_delete_selected() -> Dictionary:
@@ -886,10 +984,32 @@ func _cmd_delete_selected() -> Dictionary:
 	var nodes = sel.get_selected_nodes()
 	if nodes.is_empty():
 		return {"ok": true, "deleted": 0}
-	var count = nodes.size()
+
+	var root = EditorInterface.get_edited_scene_root()
+	# 过滤掉场景根，以及祖先同样被选中的节点（否则会重复删同一棵子树）。
+	var targets: Array = []
 	for n in nodes:
-		n.queue_free()
-	return {"ok": true, "deleted": count}
+		if n == root or not n.get_parent(): continue
+		var covered := false
+		for other in nodes:
+			if other != n and other.is_ancestor_of(n):
+				covered = true
+				break
+		if not covered: targets.append(n)
+	if targets.is_empty():
+		return {"ok": true, "deleted": 0, "note": "Nothing deletable (scene root cannot be deleted)"}
+
+	var ur = get_undo_redo()
+	ur.create_action("MCP: Delete %d node(s)" % targets.size())
+	for n in targets:
+		var parent: Node = n.get_parent()
+		ur.add_do_method(parent, "remove_child", n)
+		ur.add_undo_method(parent, "add_child", n)
+		ur.add_undo_method(parent, "move_child", n, n.get_index())
+		ur.add_undo_method(self, "_restore_owners", _collect_owner_map(n))
+		ur.add_undo_reference(n)
+	ur.commit_action()
+	return {"ok": true, "deleted": targets.size(), "undoable": true}
 
 
 func _cmd_add_node(params: Dictionary) -> Dictionary:
@@ -922,21 +1042,33 @@ func _cmd_add_node(params: Dictionary) -> Dictionary:
 	else:
 		new_node.name = _generate_node_name(node_type, parent)
 
-	parent.add_child(new_node)
-	new_node.set_owner(root)
-
-	# Set properties
+	# 属性在入树前设置：此时对象尚未被 UndoRedo 记录，写入最干净。
+	var failed: Array = []
 	for key in properties:
-		_node_set_property(new_node, key, str(properties[key]))
+		if not _node_set_property(new_node, key, str(properties[key])):
+			failed.append(key)
 
-	EditorInterface.save_scene()
+	# 包裹到编辑器的撤销栈，使 MCP 的改动可以直接 Ctrl+Z 撤销。
+	var ur = get_undo_redo()
+	ur.create_action("MCP: Add %s" % node_type)
+	ur.add_do_method(parent, "add_child", new_node)
+	ur.add_do_method(new_node, "set_owner", root)
+	ur.add_do_reference(new_node)
+	ur.add_undo_method(parent, "remove_child", new_node)
+	ur.commit_action()
 
-	return {
+	_maybe_save_scene(params)
+
+	var result := {
 		"ok": true,
 		"name": new_node.name,
 		"type": node_type,
 		"path": _get_node_path(new_node),
+		"undoable": true,
 	}
+	if not failed.is_empty():
+		result["failed_properties"] = failed
+	return result
 
 
 func _cmd_remove_node(params: Dictionary) -> Dictionary:
@@ -950,9 +1082,24 @@ func _cmd_remove_node(params: Dictionary) -> Dictionary:
 	if not node: return {"error": "Node not found: " + str(node_path)}
 	if node == root: return {"error": "Cannot remove root node"}
 
-	node.queue_free()
-	EditorInterface.save_scene()
-	return {"ok": true, "removed": str(node_path)}
+	var parent: Node = node.get_parent()
+	if not parent: return {"error": "Node has no parent: " + str(node_path)}
+
+	# 旧实现用 queue_free()：删除被延迟到帧末，而 save_scene() 立即执行，
+	# 结果保存下来的 .tscn 里节点仍然存在。改为立即 remove_child + 撤销记录。
+	var idx: int = node.get_index()
+	var owner_map: Array = _collect_owner_map(node)
+	var ur = get_undo_redo()
+	ur.create_action("MCP: Remove %s" % node.name)
+	ur.add_do_method(parent, "remove_child", node)
+	ur.add_undo_method(parent, "add_child", node)
+	ur.add_undo_method(parent, "move_child", node, idx)
+	ur.add_undo_method(self, "_restore_owners", owner_map)
+	ur.add_undo_reference(node)
+	ur.commit_action()
+
+	_maybe_save_scene(params)
+	return {"ok": true, "removed": str(node_path), "undoable": true}
 
 
 func _cmd_get_node_properties(params: Dictionary) -> Dictionary:
@@ -996,11 +1143,28 @@ func _cmd_set_node_properties(params: Dictionary) -> Dictionary:
 	var node = root.get_node(str(node_path))
 	if not node: return {"error": "Node not found: " + str(node_path)}
 
+	# 逐属性校验 + 记录旧值，既能反馈哪些键无效，也让整批改动可一次性撤销。
+	var applied: Array = []
+	var failed: Array = []
+	var ur = get_undo_redo()
+	ur.create_action("MCP: Set properties on %s" % node.name)
 	for key in properties:
-		_node_set_property(node, key, str(properties[key]))
+		var k: String = str(key)
+		var value = _parse_value(str(properties[key]))
+		if (k == "transform" and value is String) or not _node_has_property(node, k):
+			failed.append(k)
+			continue
+		ur.add_do_property(node, k, value)
+		ur.add_undo_property(node, k, node.get(k))
+		applied.append(k)
+	ur.commit_action()
 
-	EditorInterface.save_scene()
-	return {"ok": true, "updated": properties.size()}
+	_maybe_save_scene(params)
+	var result := {"ok": true, "updated": applied.size(), "applied": applied, "undoable": true}
+	if not failed.is_empty():
+		result["failed_properties"] = failed
+		result["hint"] = "Unknown properties were skipped. Use get_node_properties to list valid names."
+	return result
 
 
 func _cmd_rename_node(params: Dictionary) -> Dictionary:
@@ -1014,9 +1178,23 @@ func _cmd_rename_node(params: Dictionary) -> Dictionary:
 	var node = root.get_node(str(node_path))
 	if not node: return {"error": "Node not found"}
 
-	node.name = new_name
-	EditorInterface.save_scene()
-	return {"ok": true, "renamed": new_name}
+	# Godot 会静默改写非法名字（. : @ / % 等），这里提前告知调用方。
+	var safe_name: String = str(new_name).validate_node_name()
+	if safe_name.is_empty():
+		return {"error": "Invalid node name: " + str(new_name)}
+
+	var old_name: String = str(node.name)
+	var ur = get_undo_redo()
+	ur.create_action("MCP: Rename %s" % old_name)
+	ur.add_do_property(node, "name", safe_name)
+	ur.add_undo_property(node, "name", old_name)
+	ur.commit_action()
+
+	_maybe_save_scene(params)
+	var result := {"ok": true, "renamed": node.name, "previous": old_name, "undoable": true}
+	if node.name != safe_name or safe_name != str(new_name):
+		result["note"] = "Name adjusted by the engine (illegal characters or sibling collision)."
+	return result
 
 
 func _cmd_duplicate_node(params: Dictionary) -> Dictionary:
@@ -1030,15 +1208,25 @@ func _cmd_duplicate_node(params: Dictionary) -> Dictionary:
 	var node = root.get_node(str(node_path))
 	if not node: return {"error": "Node not found"}
 
+	var parent: Node = node.get_parent()
+	if not parent:
+		return {"error": "Cannot duplicate the scene root; use create_editor_scene or save_scene_as instead"}
+
 	var dup = node.duplicate(DUPLICATE_GROUPS | DUPLICATE_SIGNALS | DUPLICATE_SCRIPTS)
-	if new_name: dup.name = new_name
+	if new_name: dup.name = str(new_name).validate_node_name()
 	else: dup.name = node.name + "_copy"
 
-	node.get_parent().add_child(dup)
-	dup.set_owner(root)
-	EditorInterface.save_scene()
+	var ur = get_undo_redo()
+	ur.create_action("MCP: Duplicate %s" % node.name)
+	ur.add_do_method(parent, "add_child", dup)
+	# 必须递归设 owner：只设根节点会让副本的子节点在保存时被丢弃。
+	ur.add_do_method(self, "_set_owner_recursive", dup, root)
+	ur.add_do_reference(dup)
+	ur.add_undo_method(parent, "remove_child", dup)
+	ur.commit_action()
 
-	return {"ok": true, "name": dup.name, "path": _get_node_path(dup)}
+	_maybe_save_scene(params)
+	return {"ok": true, "name": dup.name, "path": _get_node_path(dup), "undoable": true}
 
 
 func _cmd_reparent_node(params: Dictionary) -> Dictionary:
@@ -1053,11 +1241,28 @@ func _cmd_reparent_node(params: Dictionary) -> Dictionary:
 	var new_parent = root.get_node(str(new_parent_path))
 	if not node: return {"error": "Node not found"}
 	if not new_parent: return {"error": "New parent not found"}
+	if node == root: return {"error": "Cannot reparent the scene root"}
+	# 把节点挂到它自己的后代下会破坏场景树，Godot 侧会直接崩，必须提前拦。
+	if node == new_parent or node.is_ancestor_of(new_parent):
+		return {"error": "Cannot reparent a node into itself or one of its descendants"}
 
-	node.reparent(new_parent, true)
-	node.set_owner(root)
-	EditorInterface.save_scene()
-	return {"ok": true, "moved": str(node_path) + " → " + str(new_parent_path)}
+	var old_parent: Node = node.get_parent()
+	if not old_parent: return {"error": "Node has no parent"}
+	if old_parent == new_parent:
+		return {"ok": true, "moved": "no-op (already a child of " + str(new_parent_path) + ")"}
+
+	var old_idx: int = node.get_index()
+	var owner_map: Array = _collect_owner_map(node)
+	var ur = get_undo_redo()
+	ur.create_action("MCP: Reparent %s" % node.name)
+	ur.add_do_method(self, "_reparent_and_own", node, new_parent, root)
+	ur.add_undo_method(self, "_reparent_and_own", node, old_parent, root)
+	ur.add_undo_method(old_parent, "move_child", node, old_idx)
+	ur.add_undo_method(self, "_restore_owners", owner_map)
+	ur.commit_action()
+
+	_maybe_save_scene(params)
+	return {"ok": true, "moved": str(node_path) + " → " + str(new_parent_path), "undoable": true}
 
 
 # ============================================================
@@ -1330,15 +1535,31 @@ func _cmd_instantiate_scene(params: Dictionary) -> Dictionary:
 	if not sp: return {"error": "Missing scene path"}
 	var root = EditorInterface.get_edited_scene_root()
 	if not root: return {"error": "No scene open"}
+	if not ResourceLoader.exists(str(sp)): return {"error": "Scene not found: " + str(sp)}
 	var packed = load(str(sp))
-	if not packed: return {"error": "Scene not found: " + sp}
+	# load() 对非场景资源（图片/脚本等）也会成功，直接 instantiate() 会崩溃。
+	if not (packed is PackedScene): return {"error": "Not a PackedScene: " + str(sp)}
 	var inst = packed.instantiate()
-	if nn: inst.name = nn
+	if not inst: return {"error": "Failed to instantiate: " + str(sp)}
+	if nn: inst.name = str(nn).validate_node_name()
 	var parent: Node = root
-	if pp != ".": parent = root.get_node(str(pp)); if not parent: return {"error": "Parent not found"}
-	parent.add_child(inst); inst.set_owner(root)
-	EditorInterface.save_scene()
-	return {"ok": true, "name": inst.name, "type": inst.get_class(), "path": _get_node_path(inst)}
+	if pp != ".":
+		parent = root.get_node(str(pp))
+		if not parent:
+			inst.free()
+			return {"error": "Parent not found: " + str(pp)}
+
+	var ur = get_undo_redo()
+	ur.create_action("MCP: Instantiate %s" % str(sp).get_file())
+	ur.add_do_method(parent, "add_child", inst)
+	# 实例化场景只设根 owner：子节点属于被实例化的场景，不能被外层持有。
+	ur.add_do_method(inst, "set_owner", root)
+	ur.add_do_reference(inst)
+	ur.add_undo_method(parent, "remove_child", inst)
+	ur.commit_action()
+
+	_maybe_save_scene(params)
+	return {"ok": true, "name": inst.name, "type": inst.get_class(), "path": _get_node_path(inst), "undoable": true}
 
 
 func _cmd_set_main_scene(params: Dictionary) -> Dictionary:
@@ -1502,7 +1723,17 @@ func _cmd_editor_export(params: Dictionary) -> Dictionary:
 func _cmd_get_scene_changes() -> Dictionary:
 	var root = EditorInterface.get_edited_scene_root()
 	if not root: return {"scene": null, "modified": false}
-	return {"scene": root.scene_file_path, "modified": get_undo_redo().get_current_action_name() != ""}
+	# 旧实现调用 EditorUndoRedoManager.get_current_action_name()（未绑定，运行时报错）。
+	var hist: UndoRedo = _scene_history()
+	if not hist:
+		return {"scene": root.scene_file_path, "modified": false}
+	return {
+		"scene": root.scene_file_path,
+		"modified": hist.has_undo(),
+		"last_action": hist.get_current_action_name(),
+		"can_undo": hist.has_undo(),
+		"can_redo": hist.has_redo(),
+	}
 
 func _cmd_get_recent_scenes() -> Dictionary:
 	var s = EditorInterface.get_editor_settings(); var r: Array = []

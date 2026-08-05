@@ -11,7 +11,7 @@ import { z } from 'zod';
 import { toolError, ErrorCode } from '../utils/errors.js';
 import { ToolResult } from '../utils/types.js';
 import { readTextFile, resolveProjectPath, findFilesByExtension, writeTextFile } from '../utils/file_utils.js';
-import { parseResource } from '../parsers/resource_parser.js';
+import { parseResource, serializeResource } from '../parsers/resource_parser.js';
 import fs from 'node:fs';
 
 // ---- Tool Schemas ----
@@ -231,14 +231,9 @@ export function handleSetEnvironmentParam(
 
     doc.resource[args.param] = args.value;
 
-    let newContent = `[gd_resource type="${doc.header.type}" format=${doc.header.format}`;
-    if (doc.header.uid) newContent += ` uid="${doc.header.uid}"`;
-    newContent += ']\n\n[resource]\n';
-    for (const [key, val] of Object.entries(doc.resource)) {
-      newContent += `${key} = ${val}\n`;
-    }
-
-    writeTextFile(absPath, newContent, true);
+    // An Environment usually points at a sky sub-resource; serializeResource
+    // keeps those blocks, a hand-rolled writer would delete them.
+    writeTextFile(absPath, serializeResource(doc), true);
 
     return {
       content: [{ type: 'text', text: `Environment updated: ${args.param} = ${args.value}` }],

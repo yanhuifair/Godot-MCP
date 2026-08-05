@@ -1,8 +1,9 @@
 // ============================================================
 // Godot MCP 全量工具测试 (不含 Editor) — 干净版本
 // ============================================================
-import { resolve, dirname } from "node:path";
+import { resolve, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { readFileSync } from "node:fs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const P = resolve(__dirname, "test-project");
@@ -21,18 +22,34 @@ function fail(n, m) {
   ng++;
   console.log(`  ${R}✗${N} ${n}: ${m}`);
 }
-function hdr(n) {
-  console.log(`\n${B}━━━ ${n} ━━━${N}`);
-}
-
 const FU = "../dist/utils/file_utils.js";
 
-async function t(name, mod, fn) {
-  try {
-    const m = await import(mod);
-    fn(m);
-  } catch (e) {
-    fail(name, e.message);
+// Checks share on-disk fixtures and frequently depend on the previous step
+// (create -> mutate -> cleanup). Firing them concurrently made cleanup race
+// creation and left junk behind in tracked fixtures, so everything is queued
+// here and drained strictly in declaration order.
+const QUEUE = [];
+
+function hdr(n) {
+  QUEUE.push({ header: n });
+}
+
+function t(name, mod, fn) {
+  QUEUE.push({ name, mod, fn });
+}
+
+async function runAll() {
+  for (const item of QUEUE) {
+    if (item.header !== undefined) {
+      console.log(`\n${B}━━━ ${item.header} ━━━${N}`);
+      continue;
+    }
+    try {
+      const m = await import(item.mod);
+      await item.fn(m);
+    } catch (e) {
+      fail(item.name, e.message);
+    }
   }
 }
 
@@ -182,6 +199,20 @@ t("set_collision_shape", "../dist/tools/scene.js", ({ handleSetCollisionShape })
 t("edit_scene", "../dist/tools/scene.js", ({ handleEditScene }) => {
   handleEditScene(P, { path: "scenes/_t.tscn", operations: [] });
   pass("edit_scene");
+});
+t("load_sprite writes a well-formed ext_resource", "../dist/tools/scene.js", ({ handleAddNode, handleLoadSprite }) => {
+  // Regression: the id used to be built with quotes already baked in, so
+  // serializeScene emitted id=""1_sprite_texture"" and Godot could no longer
+  // parse the file at all ("Unexpected end of file"). The path also has to be
+  // res:// absolute or the texture reference resolves against the scene folder.
+  handleAddNode(P, { scene_path: "scenes/_t.tscn", parent_path: ".", type: "Sprite2D", name: "SprFix" });
+  const r = handleLoadSprite(P, { scene_path: "scenes/_t.tscn", node_path: "SprFix", texture_path: "icon.svg" });
+  if (r.isError) return fail("load_sprite writes a well-formed ext_resource", r.content[0].text);
+  const txt = readFileSync(join(P, "scenes/_t.tscn"), "utf8");
+  const line = txt.split("\n").find((l) => l.includes("CompressedTexture2D")) || "";
+  if (/id=""/.test(line)) return fail("load_sprite writes a well-formed ext_resource", `doubled quotes: ${line}`);
+  if (!line.includes('path="res://icon.svg"')) return fail("load_sprite writes a well-formed ext_resource", `bad path: ${line}`);
+  pass("load_sprite writes a well-formed ext_resource");
 });
 // Cleanup scene
 t("cleanup", FU, ({ deleteFile }) => {
@@ -335,7 +366,10 @@ t("set_animation_param", "../dist/tools/animation.js", ({ handleSetAnimationPara
 
 // ============== AUDIO ==============
 hdr("Audio (7 tools)");
+// Read-only checks use the tracked fixture; every mutating check works on a
+// scratch layout (_t* is gitignored) so the fixture never accumulates junk.
 const LP = "resources/default_bus_layout.tres";
+const TLP = "resources/_tbus.tres";
 t("read_audio_bus_layout", "../dist/tools/audio.js", ({ handleReadAudioBusLayout }) => {
   const r = handleReadAudioBusLayout(P, { path: LP });
   r.content[0].text.includes("Master") ? pass("read_audio_bus_layout") : fail("read_audio_bus_layout", "");
@@ -345,26 +379,45 @@ t("list_audio_files", "../dist/tools/audio.js", ({ handleListAudioFiles }) => {
   pass("list_audio_files");
 });
 t("create_audio_bus_layout", "../dist/tools/audio.js", ({ handleCreateAudioBusLayout }) => {
-  const r = handleCreateAudioBusLayout(P, { path: "resources/_tab.tres" });
+  const r = handleCreateAudioBusLayout(P, { path: TLP });
   r.isError ? fail("create_audio_bus_layout", r.content[0].text) : pass("create_audio_bus_layout");
-  import(FU).then(({ deleteFile }) => deleteFile(P, "resources/_tab.tres"));
 });
 t("add_audio_bus", "../dist/tools/audio.js", ({ handleAddAudioBus }) => {
-  const r = handleAddAudioBus(P, { bus_name: "TestBus", parent: "Master", volume_db: -12.0, layout_path: LP });
+  const r = handleAddAudioBus(P, { bus_name: "TestBus", send_to: "Master", volume_db: -12.0, layout_path: TLP });
   r.isError ? fail("add_audio_bus", r.content[0].text) : pass("add_audio_bus");
-  import("../dist/tools/audio.js").then(({ handleRemoveAudioBus }) => {
-    handleRemoveAudioBus(P, { bus_name: "TestBus", layout_path: LP });
-  });
+});
+t("add_bus_effect", "../dist/tools/audio.js", ({ handleAddBusEffect }) => {
+  const r = handleAddBusEffect(P, { layout_path: TLP, bus_name: "TestBus", effect_type: "Reverb", effect_params: { wet: "0.5" } });
+  if (r.isError) return fail("add_bus_effect", r.content[0].text);
+  // The effect must materialise as a real [sub_resource]; a bare SubResource()
+  // reference makes Godot reject the entire file.
+  const txt = readFileSync(join(P, TLP), "utf8");
+  txt.includes('[sub_resource type="AudioEffectReverb"') && txt.includes("effect/0/enabled = true")
+    ? pass("add_bus_effect") : fail("add_bus_effect", "missing sub_resource block");
 });
 t("set_bus_volume", "../dist/tools/audio.js", ({ handleSetBusVolume }) => {
-  handleSetBusVolume(P, { bus_name: "Master", volume_db: "-6.0", layout_path: LP });
-  handleSetBusVolume(P, { bus_name: "Master", volume_db: "0.0", layout_path: LP });
-  pass("set_bus_volume");
+  const byName = handleSetBusVolume(P, { bus_name: "TestBus", volume_db: -6.0, layout_path: TLP });
+  const byIdx = handleSetBusVolume(P, { bus_index: 0, volume_db: 0.0, layout_path: TLP });
+  byName.isError || byIdx.isError
+    ? fail("set_bus_volume", (byName.content[0].text + " | " + byIdx.content[0].text))
+    : pass("set_bus_volume");
+});
+t("set_bus_volume rejects unknown bus", "../dist/tools/audio.js", ({ handleSetBusVolume }) => {
+  const r = handleSetBusVolume(P, { bus_name: "NoSuchBus", volume_db: 0.0, layout_path: TLP });
+  r.isError ? pass("set_bus_volume rejects unknown bus") : fail("set_bus_volume rejects unknown bus", "expected error");
 });
 t("remove_audio_bus", "../dist/tools/audio.js", ({ handleRemoveAudioBus, handleAddAudioBus }) => {
-  handleAddAudioBus(P, { bus_name: "_del", parent: "Master", volume_db: -24.0, layout_path: LP });
-  const r = handleRemoveAudioBus(P, { bus_name: "_del", layout_path: LP });
+  handleAddAudioBus(P, { bus_name: "_del", send_to: "Master", volume_db: -24.0, layout_path: TLP });
+  const r = handleRemoveAudioBus(P, { bus_name: "_del", layout_path: TLP });
   r.isError ? fail("remove_audio_bus", r.content[0].text) : pass("remove_audio_bus");
+});
+t("remove_audio_bus protects Master", "../dist/tools/audio.js", ({ handleRemoveAudioBus }) => {
+  const r = handleRemoveAudioBus(P, { bus_index: 0, layout_path: TLP });
+  r.isError ? pass("remove_audio_bus protects Master") : fail("remove_audio_bus protects Master", "expected error");
+});
+t("cleanup bus layout", FU, ({ deleteFile }) => {
+  deleteFile(P, TLP);
+  pass("cleanup bus layout");
 });
 
 // ============== TRANSLATION ==============
@@ -417,8 +470,14 @@ t("read_mesh_instance", "../dist/tools/rendering.js", ({ handleReadMeshInstance 
   t.includes("MeshInstance3D") ? pass("read_mesh_instance") : fail("read_mesh_instance", "");
 });
 t("set_mesh_surface_material", "../dist/tools/rendering.js", ({ handleSetMeshSurfaceMaterial }) => {
+  // A project-relative material_path must be stored as res:// — Godot resolves a
+  // bare path against the SCENE's folder, which silently kills the reference.
+  // This very check used to corrupt test_3d.tscn because it only asserted !isError.
   const r = handleSetMeshSurfaceMaterial(P, { scene_path: "scenes/test_3d.tscn", node_name: "Box", surface_index: 0, material_path: "resources/sample_material.tres" });
-  r.isError ? fail("set_mesh_surface_material", r.content[0].text) : pass("set_mesh_surface_material");
+  if (r.isError) return fail("set_mesh_surface_material", r.content[0].text);
+  const txt = readFileSync(join(P, "scenes/test_3d.tscn"), "utf8");
+  const rel = [...txt.matchAll(/\[ext_resource[^\]]*?path="([^"]+)"/g)].filter((m) => !m[1].startsWith("res://"));
+  rel.length ? fail("set_mesh_surface_material", `non-res:// ext_resource path: ${rel[0][1]}`) : pass("set_mesh_surface_material");
 });
 t("read_viewport", "../dist/tools/rendering.js", ({ handleReadViewport }) => {
   const r = handleReadViewport(P, { scene_path: "scenes/ui_demo.tscn" });
@@ -832,39 +891,66 @@ t("get_shader_node_defaults", "../dist/tools/shader_graph.js", ({ handleGetShade
   const r = handleGetShaderNodeDefaults(P, { node_type: "color_constant" });
   r.isError ? fail("get_shader_node_defaults", r.content[0].text) : pass("get_shader_node_defaults");
 });
+// Godot reserves VisualShader node ids 0 and 1 (0 = the built-in output node),
+// so authored nodes always start at 2 and connections target 0 to reach output.
+const VS = "resources/_tvs.tres";
 t("create_visual_shader", "../dist/tools/shader_graph.js", ({ handleCreateVisualShader }) => {
-  const r = handleCreateVisualShader(P, { path: "resources/_tvs.tres", shader_type: "CanvasItem" });
-  r.isError ? fail("create_visual_shader", r.content[0].text) : pass("create_visual_shader");
+  const r = handleCreateVisualShader(P, { path: VS, shader_type: "CanvasItem" });
+  if (r.isError) return fail("create_visual_shader", r.content[0].text);
+  const txt = readFileSync(join(P, VS), "utf8");
+  txt.includes("mode = 1") ? pass("create_visual_shader") : fail("create_visual_shader", "expected integer mode, got: " + txt.split("\n")[3]);
 });
 t("add_shader_graph_node", "../dist/tools/shader_graph.js", ({ handleAddShaderGraphNode }) => {
-  const r = handleAddShaderGraphNode(P, { path: "resources/_tvs.tres", node_type: "color_constant" });
+  const r = handleAddShaderGraphNode(P, { path: VS, node_type: "color_constant" });
   r.isError ? fail("add_shader_graph_node", r.content[0].text) : pass("add_shader_graph_node");
 });
-t("connect_shader_graph_nodes", "../dist/tools/shader_graph.js", ({ handleAddShaderGraphNode, handleConnectShaderGraphNodes }) => {
-  handleAddShaderGraphNode(P, { path: "resources/_tvs.tres", node_type: "output" });
-  const r = handleConnectShaderGraphNodes(P, { path: "resources/_tvs.tres", from_node: 0, from_port: 0, to_node: 1, to_port: 0 });
-  r.isError ? fail("connect_shader_graph_nodes", r.content[0].text) : pass("connect_shader_graph_nodes");
+t("add_shader_graph_node rejects removed types", "../dist/tools/shader_graph.js", ({ handleAddShaderGraphNode }) => {
+  const r = handleAddShaderGraphNode(P, { path: VS, node_type: "output" });
+  r.isError ? pass("add_shader_graph_node rejects removed types") : fail("add_shader_graph_node rejects removed types", "expected error");
+});
+t("connect_shader_graph_nodes", "../dist/tools/shader_graph.js", ({ handleConnectShaderGraphNodes }) => {
+  const r = handleConnectShaderGraphNodes(P, { path: VS, from_node: 2, from_port: 0, to_node: 0, to_port: 0 });
+  if (r.isError) return fail("connect_shader_graph_nodes", r.content[0].text);
+  const txt = readFileSync(join(P, VS), "utf8");
+  txt.includes("nodes/fragment/connections = PackedInt32Array(2, 0, 0, 0)")
+    ? pass("connect_shader_graph_nodes") : fail("connect_shader_graph_nodes", "bad connection encoding");
 });
 t("set_shader_node_param", "../dist/tools/shader_graph.js", ({ handleSetShaderNodeParam }) => {
-  const r = handleSetShaderNodeParam(P, { path: "resources/_tvs.tres", node_index: 0, param: "constant", value: "Color(1,0,0,1)" });
+  const r = handleSetShaderNodeParam(P, { path: VS, node_index: 2, param: "constant", value: "Color(1, 0, 0, 1)" });
   r.isError ? fail("set_shader_node_param", r.content[0].text) : pass("set_shader_node_param");
 });
-t("remove_shader_graph_node", "../dist/tools/shader_graph.js", ({ handleRemoveShaderGraphNode }) => {
-  const r = handleRemoveShaderGraphNode(P, { path: "resources/_tvs.tres", node_index: 1 });
-  r.isError ? fail("remove_shader_graph_node", r.content[0].text) : pass("remove_shader_graph_node");
+t("set_shader_node_param rejects missing node", "../dist/tools/shader_graph.js", ({ handleSetShaderNodeParam }) => {
+  const r = handleSetShaderNodeParam(P, { path: VS, node_index: 77, param: "constant", value: "Color(1, 0, 0, 1)" });
+  r.isError ? pass("set_shader_node_param rejects missing node") : fail("set_shader_node_param rejects missing node", "expected error");
 });
 t("disconnect_shader_graph_nodes", "../dist/tools/shader_graph.js", ({ handleDisconnectShaderGraphNodes }) => {
-  const r = handleDisconnectShaderGraphNodes(P, { path: "resources/_tvs.tres", from_node: 0, from_port: 0, to_node: 1, to_port: 0 });
-  r.isError ? pass("disconnect_shader_graph_nodes (already removed, expected)") : pass("disconnect_shader_graph_nodes");
+  const r = handleDisconnectShaderGraphNodes(P, { path: VS, from_node: 2, from_port: 0, to_node: 0, to_port: 0 });
+  r.isError ? fail("disconnect_shader_graph_nodes", r.content[0].text) : pass("disconnect_shader_graph_nodes");
 });
-t("cleanup visual shader", FU, () => {
+t("remove_shader_graph_node", "../dist/tools/shader_graph.js", ({ handleRemoveShaderGraphNode }) => {
+  const r = handleRemoveShaderGraphNode(P, { path: VS, node_index: 2 });
+  if (r.isError) return fail("remove_shader_graph_node", r.content[0].text);
+  // Removing the last node must also drop its orphaned [sub_resource].
+  const txt = readFileSync(join(P, VS), "utf8");
+  txt.includes("sub_resource") ? fail("remove_shader_graph_node", "orphan sub_resource left behind") : pass("remove_shader_graph_node");
+});
+t("remove_shader_graph_node protects output", "../dist/tools/shader_graph.js", ({ handleRemoveShaderGraphNode }) => {
+  const r = handleRemoveShaderGraphNode(P, { path: VS, node_index: 0 });
+  r.isError ? pass("remove_shader_graph_node protects output") : fail("remove_shader_graph_node protects output", "expected error");
+});
+t("read_visual_shader", "../dist/tools/script.js", ({ handleReadVisualShader }) => {
+  const r = handleReadVisualShader(P, { path: VS });
+  r.isError ? fail("read_visual_shader", r.content[0].text) : pass("read_visual_shader");
+});
+t("cleanup visual shader", FU, ({ deleteFile }) => {
+  deleteFile(P, VS);
   pass("cleanup vshader");
 });
 
 // ============== GODOT ENGINE ==============
 hdr("Godot Engine (3 tools)");
-t("get_godot_version", "../dist/tools/godot.js", ({ handleGetGodotVersion }) => {
-  const r = handleGetGodotVersion();
+t("get_godot_version", "../dist/tools/godot.js", async ({ handleGetGodotVersion }) => {
+  const r = await handleGetGodotVersion();
   const t = r.content[0].text;
   t.includes("4.") || t.includes("Godot") ? pass("get_godot_version") : fail("get_godot_version", "");
 });
@@ -878,8 +964,7 @@ t("list_projects", "../dist/tools/godot.js", ({ handleListProjects }) => {
 });
 
 // ============== SUMMARY ==============
-setTimeout(() => {
-  console.log(`\n${B}══════════════════════════════════════════${N}`);
-  console.log(`${G}通过: ${ok}  ${R}失败: ${ng}  ${Y}总计: ${ok + ng}${N}`);
-  process.exit(ng > 0 ? 1 : 0);
-}, 2000);
+await runAll();
+console.log(`\n${B}══════════════════════════════════════════${N}`);
+console.log(`${G}通过: ${ok}  ${R}失败: ${ng}  ${Y}总计: ${ok + ng}${N}`);
+process.exit(ng > 0 ? 1 : 0);

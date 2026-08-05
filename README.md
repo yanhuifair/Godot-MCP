@@ -22,6 +22,7 @@
 
 - 📂 **Reads and writes your project files natively** — `.tscn` scenes, `.tres` resources, GDScript, C#, `.gdshader`, `project.godot`. Custom parsers, no Godot process required, instant response.
 - 🎛️ **Drives the live editor** — select nodes, connect signals, author visual shaders, bake lightmaps, set breakpoints, step the debugger, run and stop the game.
+- ↩️ **Every scene edit is undoable** — add, remove, rename, move, reparent, duplicate and instantiate all register on Godot's native undo stack. If the AI gets it wrong, **Ctrl+Z** puts it back.
 - 🎮 **Reaches inside the running game** — inspect the live scene tree, call methods, inject input, **freeze the game, step it one frame at a time, and screenshot the result.** No other public Godot MCP does this.
 - 🔎 **Stays usable at scale** — `search_tools` finds the right tool out of 358, `get_status` tells you exactly what is connected, and every error returns a typed code plus a repair hint.
 
@@ -46,6 +47,7 @@ npx @yanhuifair/godot-mcp --enable-plugin -p .
 | **Tool count** | **358** across 29 categories | 16 – 156 |
 | **Works without Godot running** | ✅ Native `.tscn` / `.tres` / `.godot` parsers | ⚠️ Usually needs a live editor |
 | **Live editor control** | ✅ 123 tools — play, debug, breakpoints, viewport, bake | Partial |
+| **Undoable AI edits** | ✅ **Every scene mutation is one Ctrl+Z away** — native `EditorUndoRedoManager` actions | ❌ Edits are permanent |
 | **Control the _running game_** | ✅ **11 tools** — live tree, method calls, input injection | ❌ None |
 | **Deterministic frame stepping** | ✅ `runtime_freeze` → `runtime_step` → `runtime_screenshot` | ❌ None |
 | **Tool discovery for large catalogs** | ✅ `search_tools` + `get_status` | ❌ None |
@@ -161,6 +163,8 @@ With 358 tools, the AI can't see them all at once — tell it to **`search_tools
 | `Project not found` errors | The `-p` path must point at the folder containing `project.godot`. Using `"."` only works if the client's working directory *is* your project — otherwise use an absolute path. |
 | Editor tools fail, file tools work | The plugin isn't installed/enabled. Re-run Step 1, then reload the project in Godot. |
 | `EDITOR_NOT_REACHABLE` | Godot isn't running, or the plugin isn't enabled. The server will try to launch Godot itself; if that fails, open the project in Godot manually and check Project → Project Settings → Plugins → **Godot MCP** is enabled. |
+| `EDITOR_COMMAND_FAILED` | The editor received the command but refused it — usually a wrong node path, a property that doesn't exist on that node type, or an invalid target. The message carries Godot's own reason. Use `editor_get_scene_tree` / `get_class_properties` to verify before retrying. |
+| AI made a scene edit you don't want | Press **Ctrl+Z** in Godot, or call `editor_undo`. Every MCP scene mutation is a native undo action. |
 | Godot binary not found | Set the `GODOT_PATH` environment variable to your Godot executable. See [Environment Variables](#environment-variables). |
 
 </details>
@@ -350,8 +354,8 @@ godot-mcp/
 │   └── godot-mcp/            # Godot editor plugin
 │       ├── plugin.cfg         # Plugin metadata
 │       └── plugin.gd          # stdin reader, TCP server, 102 command handlers
-├── test/                     # Vitest suite (144 tests: 74 runnable + 70 integration requiring a live Godot project) + legacy .mjs suites
-│   ├── test_all.mjs          # Legacy standalone suite (167 tool checks)
+├── test/                     # Vitest suite (197 tests: 127 runnable + 70 integration requiring a live Godot project) + legacy .mjs suites
+│   ├── test_all.mjs          # Legacy standalone suite (176 tool checks)
 │   ├── test_editor.mjs       # Legacy editor bridge TCP tests
 │   ├── test_runner.mjs       # Early integration test runner
 │   ├── tools.test.ts         # Vitest tool handler tests
@@ -359,6 +363,9 @@ godot-mcp/
 │   ├── structural.test.ts    # Vitest structural tests
 │   ├── integration_mcp_test.test.ts  # Vitest integration tests
 │   ├── server_normalization.test.ts  # Vitest parameter-normalization tests
+│   ├── scene_format.test.ts  # .tscn/.tres on-disk format contract (round-trip, hierarchy, ids)
+│   ├── addon_bridges.test.ts # GDScript bridge invariants (reserved names, poll(), return types)
+│   ├── editor_error_surface.test.ts  # Editor error tagging + undo/redo addon invariants
 │   ├── fixtures/             # Test fixture files (.tscn, .tres, .gd)
 │   └── test-project/         # Standalone Godot test project
 ├── scripts/
@@ -412,7 +419,8 @@ To accommodate AI clients that may use either `snake_case` or `camelCase` parame
 - **Read-only mode**: `--read-only` (or `GODOT_MCP_READ_ONLY=true`) rejects the 164 write/side-effect tools (write_, create_, delete_, move_, set_, edit_, editor_* mutations, run/export/launch, …) via a maintained whitelist — they are hidden from `tools/list` and blocked with a `READ_ONLY` error if called directly
 - **TCP only on loopback**: The editor plugin's TCP bridge binds `127.0.0.1` only, never the LAN
 - **Optional token auth**: Set `GODOT_MCP_TOKEN` to require a bearer token on HTTP (`/mcp`, `/sse`) and an `auth` handshake on the plugin TCP bridge; non-loopback HTTP binds are refused without it
-- **Structured errors**: Tool failures return structured `{ content, isError: true }` responses; privileged paths (read-only, editor unreachable) carry typed error codes (`READ_ONLY`, `EDITOR_NOT_REACHABLE`, `NOT_FOUND`, …)
+- **Undoable editor mutations**: Every scene-changing editor command (`editor_add_node`, `editor_remove_node`, `editor_set_node_properties`, `editor_rename_node`, `editor_move_node`, `editor_move_node_3d`, `editor_reparent_node`, `editor_duplicate_node`, `editor_delete_selected`, `editor_instantiate_scene`, …) is committed through Godot's native `EditorUndoRedoManager`, so a single **Ctrl+Z** (or `editor_undo`) reverts what the AI just did
+- **Structured errors**: Tool failures return structured `{ content, isError: true }` responses; privileged paths carry typed error codes (`READ_ONLY`, `EDITOR_NOT_REACHABLE`, `EDITOR_COMMAND_FAILED`, `NOT_FOUND`, …). Engine-side failures are never reported as success — if the editor rejects a command, the tool surfaces `EDITOR_COMMAND_FAILED` with the engine's own message
 
 ---
 
@@ -499,7 +507,7 @@ Starts: Stdio + SSE (`/sse`) + Streamable HTTP (`/mcp`) + Health Check (`/health
 
 ```bash
 curl http://127.0.0.1:3000/health
-# {"status":"ok","version":"1.9.1","projectRoot":"/path/to/project","endpoints":{...}}
+# {"status":"ok","version":"1.10.0","projectRoot":"/path/to/project","endpoints":{...}}
 ```
 
 ---
@@ -1235,6 +1243,11 @@ This project has the `godot-mcp` server attached (358 tools).
   e.g. search_tools("tileset"), search_tools("animation"), search_tools("navmesh").
 - On `EDITOR_NOT_REACHABLE` or `RUNTIME_NOT_REACHABLE`, call `get_status`
   and tell me what's missing instead of retrying blindly.
+- On `EDITOR_COMMAND_FAILED`, the editor rejected the command — read the
+  engine message, verify the node path / property with `editor_get_scene_tree`
+  or `get_class_properties`, then retry. Do not repeat the same call.
+- Every `editor_*` scene change is undoable — if I say "undo that",
+  call `editor_undo` rather than trying to reconstruct the old state.
 - Prefer the file tools (read_scene, write_script, create_resource…).
   They work with Godot closed and are the fastest path.
 - Use `editor_*` tools only when the change must show up in a live editor.
@@ -1411,6 +1424,8 @@ The runtime bridge is a separate, lightweight autoload — it does not modify th
 4. Run the game from the editor (F5). The autoload prints `[godot-mcp-runtime] Listening on 127.0.0.1:9877` to the output log.
 
 > **Security**: the bridge binds `127.0.0.1` only — it is never reachable from the LAN. It runs with `process_mode = PROCESS_MODE_ALWAYS`, so pausing the game (via `runtime_freeze` or the editor) does not stop the bridge from receiving commands.
+>
+> **It also refuses to start in an exported build.** The bridge can call arbitrary methods on any node, so shipping it would be a backdoor. It only listens when `OS.has_feature("editor")` is true — i.e. when the game is run from the editor. If you forget to remove the autoload before exporting, it stays dormant instead of opening a port. To drive an exported build in CI, set `GODOT_MCP_RUNTIME=1` in the environment.
 
 ### Runtime Tools (11)
 
@@ -1480,8 +1495,8 @@ Click each category to expand and see all tools with descriptions.
 | `editor_run_specific_scene` | Run a specific scene (not just main). |
 | `editor_get_running_scene_tree` | Get the live scene tree while the game is running. |
 | `editor_get_performance` | Get FPS, draw calls, memory usage while game is running. |
-| `editor_undo` | Undo last editor action. |
-| `editor_redo` | Redo last undone action. |
+| `editor_undo` | Undo the last scene action (including every MCP scene mutation) and report which action was undone. |
+| `editor_redo` | Redo the last undone scene action and report which action was redone. |
 | `editor_save` | Save current scene in editor. |
 | `editor_save_all` | Save all open scenes. |
 | `editor_reload_scene` | Save and reload current scene. |
@@ -1489,7 +1504,7 @@ Click each category to expand and see all tools with descriptions.
 | `editor_create_scene` | Create and open a new scene in the editor. |
 | `editor_instantiate_scene` | Instantiate a PackedScene into the current scene. |
 | `editor_set_main_scene` | Set the project main scene. |
-| `editor_get_scene_changes` | Check if current scene has unsaved changes. |
+| `editor_get_scene_changes` | Check unsaved changes plus the last action name and whether undo/redo are available. |
 | `editor_add_node` | Add a node to the currently open scene in editor. |
 | `editor_remove_node` | Remove a node from the currently open scene. |
 | `editor_duplicate_node` | Duplicate a node with children, scripts, and signals. |
@@ -1852,8 +1867,10 @@ Click each category to expand and see all tools with descriptions.
 npm install          # Install dependencies
 npm run build        # Build TypeScript to dist/
 npm run dev          # Dev mode (tsx hot reload)
-npm test             # Run vitest suite (144 tests: 74 runnable + 70 integration requiring a live Godot project); node test/test_all.mjs for 167 legacy checks
+npm test             # Run vitest suite (197 tests: 127 runnable + 70 integration requiring a live Godot project); node test/test_all.mjs for 176 legacy checks
 npm run test:watch   # Watch mode
+npm run check:godot  # Load every fixture in a real headless Godot and verify
+                     # ext_resource paths, UIDs and SubResource refs (needs Godot installed)
 ```
 
 ### CLI Options
@@ -1888,13 +1905,13 @@ npm run test:watch   # Watch mode
 
 ```bash
 npm run vsix
-# Output: godot-mcp-1.9.1.vsix
+# Output: godot-mcp-1.10.0.vsix
 ```
 
 Install in VS Code:
 
 ```bash
-code --install-extension godot-mcp-1.9.1.vsix
+code --install-extension godot-mcp-1.10.0.vsix
 ```
 
 ---

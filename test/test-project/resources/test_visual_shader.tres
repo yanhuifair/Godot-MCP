@@ -1,13 +1,10 @@
-[gd_resource type="VisualShader" format=3 uid="uid://test_visual_shader"]
+[gd_resource type="VisualShader" format=3 uid="uid://dd7fgc407wmse"]
+
+[sub_resource type="VisualShaderNodeColorConstant" id="ColorConstant_1"]
+constant = Color(1, 0.5, 0.2, 1)
 
 [resource]
-graph_offset = Vector2(0, 0)
-nodes/0/node = SubResource("output")
-nodes/0/position = Vector2(200, 0)
-nodes/1/node = SubResource("color_const")
-nodes/1/position = Vector2(0, 0)
-
-[sub_resource type="VisualShaderNodeOutput" id="output"]
-
-[sub_resource type="VisualShaderNodeColorConstant" id="color_const"]
-constant = Color(1, 0.5, 0.2, 1)
+mode = 0
+nodes/fragment/2/node = SubResource("ColorConstant_1")
+nodes/fragment/2/position = Vector2(-300, 0)
+nodes/fragment/connections = PackedInt32Array(2, 0, 0, 0)

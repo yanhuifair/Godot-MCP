@@ -17,6 +17,7 @@ export enum ErrorCode {
   GODOT_CLI_ERROR = 'GODOT_CLI_ERROR',
   PROCESS_ERROR = 'PROCESS_ERROR',
   EDITOR_NOT_REACHABLE = 'EDITOR_NOT_REACHABLE',
+  EDITOR_COMMAND_FAILED = 'EDITOR_COMMAND_FAILED',
   RUNTIME_NOT_REACHABLE = 'RUNTIME_NOT_REACHABLE',
   INVALID_ARGUMENT = 'INVALID_ARGUMENT',
   ALREADY_EXISTS = 'ALREADY_EXISTS',
@@ -44,6 +45,11 @@ const SOLUTION_MAP: Partial<Record<ErrorCode, string[]>> = {
   [ErrorCode.EDITOR_NOT_REACHABLE]: [
     'Open the Godot editor with the MCP plugin installed, or run: npx @yanhuifair/godot-mcp --enable-plugin -p <project>',
     'The editor bridge probes TCP on 127.0.0.1:9876 first, then falls back to spawning Godot — verify the plugin is present in the target project.',
+  ],
+  [ErrorCode.EDITOR_COMMAND_FAILED]: [
+    'The editor was reached but rejected the command — read the message above; it comes straight from Godot.',
+    'Common causes: no scene is open, the node path does not exist, or the target node type does not support the operation.',
+    'Use editor_get_scene_tree / editor_get_node_properties to confirm the node path and property names first.',
   ],
   [ErrorCode.RUNTIME_NOT_REACHABLE]: [
     'The running game is not reachable. Add the `runtime_bridge.gd` autoload to your project (copy addons/godot-mcp/runtime_bridge.gd into your project and enable it as an autoload named `godot_mcp_runtime`), then run the game from the editor.',
@@ -112,7 +118,25 @@ export function wrapError(
   prefix?: string
 ): ToolResult {
   const message = err instanceof Error ? err.message : String(err);
-  return toolError(code, prefix ? `${prefix}: ${message}` : message);
+  // 引擎侧返回的业务错误（"Node not found" 等）不是连接问题。用调用方传入的
+  // EDITOR_NOT_REACHABLE 标注会把用户引向"检查插件/端口"的错误排查方向，
+  // 因此这里按标记改写成 EDITOR_COMMAND_FAILED。
+  const effective = isEditorCommandFailure(err) ? ErrorCode.EDITOR_COMMAND_FAILED : code;
+  return toolError(effective, prefix ? `${prefix}: ${message}` : message);
+}
+
+/** 标记：由 Godot 侧返回的命令级失败（而非传输/连接失败）。 */
+export const EDITOR_COMMAND_FAILURE = Symbol.for('godot-mcp.editorCommandFailure');
+
+export function isEditorCommandFailure(err: unknown): boolean {
+  return !!err && typeof err === 'object' && (err as any)[EDITOR_COMMAND_FAILURE] === true;
+}
+
+/** 把 Godot 返回的 `{ error: "..." }` 包装成带标记的 Error。 */
+export function editorCommandError(method: string, message: string): Error {
+  const err = new Error(`${method} failed: ${message}`);
+  (err as any)[EDITOR_COMMAND_FAILURE] = true;
+  return err;
 }
 
 /**

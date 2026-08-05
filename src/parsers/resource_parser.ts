@@ -15,7 +15,7 @@
 // .res files are binary - not supported.
 
 import { ResourceDocument, ResourceHeader, ExtResource, SubResource } from '../utils/types.js';
-import { splitHeaderParts, parseKeyValuePairs, unquote } from './parser_helpers.js';
+import { splitHeaderParts, parseKeyValuePairs, unquote, unquoteId, unquoteAttr } from './parser_helpers.js';
 
 const BINARY_RES_HEADER = 'GDROM'; // 4-byte magic for Godot binary resources
 
@@ -73,17 +73,17 @@ export function parseResource(content: string): ResourceDocument {
           break;
         case 'ext_resource':
           doc.extResources.push({
-            type: props.type || '',
-            uid: props.uid || undefined,
-            path: unquote(props.path || ''),
-            id: props.id || '',
+            type: unquoteAttr(props.type),
+            uid: props.uid ? unquoteAttr(props.uid) : undefined,
+            path: unquoteAttr(props.path),
+            id: unquoteId(props.id),
           });
           currentSection = 'ext_resource';
           break;
         case 'sub_resource':
           doc.subResources.push({
-            type: props.type || '',
-            id: props.id || '',
+            type: unquoteAttr(props.type),
+            id: unquoteId(props.id),
             properties: {},
           });
           currentSubIdx = doc.subResources.length - 1;
@@ -111,4 +111,55 @@ export function parseResource(content: string): ResourceDocument {
   }
 
   return doc;
+}
+
+/**
+ * Serialize a ResourceDocument back to .tres text.
+ *
+ * Every caller used to hand-roll this and each one emitted only the header plus
+ * `[resource]`. That silently deleted the `[ext_resource]` / `[sub_resource]`
+ * blocks, so a single property edit on a material with a texture, or on an
+ * Environment with a sky, turned every `ExtResource("1")` / `SubResource("x")`
+ * into a dangling reference and Godot refused to open the file at all.
+ *
+ * `load_steps` is recomputed rather than trusted: it must equal
+ * ext + sub + 1, and a stale value makes the engine stop reading early.
+ */
+export function serializeResource(
+  doc: ResourceDocument,
+  /**
+   * Optional reordering of the `[resource]` keys. Most resources keep insertion
+   * order, but AudioBusLayout must be written numerically by bus index or Godot
+   * mis-reads the file (see src/tools/audio.ts).
+   */
+  sortResourceKeys?: (keys: string[]) => string[],
+): string {
+  let out = `[gd_resource type="${doc.header.type}"`;
+
+  const loadSteps = doc.extResources.length + doc.subResources.length + 1;
+  if (loadSteps > 1) out += ` load_steps=${loadSteps}`;
+  out += ` format=${doc.header.format}`;
+  if (doc.header.uid) out += ` uid="${doc.header.uid}"`;
+  out += ']\n';
+
+  for (const ext of doc.extResources) {
+    out += `\n[ext_resource type="${ext.type}"`;
+    if (ext.uid) out += ` uid="${ext.uid}"`;
+    out += ` path="${ext.path}" id="${ext.id}"]\n`;
+  }
+
+  // Godot requires every [sub_resource] to appear before [resource].
+  for (const sub of doc.subResources) {
+    out += `\n[sub_resource type="${sub.type}" id="${sub.id}"]\n`;
+    for (const [key, val] of Object.entries(sub.properties)) {
+      out += `${key} = ${val}\n`;
+    }
+  }
+
+  out += '\n[resource]\n';
+  const keys = Object.keys(doc.resource);
+  for (const key of sortResourceKeys ? sortResourceKeys(keys) : keys) {
+    out += `${key} = ${doc.resource[key]}\n`;
+  }
+  return out;
 }

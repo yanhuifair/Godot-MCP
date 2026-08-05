@@ -24,6 +24,17 @@ var _buffer := ""
 var _step_frames := 0  # remaining frames to run while stepping
 
 func _ready() -> void:
+	# SAFETY: never open a control port in an exported / shipped game.
+	# This bridge grants full remote control of the process (call_method on any
+	# node, arbitrary property writes, input injection), so it must only run in
+	# editor play sessions. If a developer forgets to remove the autoload before
+	# exporting, we silently stay dormant instead of shipping a backdoor.
+	# Escape hatch for CI / automated playtests of an exported build:
+	#   GODOT_MCP_RUNTIME=1
+	if not OS.has_feature("editor") and OS.get_environment("GODOT_MCP_RUNTIME") != "1":
+		set_process(false)
+		return
+
 	# Keep running even when the tree is globally paused, so frame-stepping
 	# and command polling keep working while the game is "frozen".
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -47,9 +58,18 @@ func _process(_delta: float) -> void:
 func _poll() -> void:
 	if not _server:
 		return
+	# get_status() only refreshes on poll(); without this a departed client leaves
+	# _peer permanently "CONNECTED" and the bridge never accepts anyone again.
+	if _peer:
+		_peer.poll()
+		if _peer.get_status() != StreamPeerTCP.STATUS_CONNECTED:
+			_peer.disconnect_from_host()
+			_peer = null
+			_buffer = ""
 	if not _peer and _server.is_connection_available():
 		_peer = _server.take_connection()
 		_buffer = ""
+		_peer.poll()
 	if _peer:
 		var status := _peer.get_status()
 		if status == StreamPeerTCP.STATUS_CONNECTED:
@@ -99,7 +119,7 @@ func _dispatch(method: String, params: Dictionary) -> Dictionary:
 		"emit_signal":
 			return _emit_signal(params)
 		"input":
-			return _input(params)
+			return _cmd_input(params)
 		"freeze":
 			get_tree().paused = true
 			return {"ok": true, "paused": true}
@@ -185,7 +205,9 @@ func _emit_signal(params: Dictionary) -> Dictionary:
 		node.emit_signal(sig, args)
 	return {"ok": true}
 
-func _input(params: Dictionary) -> Dictionary:
+# NOTE: must NOT be named `_input` — that collides with the built-in virtual
+# Node._input(InputEvent) -> void and makes the whole script fail to parse.
+func _cmd_input(params: Dictionary) -> Dictionary:
 	var keycode: int = int(params.get("keycode", 0))
 	var action: String = params.get("action", "press")
 	var ev := InputEventKey.new()
@@ -205,7 +227,7 @@ func _screenshot(params: Dictionary) -> Dictionary:
 		return {"error": "failed to save screenshot: " + str(err)}
 	return {"ok": true, "path": path}
 
-func _resolve(path: String):
+func _resolve(path: String) -> Node:
 	var root := _current_scene()
 	if not root:
 		return null

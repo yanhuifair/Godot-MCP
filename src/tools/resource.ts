@@ -9,7 +9,7 @@ import { toolError, ErrorCode } from '../utils/errors.js';
 import { ToolResult, ResourceTemplateType } from '../utils/types.js';
 import fs from 'node:fs';
 import { readTextFile, findFilesByExtension, resolveProjectPath, writeTextFile } from '../utils/file_utils.js';
-import { parseResource, isBinaryResource } from '../parsers/resource_parser.js';
+import { parseResource, isBinaryResource, serializeResource } from '../parsers/resource_parser.js';
 
 // ---- Resource Templates ----
 
@@ -307,17 +307,9 @@ export function handleWriteResource(
     // Merge new properties
     Object.assign(doc.resource, args.properties);
 
-    // Rebuild .tres text
-    let newContent = `[gd_resource type="${doc.header.type}" format=${doc.header.format}`;
-    if (doc.header.uid) newContent += ` uid="${doc.header.uid}"`;
-    if (doc.header.load_steps) newContent += ` load_steps=${doc.header.load_steps}`;
-    newContent += ']\n\n[resource]\n';
-
-    for (const [key, val] of Object.entries(doc.resource)) {
-      newContent += `${key} = ${val}\n`;
-    }
-
-    writeTextFile(absPath, newContent, args.create_backup !== false);
+    // serializeResource re-emits ext/sub resource blocks; hand-rolling the text
+    // here used to drop them and break every ExtResource()/SubResource() link.
+    writeTextFile(absPath, serializeResource(doc), args.create_backup !== false);
     return {
       content: [{ type: 'text', text: `Resource updated: ${args.path} (${Object.keys(args.properties).length} properties changed)` }],
     };

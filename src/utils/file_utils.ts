@@ -7,6 +7,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { FileEntry, SearchMatch } from './types.js';
+import { stampUid } from './uid.js';
 
 /**
  * Find the Godot project root by looking for project.godot
@@ -267,6 +268,23 @@ export function readFileLines(
 }
 
 /**
+ * Normalise a user-supplied resource path to the `res://` form Godot stores.
+ *
+ * Every MCP tool takes project-relative paths, but `[ext_resource path=...]`
+ * is resolved by the engine RELATIVE TO THE REFERRING FILE when it lacks the
+ * `res://` prefix. Writing "resources/mat.tres" into "scenes/main.tscn" therefore
+ * silently points at "res://scenes/resources/mat.tres" and the reference dies.
+ * Always run external references through this.
+ */
+export function toResPath(inputPath: string): string {
+  const trimmed = inputPath.trim();
+  if (trimmed.startsWith('res://') || trimmed.startsWith('user://') || trimmed.startsWith('uid://')) {
+    return trimmed;
+  }
+  return `res://${trimmed.replace(/^\.\//, '').replace(/^\/+/, '')}`;
+}
+
+/**
  * Write content to a file, optionally creating a backup.
  */
 export function writeTextFile(absolutePath: string, content: string, createBackup: boolean = false): void {
@@ -280,10 +298,17 @@ export function writeTextFile(absolutePath: string, content: string, createBacku
     fs.copyFileSync(absolutePath, backupPath);
   }
 
+  // The scene/resource templates emit `uid=""` as a placeholder. Mint a real
+  // UID here so every file we create is a first-class resource instead of one
+  // our own `validate_project` would immediately flag. The substitution is
+  // scoped to the [gd_scene]/[gd_resource] header, so other content (scripts,
+  // shaders, .import files) passes through untouched.
+  const payload = stampUid(content);
+
   // Atomic write: write to a temp file in the same directory, then rename.
   // Prevents leaving a partially-written (corrupted) file if the process crashes mid-write.
   const tmpPath = `${absolutePath}.tmp.${process.pid}`;
-  fs.writeFileSync(tmpPath, content, 'utf-8');
+  fs.writeFileSync(tmpPath, payload, 'utf-8');
   try {
     fs.renameSync(tmpPath, absolutePath);
   } catch (err) {

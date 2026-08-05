@@ -8,8 +8,8 @@ import { z } from 'zod';
 import { toolError, ErrorCode } from '../utils/errors.js';
 import fs from 'node:fs';
 import pathMod from 'node:path';
-import { ToolResult, SceneOperation, SceneTemplateType } from '../utils/types.js';
-import { readTextFile, writeTextFile, findFilesByExtension, findProjectRoot, resolveProjectPath } from '../utils/file_utils.js';
+import { ToolResult, SceneOperation, SceneTemplateType, GodotDocument, NodeDefinition } from '../utils/types.js';
+import { readTextFile, writeTextFile, findFilesByExtension, findProjectRoot, resolveProjectPath, toResPath } from '../utils/file_utils.js';
 import { parseScene, serializeScene, generateSceneTemplate, editScene } from '../parsers/scene_parser.js';
 
 // ---- Tool Schemas ----
@@ -796,24 +796,103 @@ const SHAPE_DEFAULTS: Record<string, Record<string, string>> = {
   'RectangleShape2D': { size: 'Vector2(20, 20)' },
 };
 
+/** Godot shape classes always end in Shape2D / Shape3D (e.g. CapsuleShape2D, ConcavePolygonShape3D). */
+const SHAPE_TYPE_RE = /^[A-Za-z][A-Za-z0-9]*Shape(2D|3D)$/;
+
+/** Allocate a resource id that is not already used by an ext_resource or sub_resource. */
+function uniqueResourceId(doc: GodotDocument, prefix: string): string {
+  const taken = new Set<string>([
+    ...doc.extResources.map(r => r.id),
+    ...doc.subResources.map(r => r.id),
+  ]);
+  let n = 1;
+  while (taken.has(`${prefix}_${n}`)) n++;
+  return `${prefix}_${n}`;
+}
+
+/** Godot uses load_steps as a loader hint: 1 + every ext/sub resource entry. */
+function recomputeLoadSteps(doc: GodotDocument): void {
+  doc.header.load_steps = doc.extResources.length + doc.subResources.length + 1;
+}
+
 export function handleSetCollisionShape(
   projectRoot: string,
   args: { scene_path: string; node_path: string; shape_type: string; shape_resource_path?: string }
 ): ToolResult {
-  // Atomic: set shape property on an existing CollisionShape node.
-  // Use add_node first to create the CollisionShape2D/3D child if needed.
-  // Use create_resource first to create the shape .tres if needed.
+  // Atomic: attach a shape to an existing CollisionShape2D/3D node.
+  //   - no shape_resource_path -> an inline [sub_resource] block is created and
+  //     referenced with SubResource("id")
+  //   - shape_resource_path given -> an [ext_resource] entry is registered (reused
+  //     if the same path is already present) and referenced with ExtResource("id")
+  // Use add_node first if the CollisionShape node does not exist yet.
   try {
+    if (!SHAPE_TYPE_RE.test(args.shape_type)) {
+      return toolError(
+        ErrorCode.INVALID_ARGUMENT,
+        `Invalid shape_type "${args.shape_type}". Expected a Godot shape class such as ` +
+        `RectangleShape2D, CircleShape2D, CapsuleShape2D, BoxShape3D, SphereShape3D, CapsuleShape3D.`
+      );
+    }
+
     const absPath = resolveProjectPath(projectRoot, args.scene_path);
     const { content } = readTextFile(absPath);
+    const doc = parseScene(content);
 
-    const shapePath = args.shape_resource_path || `res://shapes/${args.node_path.replace(/[/\\]/g, '_')}_shape.tres`;
-    const ops: SceneOperation[] = [{ action: 'modify_node', node_path: args.node_path, properties: { shape: `SubResource("${shapePath}")` } }];
-    const modified = editScene(content, ops);
-    writeTextFile(absPath, modified, true);
+    // The node must already exist — editScene silently ignores unknown paths,
+    // which would otherwise report success while doing nothing.
+    const known = new Set<string>();
+    (function index(nodes: NodeDefinition[], parentPath: string): void {
+      for (const node of nodes) {
+        const full = parentPath ? `${parentPath}/${node.name}` : node.name;
+        known.add(full);
+        index(node.children, full);
+      }
+    })(doc.nodes, '');
+    if (!known.has(args.node_path)) {
+      return toolError(
+        ErrorCode.NOT_FOUND,
+        `Node "${args.node_path}" not found in ${args.scene_path}. ` +
+        `Available nodes: ${[...known].join(', ') || '(none)'}`
+      );
+    }
+
+    let reference: string;
+    let description: string;
+
+    if (args.shape_resource_path) {
+      // External .tres — must be declared as an ext_resource, not a SubResource.
+      // `res://` is mandatory: a bare path is resolved relative to this scene's
+      // own directory, which silently breaks the reference.
+      const path = toResPath(args.shape_resource_path);
+      let ext = doc.extResources.find(e => e.path === path);
+      if (!ext) {
+        ext = { type: args.shape_type, path, id: uniqueResourceId(doc, args.shape_type) };
+        doc.extResources.push(ext);
+      }
+      reference = `ExtResource("${ext.id}")`;
+      description = `external shape "${path}"`;
+    } else {
+      // Inline sub_resource with sensible defaults for the common shape classes.
+      const id = uniqueResourceId(doc, args.shape_type);
+      doc.subResources.push({
+        type: args.shape_type,
+        id,
+        properties: { ...(SHAPE_DEFAULTS[args.shape_type] || {}) },
+      });
+      reference = `SubResource("${id}")`;
+      description = `inline ${args.shape_type}`;
+    }
+
+    recomputeLoadSteps(doc);
+
+    const withResource = serializeScene(doc);
+    const ops: SceneOperation[] = [
+      { action: 'modify_node', node_path: args.node_path, properties: { shape: reference } },
+    ];
+    writeTextFile(absPath, editScene(withResource, ops), true);
 
     return {
-      content: [{ type: 'text', text: `Shape "${shapePath}" assigned to "${args.node_path}" in ${args.scene_path}` }],
+      content: [{ type: 'text', text: `Assigned ${description} to "${args.node_path}" as ${reference} in ${args.scene_path}` }],
     };
   } catch (err: any) {
     return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
@@ -958,18 +1037,27 @@ export function handleLoadSprite(
             return toolError(ErrorCode.INTERNAL_ERROR, `Node "${args.node_path}" is ${node.type}, not Sprite2D or TextureRect.`);
     }
 
-    // 添加 ExtResource 引用
-    const resId = `"${doc.extResources.length + 1}_sprite_texture"`;
-    doc.extResources.push({
-      id: resId,
-      type: 'CompressedTexture2D',
-      path: args.texture_path,
-    });
+    // 添加 ExtResource 引用。
+    // 两个必须注意的点：
+    //   1. id 不能自带引号 —— serializeScene 会再包一层，写出 id=""1_sprite_texture""，
+    //      整个文件都无法解析（Godot: "Unexpected end of file"）。
+    //   2. path 必须是 res:// 绝对路径，否则引擎按场景所在目录解析，引用直接失效。
+    const texPath = toResPath(args.texture_path);
+    let ext = doc.extResources.find(e => e.path === texPath);
+    if (!ext) {
+      ext = {
+        id: uniqueResourceId(doc, 'sprite_texture'),
+        type: 'CompressedTexture2D',
+        path: texPath,
+      };
+      doc.extResources.push(ext);
+    }
 
     // 设置 texture 属性
     if (!node.properties) node.properties = {};
-    node.properties.texture = `ExtResource(${resId})`;
+    node.properties.texture = `ExtResource("${ext.id}")`;
 
+    recomputeLoadSteps(doc);
     const modified = serializeScene(doc);
     writeTextFile(absPath, modified, true);
 

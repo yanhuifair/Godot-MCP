@@ -7,7 +7,7 @@
 import { z } from 'zod';
 import { toolError, ErrorCode } from '../utils/errors.js';
 import { ToolResult } from '../utils/types.js';
-import { readTextFile, resolveProjectPath, findFilesByExtension, writeTextFile } from '../utils/file_utils.js';
+import { readTextFile, resolveProjectPath, findFilesByExtension, writeTextFile, toResPath } from '../utils/file_utils.js';
 import { parseScene, serializeScene } from '../parsers/scene_parser.js';
 
 // ---- Schemas ----
@@ -123,23 +123,31 @@ export function handleSetMeshSurfaceMaterial(
     return toolError(ErrorCode.FILE_NOT_FOUND, `MeshInstance "${args.node_name}" not found`);
     }
 
-    // Add ExtResource for the material if not already present
+    // Add ExtResource for the material if not already present.
+    // The path must be res:// absolute — a bare "resources/x.tres" is resolved
+    // relative to the scene's own folder and the reference silently breaks.
+    const materialPath = toResPath(args.material_path);
     let materialId: string | null = null;
     for (const ext of doc.extResources) {
-      if (ext.path === args.material_path) {
+      if (ext.path === materialPath) {
         materialId = ext.id;
         break;
       }
     }
 
     if (!materialId) {
-      const nextId = doc.extResources.length + 1;
-      materialId = `material_${nextId}`;
+      // Derive from the set of ids actually in use; `length + 1` collides as
+      // soon as anything else already claimed that name.
+      const taken = new Set(doc.extResources.map(e => e.id).concat(doc.subResources.map(s => s.id)));
+      let n = 1;
+      while (taken.has(`material_${n}`)) n++;
+      materialId = `material_${n}`;
       doc.extResources.push({
         type: 'Material',
-        path: args.material_path,
+        path: materialPath,
         id: materialId,
       });
+      doc.header.load_steps = doc.extResources.length + doc.subResources.length + 1;
     }
 
     const si = args.surface_index ?? 0;
