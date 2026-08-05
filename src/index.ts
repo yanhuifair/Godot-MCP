@@ -2,7 +2,7 @@
 // Copyright (c) 2026 FairYan
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // ============================================================
-// Godot MCP Server - Entry Point (v1.9.0)
+// Godot MCP Server - Entry Point (v1.9.1)
 // ============================================================
 // 同时支持三种 MCP 通信协议：
 //   - Stdio（标准输入输出，默认）
@@ -119,7 +119,7 @@ OPTIONS:
   --godot-path, -g <path>    Godot 可执行文件路径（默认：自动检测）
   --install-addons            将编辑器插件 (addons/) 安装到目标项目
   --enable-plugin             安装 addons 并自动在 project.godot 中启用插件
-  --read-only                 只读模式：拒绝约 140 个写/副作用工具（安全模式）
+  --read-only                 只读模式：拒绝164 个写/副作用工具（安全模式）
 
 TRANSPORT OPTIONS:
   --transport, -t <mode>     传输协议（默认：stdio）

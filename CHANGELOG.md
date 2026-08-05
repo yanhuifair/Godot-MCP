@@ -1,4 +1,11 @@
 # Changelog
+## v1.9.1 (2026-08-05)
+
+### Fixes
+- **Corrected the read-only tool count** in docs and the CLI help text: `--read-only` actually rejects **164** write/side-effect tools (the `WRITE_TOOLS` set), not "~140". Updated README (en/zh) and `src/index.ts` accordingly.
+- **Fixed the vitest test-count claim**: the suite is **144 tests** (74 runnable + 70 integration requiring a live Godot project), not "140". Legacy `test/test_all.mjs` "167 checks" claim verified accurate and kept.
+- **Robust camelCase→snake_case parameter mapping.** `normalizeParameterNames` now converts *any* camelCase argument key to snake_case (generic `toSnakeCase` fallback) instead of only the 30 hand-listed `PARAMETER_MAP` entries. This closes a gap where 111 multi-word tool parameters would fail Zod validation if an LLM client emitted camelCase. Snake_case keys still pass through unchanged; `test/server_normalization.test.ts` updated to match.
+
 ## v1.9.0 (2026-08-05)
 
 ### License

@@ -1,7 +1,7 @@
 // Copyright (c) 2026 FairYan
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // ============================================================
-// Godot MCP Server - Server Factory & Handlers (v1.9.0)
+// Godot MCP Server - Server Factory & Handlers (v1.9.1)
 // ============================================================
 // 将 MCP Server 创建、工具注册、请求处理抽离为独立工厂函数，
 // 供 Stdio、SSE、Streamable HTTP 三种传输层共用。
@@ -67,7 +67,7 @@ export function createMcpServer(options: CreateServerOptions = {}): Server {
   const { registry } = initSharedResources();
 
   const server = new Server(
-    { name: 'godot-mcp', version: '1.9.0' },
+    { name: 'godot-mcp', version: '1.9.1' },
     { capabilities: { tools: {} } }
   );
 
@@ -179,15 +179,27 @@ const PARAMETER_MAP: Record<string, string> = {
 
 /**
  * Convert camelCase keys to snake_case in an arguments object so they match the
- * snake_case keys declared in our Zod schemas. Leaves unknown keys unchanged
- * (they pass through to Zod validation).
+ * snake_case keys declared in our Zod schemas. Explicit `PARAMETER_MAP` entries
+ * win (handles irregular forms); any remaining key containing an uppercase
+ * letter is converted generically so LLM clients that emit camelCase don't fail
+ * Zod validation on the 100+ multi-word tool parameters. Keys already in
+ * snake_case (no uppercase) pass through unchanged.
  */
 export function normalizeParameterNames(args: Record<string, unknown>): Record<string, unknown> {
   if (!args || typeof args !== 'object') return args;
   const result: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(args)) {
-    const snakeKey = PARAMETER_MAP[key] || key;
+    const snakeKey = PARAMETER_MAP[key] || toSnakeCase(key);
     result[snakeKey] = value;
   }
   return result;
+}
+
+/** Generic camelCase → snake_case converter for otherwise-unmapped keys. */
+function toSnakeCase(key: string): string {
+  if (!/[A-Z]/.test(key)) return key; // already snake_case / no uppercase
+  return key
+    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1_$2')
+    .toLowerCase();
 }

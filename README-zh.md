@@ -350,7 +350,7 @@ godot-mcp/
 │   └── godot-mcp/            # Godot 编辑器插件
 │       ├── plugin.cfg         # 插件元数据
 │       └── plugin.gd          # stdin 读取器、TCP 服务器、102 个命令处理器
-├── test/                     # Vitest 套件（140 个测试）+ 旧版 .mjs 套件
+├── test/                     # Vitest 套件（144 个测试：74 个可运行 + 70 个集成需要真实 Godot 项目）+ 旧版 .mjs 套件
 │   ├── test_all.mjs          # 旧版独立套件（167 项工具检查）
 │   ├── test_editor.mjs       # Editor 桥 TCP 测试
 │   ├── test_runner.mjs       # 早期集成测试
@@ -408,7 +408,7 @@ godot-mcp/
 
 - **路径穿越防护**：所有文件操作验证解析后的路径保持在项目根目录内
 - **自动备份**：脚本和场景文件的写操作会创建 `.bak` 备份副本
-- **只读模式**：`--read-only`（或 `GODOT_MCP_READ_ONLY=true`）通过维护的白名单拒绝约 140 个写/副作用工具（write_、create_、delete_、move_、set_、edit_、editor_* 变更类、run/export/launch 等）——它们从 `tools/list` 中隐藏，直接调用时返回 `READ_ONLY` 错误
+- **只读模式**：`--read-only`（或 `GODOT_MCP_READ_ONLY=true`）通过维护的白名单拒绝164 个写/副作用工具（write_、create_、delete_、move_、set_、edit_、editor_* 变更类、run/export/launch 等）——它们从 `tools/list` 中隐藏，直接调用时返回 `READ_ONLY` 错误
 - **TCP 仅限本机**：编辑器插件的 TCP 桥只绑定 `127.0.0.1`，绝不暴露到局域网
 - **可选令牌鉴权**：设置 `GODOT_MCP_TOKEN` 后，HTTP（`/mcp`、`/sse`）要求 Bearer 令牌，插件 TCP 桥要求 `auth` 握手；非 loopback 的 HTTP 绑定在没有令牌时拒绝启动
 - **结构化错误**：工具失败统一返回 `{ content, isError: true }` 结构；关键路径（只读、编辑器不可达）携带类型化错误码（`READ_ONLY`、`EDITOR_NOT_REACHABLE`、`NOT_FOUND` 等）
@@ -498,7 +498,7 @@ npx @yanhuifair/godot-mcp -t all --port 3000 -p /path/to/your/godot/project
 
 ```bash
 curl http://127.0.0.1:3000/health
-# {"status":"ok","version":"1.9.0","projectRoot":"/path/to/project","endpoints":{...}}
+# {"status":"ok","version":"1.9.1","projectRoot":"/path/to/project","endpoints":{...}}
 ```
 
 ---
@@ -565,7 +565,7 @@ node dist/index.js -p /path/to/your/godot/project
 | `-g, --godot-path <path>` | Godot 可执行文件路径。不填则自动检测（顺序见下方）。 |
 | `--enable-plugin` | 把编辑器插件复制进 `addons/`**并**在 `project.godot` 中自动启用。需要配合 `-p`。**通常你要的就是这个。** |
 | `--install-addons` | 只复制插件文件，需要你自己去 Godot 的插件面板里勾选启用。 |
-| `--read-only` | 安全模式：拒绝约 140 个会写文件或产生副作用的工具。让 AI 探索一个陌生项目时非常好用。 |
+| `--read-only` | 安全模式：拒绝164 个会写文件或产生副作用的工具。让 AI 探索一个陌生项目时非常好用。 |
 | `-t, --transport <mode>` | `stdio`（默认）· `sse` · `streamable-http` · `all`。详见[传输模式](#传输模式)。 |
 | `--port <number>` | `sse` / `streamable-http` 的 HTTP 端口，默认 `3000`。 |
 | `--host <string>` | HTTP 监听地址，默认 `127.0.0.1`。绑定其他地址**必须**设置 `GODOT_MCP_TOKEN`。 |
@@ -584,7 +584,7 @@ npx @yanhuifair/godot-mcp -p . -t streamable-http --port 8080
 | 变量 | 描述 |
 |---|---|
 | `GODOT_PATH` | Godot 二进制路径（可选，自动检测） |
-| `GODOT_MCP_READ_ONLY` | `true` — 启用只读模式（拒绝约 140 个写/副作用工具） |
+| `GODOT_MCP_READ_ONLY` | `true` — 启用只读模式（拒绝164 个写/副作用工具） |
 | `GODOT_MCP_TOKEN` | 鉴权令牌。HTTP：绑定非 loopback 地址时必须设置；插件 TCP 桥：在 9876 端口启用 `auth` 握手 |
 | `GODOT_MCP_TEST_PROJECT` | 集成测试项目路径 |
 | `GODOT_PROJECT` | `sync-addons` 构建钩子的目标项目 |
@@ -1851,7 +1851,7 @@ npx @yanhuifair/godot-mcp --enable-plugin -p /path/to/your/godot/project
 npm install          # 安装依赖
 npm run build        # 构建 TypeScript 到 dist/
 npm run dev          # 开发模式（tsx 热重载）
-npm test             # 运行 vitest 套件（140 个测试）；node test/test_all.mjs 运行 167 项旧版检查
+npm test             # 运行 vitest 套件（144 个测试：74 个可运行 + 70 个集成需要真实 Godot 项目）；node test/test_all.mjs 运行 167 项旧版检查
 npm run test:watch   # 监听模式
 ```
 
@@ -1866,7 +1866,7 @@ npm run test:watch   # 监听模式
 | `--host` | HTTP 绑定地址（默认：127.0.0.1） |
 | `--install-addons` | 将编辑器插件复制到目标 Godot 项目 |
 | `--enable-plugin` | 安装并自动启用编辑器插件 |
-| `--read-only` | 拒绝约 140 个写/副作用工具（安全模式） |
+| `--read-only` | 拒绝164 个写/副作用工具（安全模式） |
 | `--no-sse` | 禁用 SSE 端点 |
 | `--no-streamable-http` | 禁用 Streamable HTTP 端点 |
 | `-h, --help` | 显示帮助 |
@@ -1887,13 +1887,13 @@ npm run test:watch   # 监听模式
 
 ```bash
 npm run vsix
-# 输出: godot-mcp-1.9.0.vsix
+# 输出: godot-mcp-1.9.1.vsix
 ```
 
 在 VS Code 中安装：
 
 ```bash
-code --install-extension godot-mcp-1.9.0.vsix
+code --install-extension godot-mcp-1.9.1.vsix
 ```
 
 ---

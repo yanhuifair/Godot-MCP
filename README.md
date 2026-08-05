@@ -350,7 +350,7 @@ godot-mcp/
 │   └── godot-mcp/            # Godot editor plugin
 │       ├── plugin.cfg         # Plugin metadata
 │       └── plugin.gd          # stdin reader, TCP server, 102 command handlers
-├── test/                     # Vitest suite (140 tests) + legacy .mjs suites
+├── test/                     # Vitest suite (144 tests: 74 runnable + 70 integration requiring a live Godot project) + legacy .mjs suites
 │   ├── test_all.mjs          # Legacy standalone suite (167 tool checks)
 │   ├── test_editor.mjs       # Legacy editor bridge TCP tests
 │   ├── test_runner.mjs       # Early integration test runner
@@ -409,7 +409,7 @@ To accommodate AI clients that may use either `snake_case` or `camelCase` parame
 
 - **Path traversal protection**: All file operations validate that resolved paths stay within the project root
 - **Automatic backups**: Write operations on script and scene files create `.bak` backup copies
-- **Read-only mode**: `--read-only` (or `GODOT_MCP_READ_ONLY=true`) rejects the ~140 write/side-effect tools (write_, create_, delete_, move_, set_, edit_, editor_* mutations, run/export/launch, …) via a maintained whitelist — they are hidden from `tools/list` and blocked with a `READ_ONLY` error if called directly
+- **Read-only mode**: `--read-only` (or `GODOT_MCP_READ_ONLY=true`) rejects the 164 write/side-effect tools (write_, create_, delete_, move_, set_, edit_, editor_* mutations, run/export/launch, …) via a maintained whitelist — they are hidden from `tools/list` and blocked with a `READ_ONLY` error if called directly
 - **TCP only on loopback**: The editor plugin's TCP bridge binds `127.0.0.1` only, never the LAN
 - **Optional token auth**: Set `GODOT_MCP_TOKEN` to require a bearer token on HTTP (`/mcp`, `/sse`) and an `auth` handshake on the plugin TCP bridge; non-loopback HTTP binds are refused without it
 - **Structured errors**: Tool failures return structured `{ content, isError: true }` responses; privileged paths (read-only, editor unreachable) carry typed error codes (`READ_ONLY`, `EDITOR_NOT_REACHABLE`, `NOT_FOUND`, …)
@@ -499,7 +499,7 @@ Starts: Stdio + SSE (`/sse`) + Streamable HTTP (`/mcp`) + Health Check (`/health
 
 ```bash
 curl http://127.0.0.1:3000/health
-# {"status":"ok","version":"1.9.0","projectRoot":"/path/to/project","endpoints":{...}}
+# {"status":"ok","version":"1.9.1","projectRoot":"/path/to/project","endpoints":{...}}
 ```
 
 ---
@@ -566,7 +566,7 @@ Point your client at the built entry file:
 | `-g, --godot-path <path>` | Path to the Godot executable. Auto-detected if omitted (see the detection order below). |
 | `--enable-plugin` | Copy the editor plugin into `addons/` **and** switch it on in `project.godot`. Requires `-p`. **This is the one you want.** |
 | `--install-addons` | Copy the plugin files only — you enable it yourself in Godot's Plugins tab. |
-| `--read-only` | Safe mode: rejects the ~140 tools that write files or cause side effects. Great for letting an AI explore an unfamiliar project. |
+| `--read-only` | Safe mode: rejects the 164 tools that write files or cause side effects. Great for letting an AI explore an unfamiliar project. |
 | `-t, --transport <mode>` | `stdio` (default) · `sse` · `streamable-http` · `all`. See [Transport Modes](#transport-modes). |
 | `--port <number>` | HTTP port for `sse` / `streamable-http`. Default `3000`. |
 | `--host <string>` | HTTP bind address. Default `127.0.0.1`. Binding anything else **requires** `GODOT_MCP_TOKEN`. |
@@ -585,7 +585,7 @@ npx @yanhuifair/godot-mcp -p . -t streamable-http --port 8080
 | Variable | Description |
 |---|---|
 | `GODOT_PATH` | Path to Godot binary (optional, auto-detected) |
-| `GODOT_MCP_READ_ONLY` | `true` — enable read-only mode (rejects ~140 write/side-effect tools) |
+| `GODOT_MCP_READ_ONLY` | `true` — enable read-only mode (rejects 164 write/side-effect tools) |
 | `GODOT_MCP_TOKEN` | Auth token. HTTP: required when binding a non-loopback host. Plugin TCP bridge: enables the `auth` handshake on port 9876 |
 | `GODOT_MCP_TEST_PROJECT` | Path to test project for integration tests |
 | `GODOT_PROJECT` | Target project for the `sync-addons` build hook |
@@ -1852,7 +1852,7 @@ Click each category to expand and see all tools with descriptions.
 npm install          # Install dependencies
 npm run build        # Build TypeScript to dist/
 npm run dev          # Dev mode (tsx hot reload)
-npm test             # Run vitest suite (140 tests); node test/test_all.mjs for 167 legacy checks
+npm test             # Run vitest suite (144 tests: 74 runnable + 70 integration requiring a live Godot project); node test/test_all.mjs for 167 legacy checks
 npm run test:watch   # Watch mode
 ```
 
@@ -1867,7 +1867,7 @@ npm run test:watch   # Watch mode
 | `--host` | HTTP bind address (default: 127.0.0.1) |
 | `--install-addons` | Copy editor plugin to target Godot project |
 | `--enable-plugin` | Install and auto-enable the editor plugin |
-| `--read-only` | Reject ~140 write/side-effect tools (security mode) |
+| `--read-only` | Reject 164 write/side-effect tools (security mode) |
 | `--no-sse` | Disable SSE endpoint |
 | `--no-streamable-http` | Disable Streamable HTTP endpoint |
 | `-h, --help` | Show help |
@@ -1888,13 +1888,13 @@ npm run test:watch   # Watch mode
 
 ```bash
 npm run vsix
-# Output: godot-mcp-1.9.0.vsix
+# Output: godot-mcp-1.9.1.vsix
 ```
 
 Install in VS Code:
 
 ```bash
-code --install-extension godot-mcp-1.9.0.vsix
+code --install-extension godot-mcp-1.9.1.vsix
 ```
 
 ---
