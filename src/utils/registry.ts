@@ -17,6 +17,8 @@ export interface ToolRegistration {
   schema: Record<string, ZodTypeAny>;
   handler: ToolHandler;
   readOnly?: boolean; // for future READ_ONLY_MODE support
+  /** 分组名，由 registry.setCategory() 在注册时自动打上，供 search_tools / list_tool_categories 使用。 */
+  category?: string;
 }
 
 /**
@@ -91,6 +93,11 @@ export const WRITE_TOOLS: ReadonlySet<string> = new Set([
   // ---- 实时游戏运行时写工具 (v1.8.0) ----
   'runtime_set_node', 'runtime_call_method', 'runtime_emit_signal', 'runtime_input',
   'runtime_freeze', 'runtime_resume', 'runtime_step', 'runtime_screenshot',
+  // ---- 新增 Editor / Logs 写工具 (v1.10.0) ----
+  'editor_save_scene_as', 'editor_close_scene', 'editor_mark_scene_unsaved',
+  'editor_play_current_scene', 'editor_set_distraction_free', 'editor_set_movie_maker',
+  'editor_restart', 'editor_select_node',
+  'clear_game_logs', 'configure_file_logging',
 ]);
 
 /** 该工具是否为写/副作用操作（read-only 模式下应被拒绝）。 */
@@ -115,9 +122,31 @@ export function getActiveRegistry(): ToolRegistry | null {
 export class ToolRegistry {
   private tools = new Map<string, ToolRegistration>();
   private readOnly: boolean;
+  private currentCategory = 'Uncategorized';
 
   constructor(opts?: { readOnly?: boolean }) {
     this.readOnly = opts?.readOnly ?? false;
+  }
+
+  /**
+   * 设置后续 register() 调用的分组名。
+   * 分类以前只以 register.ts 里的注释形式存在，导致每个工具的 category 都是
+   * undefined —— search_tools 无法按类聚合，README 宣称的"29 个分类"也无从校验。
+   */
+  setCategory(name: string): void {
+    this.currentCategory = name;
+  }
+
+  /** 所有分类及其工具数（只读模式下已过滤写工具）。 */
+  categories(): { name: string; count: number }[] {
+    const counts = new Map<string, number>();
+    for (const t of this.list()) {
+      const c = t.category ?? 'Uncategorized';
+      counts.set(c, (counts.get(c) ?? 0) + 1);
+    }
+    return [...counts.entries()]
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
   }
 
   /** 当前是否处于只读模式 */
@@ -131,7 +160,7 @@ export class ToolRegistry {
       console.error(`[ToolRegistry] Duplicate tool: ${tool.name}`);
       return;
     }
-    this.tools.set(tool.name, tool);
+    this.tools.set(tool.name, { category: this.currentCategory, ...tool });
   }
 
   /** Get all tool definitions (for list_tools). 只读模式下过滤掉写工具。 */

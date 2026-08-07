@@ -275,7 +275,7 @@ func _handle_message(raw: String) -> void:
 func _execute_command(method: String, params: Dictionary) -> Dictionary:
 	match method:
 		# ---- Health Check ----
-		"health_check": return {"ok": true, "version": PLUGIN_VERSION, "commands": 102, "undo_support": true}
+		"health_check": return {"ok": true, "version": PLUGIN_VERSION, "commands": 116, "undo_support": true}
 
 		# ---- Editor State ----
 		"get_open_scene": return _cmd_get_open_scene()
@@ -287,8 +287,11 @@ func _execute_command(method: String, params: Dictionary) -> Dictionary:
 		# ---- Scene Operations ----
 		"save_scene": return _cmd_save_scene()
 		"save_all_scenes": return _cmd_save_all_scenes()
+		"save_scene_as": return _cmd_save_scene_as(params)
 		"close_scene": return _cmd_close_scene()
 		"reload_scene": return _cmd_reload_scene()
+		"get_unsaved_scenes": return _cmd_get_unsaved_scenes()
+		"mark_scene_unsaved": return _cmd_mark_scene_unsaved()
 
 		# ---- Playback ----
 		"play_project": return _cmd_play_project()
@@ -297,6 +300,8 @@ func _execute_command(method: String, params: Dictionary) -> Dictionary:
 		"unpause_project": return _cmd_unpause_project()
 		"is_playing": return _cmd_is_playing()
 		"run_specific_scene": return _cmd_run_specific_scene(params)
+		"play_current_scene": return _cmd_play_current_scene()
+		"get_playing_scene": return _cmd_get_playing_scene()
 
 		# ---- Edit Operations ----
 		"undo": return _cmd_undo()
@@ -327,7 +332,6 @@ func _execute_command(method: String, params: Dictionary) -> Dictionary:
 		"get_editor_output": return _cmd_get_editor_output()
 		"get_editor_version": return _cmd_get_editor_version()
 		"get_editor_info": return _cmd_get_editor_info()
-		"read_current_scene": return _cmd_get_current_scene_tree()
 		"get_breakpoints": return _cmd_get_breakpoints()
 		"set_breakpoint": return _cmd_set_breakpoint(params)
 		"remove_breakpoint": return _cmd_remove_breakpoint(params)
@@ -336,12 +340,20 @@ func _execute_command(method: String, params: Dictionary) -> Dictionary:
 		"open_asset": return _cmd_open_asset(params)
 		"show_in_filesystem": return _cmd_show_in_filesystem(params)
 		"list_filesystem": return _cmd_list_filesystem(params)
+		"get_filesystem_selection": return _cmd_get_filesystem_selection()
+		"open_script_at_line": return _cmd_open_script_at_line(params)
 
 		# ---- UI / Window ----
 		"get_editor_rect": return _cmd_get_editor_rect()
 		"focus_editor": return _cmd_focus_editor()
 		"open_dock": return _cmd_open_dock(params)
 		"take_screenshot": return _cmd_take_screenshot(params)
+		"show_toast": return _cmd_show_toast(params)
+		"set_distraction_free": return _cmd_set_distraction_free(params)
+		"set_movie_maker": return _cmd_set_movie_maker(params)
+		"get_3d_snap": return _cmd_get_3d_snap()
+		"get_editor_paths": return _cmd_get_editor_paths()
+		"restart_editor": return _cmd_restart_editor(params)
 
 		# ---- Scene Creation ----
 		"create_scene": return _cmd_create_editor_scene(params)
@@ -369,7 +381,9 @@ func _execute_command(method: String, params: Dictionary) -> Dictionary:
 		"list_node_signals": return _cmd_list_node_signals(params)
 
 		# ---- Export ----
-		"export_project": return _cmd_editor_export(params)
+		# NOTE: project export is driven from the MCP side via the Godot CLI
+		# (handleExportProject -> exportGodotProject), not the bridge, so there
+		# is intentionally no "export_project" dispatch key here.
 
 		# ---- Project State ----
 		"get_scene_changes": return _cmd_get_scene_changes()
@@ -742,10 +756,46 @@ func _cmd_save_all_scenes() -> Dictionary:
 	return {"ok": true}
 
 
+func _cmd_save_scene_as(params: Dictionary) -> Dictionary:
+	var path = str(params.get("path", ""))
+	if path.is_empty():
+		return {"error": "Missing path"}
+	if not path.begins_with("res://"):
+		return {"error": "path must start with res:// — got: " + path}
+	if not EditorInterface.get_edited_scene_root():
+		return {"error": "No scene open"}
+	var with_preview = bool(params.get("with_preview", true))
+	EditorInterface.save_scene_as(path, with_preview)
+	return {"ok": true, "path": path}
+
+
 func _cmd_close_scene() -> Dictionary:
-	# Godot 4 没有公开的"关闭当前场景"API；保存场景并如实说明。
-	EditorInterface.save_scene()
-	return {"ok": true, "message": "Scene saved. Note: Godot 4 has no public 'close scene' API; the scene remains open."}
+	# EditorInterface.close_scene() 在 Godot 4.6 加入（editor_interface.cpp:948）。
+	# 旧版本没有该 API，退回到"保存并如实说明"。
+	var root = EditorInterface.get_edited_scene_root()
+	var scene_path = root.scene_file_path if root else ""
+	if not EditorInterface.has_method("close_scene"):
+		EditorInterface.save_scene()
+		return {
+			"ok": false,
+			"closed": false,
+			"message": "EditorInterface.close_scene() requires Godot 4.6+. Scene was saved instead; it remains open.",
+		}
+	EditorInterface.close_scene()
+	return {"ok": true, "closed": true, "scene": scene_path}
+
+
+func _cmd_get_unsaved_scenes() -> Dictionary:
+	if not EditorInterface.has_method("get_unsaved_scenes"):
+		return {"error": "EditorInterface.get_unsaved_scenes() requires Godot 4.4+"}
+	return {"scenes": Array(EditorInterface.get_unsaved_scenes())}
+
+
+func _cmd_mark_scene_unsaved() -> Dictionary:
+	if not EditorInterface.get_edited_scene_root():
+		return {"error": "No scene open"}
+	EditorInterface.mark_scene_as_unsaved()
+	return {"ok": true}
 
 
 func _cmd_reload_scene() -> Dictionary:
@@ -785,7 +835,10 @@ func _cmd_pause_project() -> Dictionary:
 
 
 func _cmd_is_playing() -> Dictionary:
-	return {"playing": EditorInterface.is_playing_scene()}
+	return {
+		"playing": EditorInterface.is_playing_scene(),
+		"scene": EditorInterface.get_playing_scene(),
+	}
 
 
 func _cmd_run_specific_scene(params: Dictionary) -> Dictionary:
@@ -794,6 +847,23 @@ func _cmd_run_specific_scene(params: Dictionary) -> Dictionary:
 		return {"error": "Missing scene path"}
 	EditorInterface.play_custom_scene(str(scene_path))
 	return {"ok": true, "running": str(scene_path)}
+
+
+func _cmd_play_current_scene() -> Dictionary:
+	var root = EditorInterface.get_edited_scene_root()
+	if not root:
+		return {"error": "No scene open"}
+	if root.scene_file_path.is_empty():
+		return {"error": "Current scene has never been saved — save it first (save_scene_as)"}
+	EditorInterface.play_current_scene()
+	return {"ok": true, "playing": true, "scene": root.scene_file_path}
+
+
+func _cmd_get_playing_scene() -> Dictionary:
+	return {
+		"playing": EditorInterface.is_playing_scene(),
+		"scene": EditorInterface.get_playing_scene(),
+	}
 
 
 # ============================================================
@@ -1352,16 +1422,27 @@ func _cmd_get_editor_version() -> Dictionary:
 
 func _cmd_get_editor_info() -> Dictionary:
 	var scene = _cmd_get_open_scene()
-	var playing = EditorInterface.is_playing_scene()
-	var version = Engine.get_version_info()
 	var rect = DisplayServer.window_get_size()
-	return {
-		"version": version,
-		"playing": playing,
+	var out := {
+		"version": Engine.get_version_info(),
+		"playing": EditorInterface.is_playing_scene(),
+		"playing_scene": EditorInterface.get_playing_scene(),
 		"open_scene": scene.get("scene", null),
+		"open_scenes": Array(EditorInterface.get_open_scenes()),
+		"main_screen": EditorInterface.get_editor_main_screen().get_class() if EditorInterface.get_editor_main_screen() else "",
 		"editor_width": rect.x,
 		"editor_height": rect.y,
+		"editor_scale": EditorInterface.get_editor_scale(),
+		"editor_language": EditorInterface.get_editor_language(),
+		"distraction_free": EditorInterface.is_distraction_free_mode_enabled(),
+		"movie_maker": EditorInterface.is_movie_maker_enabled(),
+		"multi_window": EditorInterface.is_multi_window_enabled(),
+		"current_directory": EditorInterface.get_current_directory(),
+		"plugin_version": PLUGIN_VERSION,
 	}
+	if EditorInterface.has_method("get_unsaved_scenes"):
+		out["unsaved_scenes"] = Array(EditorInterface.get_unsaved_scenes())
+	return out
 
 
 func _cmd_get_breakpoints() -> Dictionary:
@@ -1448,6 +1529,32 @@ func _cmd_list_filesystem(params: Dictionary) -> Dictionary:
 	return {"path": str(dir_path), "files": files}
 
 
+func _cmd_get_filesystem_selection() -> Dictionary:
+	# FileSystem dock state — what the user currently has highlighted/navigated to.
+	return {
+		"current_directory": EditorInterface.get_current_directory(),
+		"current_path": EditorInterface.get_current_path(),
+		"selected_paths": Array(EditorInterface.get_selected_paths()),
+	}
+
+
+func _cmd_open_script_at_line(params: Dictionary) -> Dictionary:
+	var path = str(params.get("path", ""))
+	if path.is_empty():
+		return {"error": "Missing path"}
+	if not ResourceLoader.exists(path):
+		return {"error": "Script not found: " + path}
+	var script = load(path)
+	if not (script is Script):
+		return {"error": "Not a Script resource: " + path}
+	# edit_script() is 1-based for the line; column defaults to 0.
+	var line = int(params.get("line", 1))
+	var column = int(params.get("column", 0))
+	var grab_focus = bool(params.get("grab_focus", true))
+	EditorInterface.edit_script(script, line, column, grab_focus)
+	return {"ok": true, "path": path, "line": line}
+
+
 func _list_dir(dir: DirAccess, base: String, out: Array, recursive: bool, pattern: String, depth: int, max_depth: int) -> void:
 	if depth > max_depth: return
 	dir.list_dir_begin()
@@ -1483,6 +1590,78 @@ func _cmd_get_editor_rect() -> Dictionary:
 func _cmd_focus_editor() -> Dictionary:
 	DisplayServer.window_move_to_foreground()
 	return {"ok": true}
+
+
+func _cmd_show_toast(params: Dictionary) -> Dictionary:
+	# EditorToaster.push_toast(message, severity, tooltip)
+	# severity: 0 = INFO, 1 = WARNING, 2 = ERROR (editor/gui/editor_toaster.cpp:565)
+	var message = str(params.get("message", ""))
+	if message.is_empty():
+		return {"error": "Missing message"}
+	var severity_name = str(params.get("severity", "info")).to_lower()
+	var severity := 0
+	match severity_name:
+		"warning", "warn": severity = 1
+		"error", "err": severity = 2
+		_: severity = 0
+	var toaster = EditorInterface.get_editor_toaster()
+	if not toaster:
+		return {"error": "Editor toaster unavailable"}
+	toaster.push_toast(message, severity, str(params.get("tooltip", "")))
+	return {"ok": true, "severity": severity_name}
+
+
+func _cmd_set_distraction_free(params: Dictionary) -> Dictionary:
+	if not params.has("enabled"):
+		return {"enabled": EditorInterface.is_distraction_free_mode_enabled()}
+	var enabled = bool(params.get("enabled"))
+	EditorInterface.set_distraction_free_mode(enabled)
+	return {"ok": true, "enabled": enabled}
+
+
+func _cmd_set_movie_maker(params: Dictionary) -> Dictionary:
+	# Movie Maker mode: the next play session writes frames to a video file
+	# instead of running in real time (see application/run/movie_writer/*).
+	if not params.has("enabled"):
+		return {"enabled": EditorInterface.is_movie_maker_enabled()}
+	var enabled = bool(params.get("enabled"))
+	EditorInterface.set_movie_maker_enabled(enabled)
+	return {"ok": true, "enabled": enabled}
+
+
+func _cmd_get_3d_snap() -> Dictionary:
+	return {
+		"snap_enabled": EditorInterface.is_node_3d_snap_enabled(),
+		"translate_snap": EditorInterface.get_node_3d_translate_snap(),
+		"rotate_snap": EditorInterface.get_node_3d_rotate_snap(),
+		"scale_snap": EditorInterface.get_node_3d_scale_snap(),
+	}
+
+
+func _cmd_get_editor_paths() -> Dictionary:
+	var paths = EditorInterface.get_editor_paths()
+	var out := {
+		"editor_scale": EditorInterface.get_editor_scale(),
+		"editor_language": EditorInterface.get_editor_language(),
+		"multi_window": EditorInterface.is_multi_window_enabled(),
+	}
+	if paths:
+		out["data_dir"] = paths.get_data_dir()
+		out["config_dir"] = paths.get_config_dir()
+		out["cache_dir"] = paths.get_cache_dir()
+		out["project_settings_dir"] = paths.get_project_settings_dir()
+		out["self_contained"] = paths.is_self_contained()
+	return out
+
+
+func _cmd_restart_editor(params: Dictionary) -> Dictionary:
+	# Destructive: tears down the editor process (and this TCP bridge with it).
+	# Require an explicit opt-in so an agent can't trigger it by accident.
+	if not bool(params.get("confirm", false)):
+		return {"error": "restart_editor requires confirm=true (this closes the editor and drops the MCP bridge connection)"}
+	var save_scenes = bool(params.get("save", true))
+	EditorInterface.restart_editor(save_scenes)
+	return {"ok": true, "restarting": true, "saved": save_scenes}
 
 
 func _cmd_open_dock(params: Dictionary) -> Dictionary:

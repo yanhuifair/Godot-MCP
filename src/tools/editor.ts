@@ -173,6 +173,37 @@ export function sendEditorCommand(method: string, params: Record<string, any> = 
   return send().then((result) => assertEditorOk(method, result));
 }
 
+/**
+ * 只读探测：给 `get_status` 这类诊断用。
+ *
+ * 与 sendEditorCommand 的两点关键区别：
+ *  1. **绝不 spawn 编辑器** —— 诊断"编辑器连上了吗"却顺手启动一个编辑器是荒谬的副作用。
+ *  2. 超时是 probeTimeoutMs（默认 1.5s）而不是 TCP_RESPONSE_TIMEOUT(30s) —— 诊断工具必须秒回。
+ *
+ * 返回 null 表示不可达，不抛异常。
+ */
+export async function probeEditor(probeTimeoutMs = 1500): Promise<any | null> {
+  if (_useTcp === false) return null; // 已知只能靠 spawn ⇒ 视为"没有在跑的编辑器"
+  try {
+    const client = await getTcpConnection();
+    const id = ++_requestIdCounter;
+    const request = JSON.stringify({ jsonrpc: '2.0', id, method: 'get_editor_version', params: {} }) + '\n';
+    return await new Promise<any | null>((resolve) => {
+      const timer = setTimeout(() => {
+        _tcpPending.delete(id);
+        resolve(null);
+      }, probeTimeoutMs);
+      _tcpPending.set(id, {
+        resolve: (result) => { clearTimeout(timer); resolve(result); },
+        reject: () => { clearTimeout(timer); resolve(null); },
+      });
+      client.write(request);
+    });
+  } catch {
+    return null;
+  }
+}
+
 /** 绕过业务错误检查的原始通道（供本身就要读 result.error 的命令使用）。 */
 export function sendEditorCommandRaw(method: string, params: Record<string, any> = {}): Promise<any> {
   if (_useTcp === true) return sendViaTcp(method, params);
@@ -538,19 +569,33 @@ export async function handleEditorOpenAsset(args: { path: string }): Promise<Too
 
 export async function handleEditorGetInfo(): Promise<ToolResult> {
   try {
-    const [version, playing, scene, selection] = await Promise.all([
-      sendEditorCommand('get_editor_version').catch(() => ({ version: {} })),
-      sendEditorCommand('is_playing').catch(() => ({ playing: false })),
-      sendEditorCommand('get_open_scene').catch(() => ({ scene: null })),
+    // Single round-trip: plugin.gd `get_editor_info` returns the whole snapshot.
+    // Selection is not part of it, so fetch it alongside.
+    const [info, selection] = await Promise.all([
+      sendEditorCommand('get_editor_info'),
       sendEditorCommand('get_selection').catch(() => ({ selection: [] })),
     ]);
+    const v = info.version || {};
     const lines = [
-      `Godot Editor:`,
-      `  Version: ${version.version?.major || '?'}.${version.version?.minor || '?'}`,
-      `  Playing: ${playing.playing ? 'yes' : 'no'}`,
-      `  Scene: ${scene.scene || 'none'}`,
-      `  Selected: ${selection.selection?.length || 0} node(s)`,
+      'Godot Editor:',
+      `  Version:       ${v.string || `${v.major ?? '?'}.${v.minor ?? '?'}.${v.patch ?? '?'}`}`,
+      `  Plugin:        v${info.plugin_version ?? '?'}`,
+      `  Language:      ${info.editor_language || '?'}   Scale: ${info.editor_scale ?? '?'}`,
+      `  Window:        ${info.editor_width}x${info.editor_height}`,
+      `  Playing:       ${info.playing ? `yes (${info.playing_scene || '?'})` : 'no'}`,
+      `  Scene:         ${info.open_scene || 'none'}`,
+      `  Open scenes:   ${(info.open_scenes || []).length}`,
     ];
+    for (const s of (info.open_scenes || [])) lines.push(`    - ${s}`);
+    if (Array.isArray(info.unsaved_scenes)) {
+      lines.push(`  Unsaved:       ${info.unsaved_scenes.length}`);
+      for (const s of info.unsaved_scenes) lines.push(`    * ${s}`);
+    }
+    lines.push(
+      `  Selected:      ${selection.selection?.length || 0} node(s)`,
+      `  FS directory:  ${info.current_directory || '?'}`,
+      `  Movie Maker:   ${info.movie_maker ? 'on' : 'off'}   Distraction-free: ${info.distraction_free ? 'on' : 'off'}   Multi-window: ${info.multi_window ? 'on' : 'off'}`,
+    );
     return { content: [{ type: 'text', text: lines.join('\n') }] };
   } catch (err: any) { return wrapError(ErrorCode.EDITOR_NOT_REACHABLE, err); }
 }
@@ -1167,9 +1212,13 @@ export const handleEditorCreateCamera = makeTypedNodeCreator('Camera3D');
 export const editorCreateMeshInstanceSchema = createTypedNodeSchema;
 export const handleEditorCreateMeshInstance = makeTypedNodeCreator('MeshInstance3D');
 export const editorCreateMultiplayerSpawnerSchema = createTypedNodeSchema;
-export const handleEditorCreateMultiplayerSpawner = makeTypedNodeCreator('MultiplayerSpawner3D');
+// NOTE: these are plain `Node` subclasses — there is no 2D/3D variant.
+// See modules/multiplayer/register_types.cpp:49-50 (GDREGISTER_CLASS(MultiplayerSpawner)).
+// They used to be created as "MultiplayerSpawner3D"/"MultiplayerSynchronizer3D",
+// which are not real classes, so both tools failed 100% of the time.
+export const handleEditorCreateMultiplayerSpawner = makeTypedNodeCreator('MultiplayerSpawner');
 export const editorCreateMultiplayerSynchronizerSchema = createTypedNodeSchema;
-export const handleEditorCreateMultiplayerSynchronizer = makeTypedNodeCreator('MultiplayerSynchronizer3D');
+export const handleEditorCreateMultiplayerSynchronizer = makeTypedNodeCreator('MultiplayerSynchronizer');
 export const editorCreateCsgBoxSchema = createTypedNodeSchema;
 export const handleEditorCreateCsgBox = makeTypedNodeCreator('CSGBox3D');
 export const editorCreateCsgSphereSchema = createTypedNodeSchema;
@@ -1182,3 +1231,260 @@ export const editorCreateCsgPolygonSchema = createTypedNodeSchema;
 export const handleEditorCreateCsgPolygon = makeTypedNodeCreator('CSGPolygon3D');
 export const editorCreateGpuParticlesSchema = createTypedNodeSchema;
 export const handleEditorCreateGpuParticles = makeTypedNodeCreator('GPUParticles3D');
+
+// ============================================================
+// Editor Interface coverage (APIs the bridge previously skipped)
+// Verified against editor/editor_interface.cpp _bind_methods().
+// ============================================================
+
+// ---- Scene lifecycle ----
+
+export const editorSaveSceneAsSchema = {
+  path: z.string().describe('Destination scene path, must start with res:// (e.g. res://levels/level2.tscn)'),
+  with_preview: z.boolean().optional().default(true).describe('Generate a thumbnail preview for the FileSystem dock'),
+};
+
+export async function handleEditorSaveSceneAs(args: { path: string; with_preview?: boolean }): Promise<ToolResult> {
+  try {
+    const r = await sendEditorCommand('save_scene_as', { path: args.path, with_preview: args.with_preview ?? true });
+    if (r.error) return plainError(r.error);
+    return { content: [{ type: 'text', text: `Scene saved as: ${r.path}` }] };
+  } catch (err: any) { return wrapError(ErrorCode.EDITOR_NOT_REACHABLE, err); }
+}
+
+export const editorCloseSceneSchema = {};
+
+export async function handleEditorCloseScene(): Promise<ToolResult> {
+  try {
+    const r = await sendEditorCommand('close_scene');
+    if (r.error) return plainError(r.error);
+    if (!r.closed) return { content: [{ type: 'text', text: r.message || 'Scene not closed.' }] };
+    return { content: [{ type: 'text', text: `Closed scene: ${r.scene || '(unsaved)'}` }] };
+  } catch (err: any) { return wrapError(ErrorCode.EDITOR_NOT_REACHABLE, err); }
+}
+
+export const editorGetOpenScenesSchema = {};
+
+export async function handleEditorGetOpenScenes(): Promise<ToolResult> {
+  try {
+    const [open, unsaved] = await Promise.all([
+      sendEditorCommand('get_open_scenes'),
+      sendEditorCommand('get_unsaved_scenes').catch(() => ({ scenes: null })),
+    ]);
+    const scenes: string[] = open.scenes || [];
+    if (scenes.length === 0) return { content: [{ type: 'text', text: 'No scenes open in the editor.' }] };
+    const dirty = new Set<string>(Array.isArray(unsaved.scenes) ? unsaved.scenes : []);
+    const lines = [`${scenes.length} open scene(s):`];
+    for (const s of scenes) lines.push(`  ${dirty.has(s) ? '*' : ' '} ${s}`);
+    if (dirty.size > 0) lines.push('', '(* = unsaved changes)');
+    return { content: [{ type: 'text', text: lines.join('\n') }] };
+  } catch (err: any) { return wrapError(ErrorCode.EDITOR_NOT_REACHABLE, err); }
+}
+
+export const editorGetUnsavedScenesSchema = {};
+
+export async function handleEditorGetUnsavedScenes(): Promise<ToolResult> {
+  try {
+    const r = await sendEditorCommand('get_unsaved_scenes');
+    if (r.error) return plainError(r.error);
+    const scenes: string[] = r.scenes || [];
+    if (scenes.length === 0) return { content: [{ type: 'text', text: 'No unsaved scenes - everything is committed to disk.' }] };
+    return { content: [{ type: 'text', text: `${scenes.length} scene(s) with unsaved changes:\n${scenes.map(s => `  ${s}`).join('\n')}` }] };
+  } catch (err: any) { return wrapError(ErrorCode.EDITOR_NOT_REACHABLE, err); }
+}
+
+export const editorMarkSceneUnsavedSchema = {};
+
+export async function handleEditorMarkSceneUnsaved(): Promise<ToolResult> {
+  try {
+    const r = await sendEditorCommand('mark_scene_unsaved');
+    if (r.error) return plainError(r.error);
+    return { content: [{ type: 'text', text: 'Current scene marked as unsaved (editor will prompt to save).' }] };
+  } catch (err: any) { return wrapError(ErrorCode.EDITOR_NOT_REACHABLE, err); }
+}
+
+// ---- Playback ----
+
+export const editorPlayCurrentSceneSchema = {};
+
+export async function handleEditorPlayCurrentScene(): Promise<ToolResult> {
+  try {
+    const r = await sendEditorCommand('play_current_scene');
+    if (r.error) return plainError(r.error);
+    return { content: [{ type: 'text', text: `Playing current scene: ${r.scene}` }] };
+  } catch (err: any) { return wrapError(ErrorCode.EDITOR_NOT_REACHABLE, err); }
+}
+
+export const editorGetPlayingSceneSchema = {};
+
+export async function handleEditorGetPlayingScene(): Promise<ToolResult> {
+  try {
+    const r = await sendEditorCommand('get_playing_scene');
+    if (!r.playing) return { content: [{ type: 'text', text: 'No scene is currently playing.' }] };
+    return { content: [{ type: 'text', text: `Playing: ${r.scene || '(main scene)'}` }] };
+  } catch (err: any) { return wrapError(ErrorCode.EDITOR_NOT_REACHABLE, err); }
+}
+
+// ---- FileSystem dock / script editor ----
+
+export const editorGetFilesystemSelectionSchema = {};
+
+export async function handleEditorGetFilesystemSelection(): Promise<ToolResult> {
+  try {
+    const r = await sendEditorCommand('get_filesystem_selection');
+    const sel: string[] = r.selected_paths || [];
+    const lines = [
+      `Current directory: ${r.current_directory || '(none)'}`,
+      `Current path:      ${r.current_path || '(none)'}`,
+      `Selected:          ${sel.length} path(s)`,
+    ];
+    for (const p of sel) lines.push(`  ${p}`);
+    return { content: [{ type: 'text', text: lines.join('\n') }] };
+  } catch (err: any) { return wrapError(ErrorCode.EDITOR_NOT_REACHABLE, err); }
+}
+
+export const editorOpenScriptAtLineSchema = {
+  path: z.string().describe('Script path, e.g. res://player.gd'),
+  line: z.number().optional().default(1).describe('Line to jump to (1-based)'),
+  column: z.number().optional().default(0).describe('Column to place the caret at'),
+  grab_focus: z.boolean().optional().default(true).describe('Focus the script editor after opening'),
+};
+
+export async function handleEditorOpenScriptAtLine(args: { path: string; line?: number; column?: number; grab_focus?: boolean }): Promise<ToolResult> {
+  try {
+    const r = await sendEditorCommand('open_script_at_line', {
+      path: args.path, line: args.line ?? 1, column: args.column ?? 0, grab_focus: args.grab_focus ?? true,
+    });
+    if (r.error) return plainError(r.error);
+    return { content: [{ type: 'text', text: `Opened ${r.path} at line ${r.line}` }] };
+  } catch (err: any) { return wrapError(ErrorCode.EDITOR_NOT_REACHABLE, err); }
+}
+
+// ---- Editor UI / environment ----
+
+export const editorShowToastSchema = {
+  message: z.string().describe('Toast text to display in the editor'),
+  severity: z.enum(['info', 'warning', 'error']).optional().default('info').describe('Toast severity/color'),
+  tooltip: z.string().optional().describe('Optional tooltip shown on hover'),
+};
+
+export async function handleEditorShowToast(args: { message: string; severity?: string; tooltip?: string }): Promise<ToolResult> {
+  try {
+    const r = await sendEditorCommand('show_toast', { message: args.message, severity: args.severity || 'info', tooltip: args.tooltip || '' });
+    if (r.error) return plainError(r.error);
+    return { content: [{ type: 'text', text: `Toast shown (${r.severity}): ${args.message}` }] };
+  } catch (err: any) { return wrapError(ErrorCode.EDITOR_NOT_REACHABLE, err); }
+}
+
+export const editorSetDistractionFreeSchema = {
+  enabled: z.boolean().optional().describe('Turn distraction-free mode on/off. Omit to just read the current state.'),
+};
+
+export async function handleEditorSetDistractionFree(args: { enabled?: boolean }): Promise<ToolResult> {
+  try {
+    const r = await sendEditorCommand('set_distraction_free', args.enabled === undefined ? {} : { enabled: args.enabled });
+    if (r.error) return plainError(r.error);
+    return { content: [{ type: 'text', text: `Distraction-free mode: ${r.enabled ? 'on' : 'off'}` }] };
+  } catch (err: any) { return wrapError(ErrorCode.EDITOR_NOT_REACHABLE, err); }
+}
+
+export const editorSetMovieMakerSchema = {
+  enabled: z.boolean().optional().describe('Enable Movie Maker mode so the next play session records to a video file. Omit to read the current state.'),
+};
+
+export async function handleEditorSetMovieMaker(args: { enabled?: boolean }): Promise<ToolResult> {
+  try {
+    const r = await sendEditorCommand('set_movie_maker', args.enabled === undefined ? {} : { enabled: args.enabled });
+    if (r.error) return plainError(r.error);
+    const hint = r.enabled
+      ? '\nSet application/run/movie_writer/movie_file in project.godot (plus mjpeg_quality / fps) to control the output.'
+      : '';
+    return { content: [{ type: 'text', text: `Movie Maker mode: ${r.enabled ? 'on' : 'off'}${hint}` }] };
+  } catch (err: any) { return wrapError(ErrorCode.EDITOR_NOT_REACHABLE, err); }
+}
+
+export const editorGet3dSnapSchema = {};
+
+export async function handleEditorGet3dSnap(): Promise<ToolResult> {
+  try {
+    const r = await sendEditorCommand('get_3d_snap');
+    const lines = [
+      `3D snap: ${r.snap_enabled ? 'enabled' : 'disabled'}`,
+      `  translate: ${r.translate_snap}`,
+      `  rotate:    ${r.rotate_snap}`,
+      `  scale:     ${r.scale_snap}`,
+    ];
+    return { content: [{ type: 'text', text: lines.join('\n') }] };
+  } catch (err: any) { return wrapError(ErrorCode.EDITOR_NOT_REACHABLE, err); }
+}
+
+export const editorGetPathsSchema = {};
+
+export async function handleEditorGetPaths(): Promise<ToolResult> {
+  try {
+    const r = await sendEditorCommand('get_editor_paths');
+    const lines = [
+      'Editor paths:',
+      `  data:              ${r.data_dir || '?'}`,
+      `  config:            ${r.config_dir || '?'}`,
+      `  cache:             ${r.cache_dir || '?'}`,
+      `  project settings:  ${r.project_settings_dir || '?'}`,
+      `  self-contained:    ${r.self_contained ? 'yes' : 'no'}`,
+      '',
+      `  editor scale:      ${r.editor_scale}`,
+      `  editor language:   ${r.editor_language}`,
+      `  multi-window:      ${r.multi_window ? 'yes' : 'no'}`,
+    ];
+    return { content: [{ type: 'text', text: lines.join('\n') }] };
+  } catch (err: any) { return wrapError(ErrorCode.EDITOR_NOT_REACHABLE, err); }
+}
+
+export const editorRestartSchema = {
+  confirm: z.boolean().describe('Must be true - restarting closes the editor and drops the MCP bridge connection.'),
+  save: z.boolean().optional().default(true).describe('Save all open scenes before restarting'),
+};
+
+export async function handleEditorRestart(args: { confirm: boolean; save?: boolean }): Promise<ToolResult> {
+  try {
+    const r = await sendEditorCommand('restart_editor', { confirm: args.confirm, save: args.save ?? true });
+    if (r.error) return plainError(r.error);
+    return { content: [{ type: 'text', text: `Editor restarting (saved: ${r.saved ? 'yes' : 'no'}). The bridge will be unreachable until it comes back up.` }] };
+  } catch {
+    // A restart tears down the socket mid-flight; that is expected, not a failure.
+    return { content: [{ type: 'text', text: 'Editor restart requested - the bridge connection dropped as expected. Reconnect once the editor is back.' }] };
+  }
+}
+
+// ---- Playback / selection convenience ----
+
+export const editorIsPlayingSchema = {};
+
+export async function handleEditorIsPlaying(): Promise<ToolResult> {
+  try {
+    const r = await sendEditorCommand('is_playing');
+    if (r.error) return plainError(r.error);
+    const playing = r.playing ? 'yes' : 'no';
+    const scene = r.scene ? String(r.scene) : '(none)';
+    return { content: [{ type: 'text', text: `Playing: ${playing}\nScene: ${scene}` }] };
+  } catch (err: any) { return wrapError(ErrorCode.EDITOR_NOT_REACHABLE, err); }
+}
+
+export const editorSelectNodeSchema = {
+  node_path: z.string().describe('Node path to select (e.g. "Player" or "World/Enemies/Boss")'),
+  property: z.string().optional().describe('Optional property to set on the node after selecting (GDScript literal)'),
+  value: z.string().optional().describe('Value for the optional property'),
+};
+
+export async function handleEditorSelectNode(args: { node_path: string; property?: string; value?: string }): Promise<ToolResult> {
+  try {
+    const params: any = { node_path: args.node_path };
+    if (args.property) params.property = args.property;
+    if (args.value) params.value = args.value;
+    const r = await sendEditorCommand('select_node', params);
+    if (r.error) return plainError(r.error);
+    const msg = args.property
+      ? `Selected "${args.node_path}" + set ${args.property}=${args.value}`
+      : `Selected: ${args.node_path}`;
+    return { content: [{ type: 'text', text: msg }] };
+  } catch (err: any) { return wrapError(ErrorCode.EDITOR_NOT_REACHABLE, err); }
+}

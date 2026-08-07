@@ -173,6 +173,21 @@ import {
   handleEditorCreateMultiplayerSynchronizer, handleEditorCreateCsgBox, handleEditorCreateCsgSphere,
   handleEditorCreateCsgCylinder, handleEditorCreateCsgMerge, handleEditorCreateCsgPolygon,
   handleEditorCreateGpuParticles,
+  // EditorInterface coverage additions
+  handleEditorSaveSceneAs, handleEditorCloseScene, handleEditorGetOpenScenes,
+  handleEditorGetUnsavedScenes, handleEditorMarkSceneUnsaved,
+  handleEditorPlayCurrentScene, handleEditorGetPlayingScene,
+  handleEditorGetFilesystemSelection, handleEditorOpenScriptAtLine,
+  handleEditorShowToast, handleEditorSetDistractionFree, handleEditorSetMovieMaker,
+  handleEditorGet3dSnap, handleEditorGetPaths, handleEditorRestart,
+  handleEditorIsPlaying, handleEditorSelectNode,
+  editorSaveSceneAsSchema, editorCloseSceneSchema, editorGetOpenScenesSchema,
+  editorGetUnsavedScenesSchema, editorMarkSceneUnsavedSchema,
+  editorPlayCurrentSceneSchema, editorGetPlayingSceneSchema,
+  editorGetFilesystemSelectionSchema, editorOpenScriptAtLineSchema,
+  editorShowToastSchema, editorSetDistractionFreeSchema, editorSetMovieMakerSchema,
+  editorGet3dSnapSchema, editorGetPathsSchema, editorRestartSchema,
+  editorIsPlayingSchema, editorSelectNodeSchema,
 } from './editor.js';
 
 // Meta / Discovery / Diagnostics tools
@@ -190,6 +205,14 @@ import {
   runtimeCallMethodSchema, runtimeEmitSignalSchema, runtimeInputSchema,
   runtimeFreezeSchema, runtimeResumeSchema, runtimeStepSchema, runtimeScreenshotSchema,
 } from './runtime.js';
+
+// Engine log tools (read user://logs/godot.log written by game runs)
+import {
+  handleReadGameLog, handleListGameLogs, handleClearGameLogs,
+  handleGetUserDataDir, handleConfigureFileLogging,
+  readGameLogSchema, listGameLogsSchema, clearGameLogsSchema,
+  getUserDataDirSchema, configureFileLoggingSchema,
+} from './logs.js';
 
 // Animation tools
 import {
@@ -370,6 +393,7 @@ import {
 
 export function registerAllTools(registry: ToolRegistry): void {
   // Project (21)
+  registry.setCategory('Project');
   registry.register({ name: 'list_project_files', description: 'List files and directories in the Godot project.', schema: listProjectFilesSchema, handler: handleListProjectFiles });
   registry.register({ name: 'read_project_config', description: 'Read and parse project.godot.', schema: readProjectConfigSchema, handler: handleReadProjectConfig });
   registry.register({ name: 'search_in_project', description: 'Search for text across project files.', schema: searchInProjectSchema, handler: handleSearchInProject });
@@ -393,6 +417,7 @@ export function registerAllTools(registry: ToolRegistry): void {
   registry.register({ name: 'add_input_binding', description: 'Add key/mouse/joypad binding to action.', schema: addInputBindingSchema, handler: handleAddInputBinding });
 
   // Scene (22)
+  registry.setCategory('Scene');
   registry.register({ name: 'read_scene', description: 'Read a .tscn scene file.', schema: readSceneSchema, handler: handleReadScene });
   registry.register({ name: 'create_scene', description: 'Create a new scene from template.', schema: createSceneSchema, handler: handleCreateScene });
   registry.register({ name: 'edit_scene', description: 'Apply batch operations to a scene.', schema: editSceneSchema, handler: handleEditScene });
@@ -417,6 +442,7 @@ export function registerAllTools(registry: ToolRegistry): void {
   registry.register({ name: 'load_sprite', description: 'Load a texture onto a Sprite2D node.', schema: loadSpriteSchema, handler: handleLoadSprite });
 
   // Script + Shader (21)
+  registry.setCategory('Script + Shader');
   registry.register({ name: 'read_script', description: 'Read a script file with line numbers.', schema: readScriptSchema, handler: handleReadScript });
   registry.register({ name: 'write_script', description: 'Write content to a script file.', schema: writeScriptSchema, handler: handleWriteScript });
   registry.register({ name: 'create_script', description: 'Create a new script from template.', schema: createScriptSchema, handler: handleCreateScript });
@@ -440,6 +466,7 @@ export function registerAllTools(registry: ToolRegistry): void {
   registry.register({ name: 'add_script_export', description: 'Add @export variable to GDScript.', schema: addScriptExportSchema, handler: handleAddScriptExport });
 
   // Resource (8)
+  registry.setCategory('Resource');
   registry.register({ name: 'read_resource', description: 'Read a .tres resource file.', schema: readResourceSchema, handler: handleReadResource });
   registry.register({ name: 'list_resources', description: 'List all resource files.', schema: listResourcesSchema, handler: handleListResources });
   registry.register({ name: 'create_resource', description: 'Create a resource from template.', schema: createResourceSchema, handler: handleCreateResource });
@@ -450,6 +477,7 @@ export function registerAllTools(registry: ToolRegistry): void {
   registry.register({ name: 'read_theme', description: 'Read Theme resource with type-aware grouping.', schema: readThemeSchema, handler: handleReadTheme });
 
   // Godot Engine (9)
+  registry.setCategory('Godot Engine');
   registry.register({ name: 'get_godot_version', description: 'Detect installed Godot version.', schema: getGodotVersionSchema, handler: () => handleGetGodotVersion() });
   registry.register({ name: 'launch_editor', description: 'Launch Godot editor with project.', schema: launchEditorSchema, handler: handleLaunchEditor });
   registry.register({ name: 'run_project', description: 'Run the Godot project.', schema: runProjectSchema, handler: handleRunProject });
@@ -460,7 +488,8 @@ export function registerAllTools(registry: ToolRegistry): void {
   registry.register({ name: 'is_editor_running', description: 'Check if Godot editor is running.', schema: isEditorRunningSchema, handler: () => handleIsEditorRunning() });
   registry.register({ name: 'list_projects', description: 'Scan directory for Godot projects.', schema: listProjectsSchema, handler: handleListProjects });
 
-  // Editor (123)
+  // Editor (140)
+  registry.setCategory('Editor');
   registry.register({ name: 'editor_get_selection', description: 'Get selected nodes in editor.', schema: editorGetSelectionSchema, handler: () => handleEditorGetSelection() });
   registry.register({ name: 'editor_set_selection', description: 'Select node in editor.', schema: editorSetSelectionSchema, handler: (_, args) => handleEditorSetSelection(args) });
   registry.register({ name: 'editor_play', description: 'Play project from editor.', schema: editorPlaySchema, handler: () => handleEditorPlay() });
@@ -590,8 +619,26 @@ export function registerAllTools(registry: ToolRegistry): void {
   registry.register({ name: 'editor_create_csg_merge', description: 'Create a CSGCombiner3D node in the open scene.', schema: editorCreateCsgMergeSchema, handler: (_, args) => handleEditorCreateCsgMerge(args) });
   registry.register({ name: 'editor_create_csg_polygon', description: 'Create a CSGPolygon3D node in the open scene.', schema: editorCreateCsgPolygonSchema, handler: (_, args) => handleEditorCreateCsgPolygon(args) });
   registry.register({ name: 'editor_create_gpu_particles', description: 'Create a GPUParticles3D node in the open scene.', schema: editorCreateGpuParticlesSchema, handler: (_, args) => handleEditorCreateGpuParticles(args) });
+  registry.register({ name: 'editor_save_scene_as', description: 'Save the current scene under a new res:// path (optionally with preview).', schema: editorSaveSceneAsSchema, handler: (_, args) => handleEditorSaveSceneAs(args) });
+  registry.register({ name: 'editor_close_scene', description: 'Close the currently open scene in the editor (Godot 4.6+).', schema: editorCloseSceneSchema, handler: () => handleEditorCloseScene() });
+  registry.register({ name: 'editor_get_open_scenes', description: 'List all scenes currently open in the editor.', schema: editorGetOpenScenesSchema, handler: () => handleEditorGetOpenScenes() });
+  registry.register({ name: 'editor_get_unsaved_scenes', description: 'List scenes that have unsaved changes.', schema: editorGetUnsavedScenesSchema, handler: () => handleEditorGetUnsavedScenes() });
+  registry.register({ name: 'editor_mark_scene_unsaved', description: 'Mark the current scene as having unsaved changes.', schema: editorMarkSceneUnsavedSchema, handler: () => handleEditorMarkSceneUnsaved() });
+  registry.register({ name: 'editor_play_current_scene', description: 'Play the currently edited scene from the editor.', schema: editorPlayCurrentSceneSchema, handler: () => handleEditorPlayCurrentScene() });
+  registry.register({ name: 'editor_get_playing_scene', description: 'Return the path of the scene currently being played, if any.', schema: editorGetPlayingSceneSchema, handler: () => handleEditorGetPlayingScene() });
+  registry.register({ name: 'editor_get_filesystem_selection', description: 'Return the editor filesystem dock selection (directory, current path, selected paths).', schema: editorGetFilesystemSelectionSchema, handler: () => handleEditorGetFilesystemSelection() });
+  registry.register({ name: 'editor_open_script_at_line', description: 'Open a script in the editor and jump to a given line/column.', schema: editorOpenScriptAtLineSchema, handler: (_, args) => handleEditorOpenScriptAtLine(args) });
+  registry.register({ name: 'editor_show_toast', description: 'Push a toast notification to the editor toaster (info/warning/error).', schema: editorShowToastSchema, handler: (_, args) => handleEditorShowToast(args) });
+  registry.register({ name: 'editor_set_distraction_free', description: 'Enable or disable distraction-free mode (pass enabled to set, omit to read).', schema: editorSetDistractionFreeSchema, handler: (_, args) => handleEditorSetDistractionFree(args) });
+  registry.register({ name: 'editor_set_movie_maker', description: 'Enable or disable the movie maker mode (pass enabled to set, omit to read).', schema: editorSetMovieMakerSchema, handler: (_, args) => handleEditorSetMovieMaker(args) });
+  registry.register({ name: 'editor_get_3d_snap', description: 'Return 3D editor snap settings (grid step, rotation step, snap enabled).', schema: editorGet3dSnapSchema, handler: () => handleEditorGet3dSnap() });
+  registry.register({ name: 'editor_get_paths', description: 'Return editor data/config/cache/project-settings directory paths.', schema: editorGetPathsSchema, handler: () => handleEditorGetPaths() });
+  registry.register({ name: 'editor_restart', description: 'Restart the editor (requires confirm=true; optional save). Destructive.', schema: editorRestartSchema, handler: (_, args) => handleEditorRestart(args) });
+  registry.register({ name: 'editor_is_playing', description: 'Return whether the editor is currently playing a scene and which scene.', schema: editorIsPlayingSchema, handler: () => handleEditorIsPlaying() });
+  registry.register({ name: 'editor_select_node', description: 'Select a node in the edited scene (optionally set a property on it).', schema: editorSelectNodeSchema, handler: (_, args) => handleEditorSelectNode(args) });
 
   // Shader Graph (8)
+  registry.setCategory('Shader Graph');
   registry.register({ name: 'create_visual_shader', description: 'Create a new VisualShader .tres graph file.', schema: createVisualShaderSchema, handler: handleCreateVisualShader });
   registry.register({ name: 'add_shader_graph_node', description: 'Add a node to a VisualShader graph. 40+ node types available (constants, math, textures, effects).', schema: addShaderGraphNodeSchema, handler: handleAddShaderGraphNode });
   registry.register({ name: 'remove_shader_graph_node', description: 'Remove a node from a VisualShader graph by index.', schema: removeShaderGraphNodeSchema, handler: handleRemoveShaderGraphNode });
@@ -602,6 +649,7 @@ export function registerAllTools(registry: ToolRegistry): void {
   registry.register({ name: 'get_shader_node_defaults', description: 'Get default ports and parameters for a specific VisualShader node type.', schema: getShaderNodeDefaultsSchema, handler: (root, args) => handleGetShaderNodeDefaults(root, args) });
 
   // Coverage (18)
+  registry.setCategory('Coverage');
   registry.register({ name: 'create_mesh_primitive', description: 'Create 3D mesh resource: Box, Capsule, Cylinder, Plane, Sphere, Torus, etc. (11 types).', schema: createMeshPrimitiveSchema, handler: handleCreateMeshPrimitive });
   registry.register({ name: 'create_vehicle_body', description: 'Create a VehicleBody3D with VehicleWheel nodes for car physics.', schema: createVehicleBodySchema, handler: handleCreateVehicleBody });
   registry.register({ name: 'read_vehicle_body', description: 'List VehicleBody3D nodes with wheel counts.', schema: readVehicleBodySchema, handler: handleReadVehicleBody });
@@ -634,6 +682,7 @@ export function registerAllTools(registry: ToolRegistry): void {
   registry.register({ name: 'create_grid_map', description: 'Create a GridMap node for 3D tile-based level design.', schema: createGridMapSchema, handler: handleCreateGridMap });
 
   // Animation (10)
+  registry.setCategory('Animation');
   registry.register({ name: 'list_animations', description: 'List AnimationPlayers and animations.', schema: listAnimationsSchema, handler: handleListAnimations });
   registry.register({ name: 'read_animation', description: 'Read animation tracks and keyframes.', schema: readAnimationSchema, handler: handleReadAnimation });
   registry.register({ name: 'create_animation', description: 'Create Animation .tres resource.', schema: createAnimationSchema, handler: handleCreateAnimation });
@@ -646,11 +695,13 @@ export function registerAllTools(registry: ToolRegistry): void {
   registry.register({ name: 'set_animation_tree_param', description: 'Set AnimationTree parameter.', schema: setAnimationTreeParamSchema, handler: handleSetAnimationTreeParam });
 
   // Import (3)
+  registry.setCategory('Import');
   registry.register({ name: 'read_import_config', description: 'Read .import file config.', schema: readImportConfigSchema, handler: handleReadImportConfig });
   registry.register({ name: 'list_import_files', description: 'List .import files grouped by type.', schema: listImportFilesSchema, handler: handleListImportFiles });
   registry.register({ name: 'write_import_config', description: 'Write import settings.', schema: writeImportConfigSchema, handler: handleWriteImportConfig });
 
   // Environment (6)
+  registry.setCategory('Environment');
   registry.register({ name: 'read_environment', description: 'Read Environment resource.', schema: readEnvironmentSchema, handler: handleReadEnvironment });
   registry.register({ name: 'list_environments', description: 'List Environment resources.', schema: listEnvironmentsSchema, handler: handleListEnvironments });
   registry.register({ name: 'create_environment', description: 'Create Environment from preset.', schema: createEnvironmentSchema, handler: handleCreateEnvironment });
@@ -659,6 +710,7 @@ export function registerAllTools(registry: ToolRegistry): void {
   registry.register({ name: 'create_world_environment', description: 'Create a .tscn with a WorldEnvironment node referencing an Environment.', schema: createWorldEnvironmentSchema, handler: handleCreateWorldEnvironment });
 
   // Audio (7)
+  registry.setCategory('Audio');
   registry.register({ name: 'read_audio_bus_layout', description: 'Read AudioBusLayout.', schema: readAudioBusLayoutSchema, handler: handleReadAudioBusLayout });
   registry.register({ name: 'list_audio_files', description: 'List audio files by format.', schema: listAudioFilesSchema, handler: handleListAudioFiles });
   registry.register({ name: 'create_audio_bus_layout', description: 'Create AudioBusLayout.', schema: createAudioBusLayoutSchema, handler: handleCreateAudioBusLayout });
@@ -668,6 +720,7 @@ export function registerAllTools(registry: ToolRegistry): void {
   registry.register({ name: 'set_bus_volume', description: 'Set bus volume in dB.', schema: setBusVolumeSchema, handler: handleSetBusVolume });
 
   // Physics (5)
+  registry.setCategory('Physics');
   registry.register({ name: 'list_physics_materials', description: 'List PhysicsMaterials.', schema: listPhysicsMaterialsSchema, handler: handleListPhysicsMaterials });
   registry.register({ name: 'read_physics_material', description: 'Read PhysicsMaterial.', schema: readPhysicsMaterialSchema, handler: handleReadPhysicsMaterial });
   registry.register({ name: 'create_physics_material', description: 'Create PhysicsMaterial.', schema: createPhysicsMaterialSchema, handler: handleCreatePhysicsMaterial });
@@ -675,6 +728,7 @@ export function registerAllTools(registry: ToolRegistry): void {
   registry.register({ name: 'write_collision_layers', description: 'Write/overwrite 2D and 3D collision layer names in project.godot.', schema: writeCollisionLayersSchema, handler: handleWriteCollisionLayers });
 
   // Inspector (5)
+  registry.setCategory('Inspector');
   registry.register({ name: 'list_cameras', description: 'List Camera nodes.', schema: listCamerasSchema, handler: handleListCameras });
   registry.register({ name: 'read_camera', description: 'Read camera configuration.', schema: readCameraSchema, handler: handleReadCamera });
   registry.register({ name: 'list_lights', description: 'List light nodes.', schema: listLightsSchema, handler: handleListLights });
@@ -682,6 +736,7 @@ export function registerAllTools(registry: ToolRegistry): void {
   registry.register({ name: 'read_particles', description: 'List particle systems.', schema: readParticlesSchema, handler: handleReadParticles });
 
   // TileMap (5)
+  registry.setCategory('TileMap');
   registry.register({ name: 'list_tilesets', description: 'List TileSet resources.', schema: listTilesetsSchema, handler: handleListTilesets });
   registry.register({ name: 'read_tileset', description: 'Read TileSet resource.', schema: readTilesetSchema, handler: handleReadTileset });
   registry.register({ name: 'read_tilemap', description: 'Read TileMapLayer in scene.', schema: readTilemapSchema, handler: handleReadTilemap });
@@ -689,6 +744,7 @@ export function registerAllTools(registry: ToolRegistry): void {
   registry.register({ name: 'add_tileset_source', description: 'Add an atlas source (texture) to a TileSet.', schema: addTilesetSourceSchema, handler: handleAddTilesetSource });
 
   // Navigation (6)
+  registry.setCategory('Navigation');
   registry.register({ name: 'list_nav_regions', description: 'List NavigationRegion nodes.', schema: listNavRegionsSchema, handler: handleListNavRegions });
   registry.register({ name: 'read_nav_region', description: 'Read navigation region.', schema: readNavRegionSchema, handler: handleReadNavRegion });
   registry.register({ name: 'create_nav_mesh', description: 'Create NavigationMesh .tres.', schema: createNavMeshSchema, handler: handleCreateNavMesh });
@@ -697,6 +753,7 @@ export function registerAllTools(registry: ToolRegistry): void {
   registry.register({ name: 'read_nav_obstacle', description: 'Read NavigationObstacle nodes across scenes.', schema: readNavObstacleSchema, handler: handleReadNavObstacle });
 
   // Translation (5)
+  registry.setCategory('Translation');
   registry.register({ name: 'list_translations', description: 'List translation files.', schema: listTranslationsSchema, handler: handleListTranslations });
   registry.register({ name: 'read_translation', description: 'Read translation file.', schema: readTranslationSchema, handler: handleReadTranslation });
   registry.register({ name: 'create_translation', description: 'Create translation CSV.', schema: createTranslationSchema, handler: handleCreateTranslation });
@@ -704,6 +761,7 @@ export function registerAllTools(registry: ToolRegistry): void {
   registry.register({ name: 'add_translation_key', description: 'Append a translation key/row to an existing CSV.', schema: addTranslationKeySchema, handler: handleAddTranslationKey });
 
   // Diff (5)
+  registry.setCategory('Diff');
   registry.register({ name: 'diff_scene', description: 'Compare two scene files.', schema: diffSceneSchema, handler: handleDiffScene });
   registry.register({ name: 'diff_resource', description: 'Compare two resource files.', schema: diffResourceSchema, handler: handleDiffResource });
   registry.register({ name: 'diff_script', description: 'Compare two GDScript files line-by-line.', schema: diffScriptSchema, handler: handleDiffScript });
@@ -711,12 +769,14 @@ export function registerAllTools(registry: ToolRegistry): void {
   registry.register({ name: 'diff_animation', description: 'Compare two Animation .tres files.', schema: diffAnimationSchema, handler: handleDiffAnimation });
 
   // Texture (4)
+  registry.setCategory('Texture');
   registry.register({ name: 'read_texture_info', description: 'Read texture asset info.', schema: readTextureInfoSchema, handler: handleReadTextureInfo });
   registry.register({ name: 'list_textures', description: 'List all texture/image assets in the project.', schema: listTexturesSchema, handler: handleListTextures });
   registry.register({ name: 'create_image_texture', description: 'Create an ImageTexture .tres pointing at an image file.', schema: createImageTextureSchema, handler: handleCreateImageTexture });
   registry.register({ name: 'set_texture_import_flags', description: 'Set import flags (compress, mipmaps, etc.) in a .import config.', schema: setTextureImportFlagsSchema, handler: handleSetTextureImportFlags });
 
   // Extension/World/C# (5)
+  registry.setCategory('Extension/World/C#');
   registry.register({ name: 'read_gdextension', description: 'Read .gdextension config.', schema: readGdextensionSchema, handler: handleReadGdextension });
   registry.register({ name: 'list_csproj', description: 'List C# project files.', schema: listCsprojSchema, handler: (root) => handleListCsproj(root) });
   registry.register({ name: 'create_world', description: 'Create World3D .tres.', schema: createWorldSchema, handler: handleCreateWorld });
@@ -724,12 +784,14 @@ export function registerAllTools(registry: ToolRegistry): void {
   registry.register({ name: 'read_csproj', description: 'Read a C# .csproj (assembly, target framework, package refs).', schema: readCsprojSchema, handler: handleReadCsproj });
 
   // UID (4)
+  registry.setCategory('UID');
   registry.register({ name: 'get_uid', description: 'Get UID for a file.', schema: getUidSchema, handler: handleGetUid });
   registry.register({ name: 'update_project_uids', description: 'Scan for missing UIDs.', schema: updateProjectUidsSchema, handler: handleUpdateProjectUids });
   registry.register({ name: 'list_missing_uids', description: 'List files missing UIDs.', schema: listMissingUidsSchema, handler: (root) => handleListMissingUids(root) });
   registry.register({ name: 'fix_missing_uids', description: 'Inject generated UIDs into scene/resource headers missing them.', schema: fixMissingUidsSchema, handler: (root) => handleFixMissingUids(root) });
 
   // Joints (5)
+  registry.setCategory('Joints');
   registry.register({ name: 'create_joint', description: 'Create a physics joint.', schema: createJointSchema, handler: handleCreateJoint });
   registry.register({ name: 'set_joint_param', description: 'Set joint parameter.', schema: setJointParamSchema, handler: handleSetJointParam });
   registry.register({ name: 'list_joints', description: 'List physics joints.', schema: listJointsSchema, handler: handleListJoints });
@@ -737,12 +799,14 @@ export function registerAllTools(registry: ToolRegistry): void {
   registry.register({ name: 'remove_joint', description: 'Remove a physics joint node from a scene.', schema: removeJointSchema, handler: handleRemoveJoint });
 
   // 2D Geometry (4)
+  registry.setCategory('2D Geometry');
   registry.register({ name: 'create_collision_polygon', description: 'Create CollisionPolygon2D.', schema: createCollisionPolygonSchema, handler: handleCreateCollisionPolygon });
   registry.register({ name: 'set_shape_points', description: 'Set shape on CollisionShape2D.', schema: setShapePointsSchema, handler: handleSetShapePoints });
   registry.register({ name: 'read_collision_polygon', description: 'Read CollisionPolygon2D points from a scene.', schema: readCollisionPolygonSchema, handler: handleReadCollisionPolygon });
   registry.register({ name: 'simplify_polygon', description: 'Simplify a polygon via Douglas-Peucker and write it back.', schema: simplifyPolygonSchema, handler: handleSimplifyPolygon });
 
   // Rendering (5)
+  registry.setCategory('Rendering');
   registry.register({ name: 'read_mesh_instance', description: 'Read MeshInstance properties.', schema: readMeshInstanceSchema, handler: handleReadMeshInstance });
   registry.register({ name: 'set_mesh_surface_material', description: 'Set surface material on MeshInstance.', schema: setMeshSurfaceMaterialSchema, handler: handleSetMeshSurfaceMaterial });
   registry.register({ name: 'read_viewport', description: 'Read Viewport settings.', schema: readViewportSchema, handler: handleReadViewport });
@@ -750,6 +814,7 @@ export function registerAllTools(registry: ToolRegistry): void {
   registry.register({ name: 'read_raycast', description: 'List RayCast/ShapeCast nodes.', schema: readRaycastSchema, handler: handleReadRaycast });
 
   // Domain (14)
+  registry.setCategory('Domain');
   registry.register({ name: 'read_curve', description: 'Read Curve resource.', schema: readCurveSchema, handler: handleReadCurve });
   registry.register({ name: 'create_curve', description: 'Create Curve .tres.', schema: createCurveSchema, handler: handleCreateCurve });
   registry.register({ name: 'read_gradient', description: 'Read Gradient resource.', schema: readGradientSchema, handler: handleReadGradient });
@@ -766,6 +831,7 @@ export function registerAllTools(registry: ToolRegistry): void {
   registry.register({ name: 'write_path_curve', description: 'Write a curve into a Path2D/Path3D node in a scene.', schema: writePathCurveSchema, handler: handleWritePathCurve });
 
   // Node Inspectors (8)
+  registry.setCategory('Node Inspectors');
   registry.register({ name: 'read_character_body', description: 'Read CharacterBody properties.', schema: readCharacterBodySchema, handler: handleReadCharacterBody });
   registry.register({ name: 'read_animated_sprite', description: 'Read AnimatedSprite settings.', schema: readAnimatedSpriteSchema, handler: handleReadAnimatedSprite });
   registry.register({ name: 'read_audio_player', description: 'List AudioStreamPlayer nodes.', schema: readAudioPlayerSchema, handler: handleReadAudioPlayer });
@@ -776,6 +842,7 @@ export function registerAllTools(registry: ToolRegistry): void {
   registry.register({ name: 'read_tab_container', description: 'Read TabContainer/TabBar.', schema: readTabContainerSchema, handler: handleReadTabContainer });
 
   // Utility (9)
+  registry.setCategory('Utility');
   registry.register({ name: 'list_all_signals', description: 'List all signal connections across scenes.', schema: listAllSignalsSchema, handler: handleListAllSignals });
   registry.register({ name: 'read_project_icon', description: 'Read project identity.', schema: readProjectIconSchema, handler: (root) => handleReadProjectIcon(root) });
   registry.register({ name: 'read_stylebox', description: 'Read StyleBox resource.', schema: readStyleboxSchema, handler: handleReadStylebox });
@@ -787,10 +854,12 @@ export function registerAllTools(registry: ToolRegistry): void {
   registry.register({ name: 'set_stylebox', description: 'Attach a StyleBoxFlat to a Theme type/state.', schema: setStyleboxSchema, handler: handleSetStylebox });
 
   // Meta / Introspection (2)
+  registry.setCategory('Meta / Introspection');
   registry.register({ name: 'search_tools', description: 'Search all tools by keyword/description to discover the right tool name. Use this instead of guessing among 350+ tools.', schema: searchToolsSchema, handler: (_, args) => handleSearchTools(args) });
   registry.register({ name: 'get_status', description: 'System status / diagnostics: editor bridge, live-game runtime bridge, and tool count. Use to debug connection issues.', schema: getStatusSchema, handler: (_, args) => handleGetStatus(args) });
 
   // Runtime (game) (11)
+  registry.setCategory('Runtime (game)');
   registry.register({ name: 'runtime_ping', description: 'Check if the live-game runtime bridge is reachable.', schema: runtimePingSchema, handler: (_) => handleRuntimePing() });
   registry.register({ name: 'runtime_get_tree', description: 'Read the running game scene tree (live, inside the played game).', schema: runtimeGetTreeSchema, handler: (_) => handleRuntimeGetTree() });
   registry.register({ name: 'runtime_get_node', description: 'Read live properties of a node in the running game.', schema: runtimeGetNodeSchema, handler: (_, args) => handleRuntimeGetNode(args) });
@@ -802,6 +871,14 @@ export function registerAllTools(registry: ToolRegistry): void {
   registry.register({ name: 'runtime_resume', description: 'Resume (unpause) the running game.', schema: runtimeResumeSchema, handler: (_) => handleRuntimeResume() });
   registry.register({ name: 'runtime_step', description: 'Advance the running game by N frames deterministically while paused (frame stepping).', schema: runtimeStepSchema, handler: (_, args) => handleRuntimeStep(args) });
   registry.register({ name: 'runtime_screenshot', description: 'Capture a screenshot of the running game viewport.', schema: runtimeScreenshotSchema, handler: (_, args) => handleRuntimeScreenshot(args) });
+
+  // Logs (5)
+  registry.setCategory('Logs');
+  registry.register({ name: 'read_game_log', description: 'Read the Godot engine log written by a game run (user://logs/godot.log). Filter by severity (error/warning/script/shader) or regex; tail or head N lines. NOTE: editor sessions never write log files, only actual game runs do.', schema: readGameLogSchema, handler: (root, args) => handleReadGameLog(root, args) });
+  registry.register({ name: 'list_game_logs', description: 'List all Godot log files (current + rotated backups) with size and timestamp, newest first.', schema: listGameLogsSchema, handler: (root) => handleListGameLogs(root) });
+  registry.register({ name: 'clear_game_logs', description: 'Delete rotated Godot log backups (optionally the current log too).', schema: clearGameLogsSchema, handler: (root, args) => handleClearGameLogs(root, args) });
+  registry.register({ name: 'get_user_data_dir', description: 'Resolve where user:// points on this machine for this project (honours use_custom_user_dir), plus the effective file-logging configuration.', schema: getUserDataDirSchema, handler: (root, args) => handleGetUserDataDir(root, args) });
+  registry.register({ name: 'configure_file_logging', description: 'Enable/disable engine file logging and set log_path / max_log_files in project.godot.', schema: configureFileLoggingSchema, handler: (root, args) => handleConfigureFileLogging(root, args) });
 
   // Expose the registry globally so meta/discovery tools can search it.
   setActiveRegistry(registry);

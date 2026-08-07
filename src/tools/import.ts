@@ -36,6 +36,16 @@ export const writeImportConfigSchema = {
 // ---- Tool Handlers ----
 
 /**
+ * asset_path 应该是**资产本身**（icon.svg），不是它的 .import 文件。
+ * 但调用方（尤其是 agent）很自然会把 list_import_files 列出的 "icon.svg.import"
+ * 直接传回来。之前会拼成 "icon.svg.import.import"：读取时误报"尚未导入"，
+ * 写入时**凭空造出一个垃圾文件**。这里统一归一化。
+ */
+function normalizeAssetPath(assetPath: string): string {
+  return assetPath.endsWith('.import') ? assetPath.slice(0, -'.import'.length) : assetPath;
+}
+
+/**
  * Read .import configuration for a specific asset.
  */
 export function handleReadImportConfig(
@@ -43,6 +53,7 @@ export function handleReadImportConfig(
   args: { asset_path: string }
 ): ToolResult {
   try {
+    args = { ...args, asset_path: normalizeAssetPath(args.asset_path) };
     const importFilePath = args.asset_path + '.import';
     const absPath = resolveProjectPath(projectRoot, importFilePath);
 
@@ -137,6 +148,7 @@ export function handleWriteImportConfig(
   args: { asset_path: string; settings: Record<string, string> }
 ): ToolResult {
   try {
+    args = { ...args, asset_path: normalizeAssetPath(args.asset_path) };
     const importFilePath = args.asset_path + '.import';
     const absPath = resolveProjectPath(projectRoot, importFilePath);
 

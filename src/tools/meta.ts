@@ -11,7 +11,7 @@ import { z } from 'zod';
 import { ToolResult } from '../utils/types.js';
 import { ErrorCode, wrapError, toolError } from '../utils/errors.js';
 import { getActiveRegistry } from '../utils/registry.js';
-import { sendEditorCommand } from './editor.js';
+import { probeEditor } from './editor.js';
 import { sendGameCommand, isGameReachable } from './runtime_bridge.js';
 
 // ---- Schemas ----
@@ -73,16 +73,16 @@ export async function handleGetStatus(args: { probe_runtime?: boolean }): Promis
 
   const out: string[] = ['Godot MCP — System Status', ''];
 
-  // Editor bridge
-  let editor = 'unreachable';
+  // Editor bridge — probe only: never spawns an editor, gives up after ~1.5s.
+  // (get_status is what users call *when things are broken*; it must never hang
+  //  for 30s on TCP_RESPONSE_TIMEOUT, and must never launch a Godot instance.)
+  let editor = 'not connected';
   let editorVersion = '';
-  try {
-    const v = await sendEditorCommand('get_editor_version');
+  const v = await probeEditor();
+  if (v) {
     editor = 'connected';
     const ver = v?.version || {};
     editorVersion = `${ver.major ?? '?'}.${ver.minor ?? '?'}.${ver.patch ?? '?'}`;
-  } catch {
-    editor = 'not connected';
   }
   out.push(`Editor bridge : ${editor}${editorVersion ? ' (Godot ' + editorVersion + ')' : ''}`);
   out.push(`  → start the editor with the MCP plugin, or run the game from the editor to auto-connect on 127.0.0.1:9876`);

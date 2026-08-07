@@ -371,6 +371,10 @@ describe('WRITE_TOOLS 名单完整性', () => {
       'editor_set_camera', 'editor_add_autoload', 'editor_remove_autoload',
       'editor_add_input_action', 'editor_remove_input_action', 'editor_reimport_asset',
       'editor_bake_lightmaps', 'editor_bake_navigation', 'editor_take_screenshot',
+      // v1.10.0 新增的 editor 写/副作用工具
+      'editor_save_scene_as', 'editor_close_scene', 'editor_mark_scene_unsaved',
+      'editor_play_current_scene', 'editor_set_distraction_free', 'editor_set_movie_maker',
+      'editor_restart', 'editor_select_node',
     ];
 
     // 已知例外：这些工具虽命中前缀但是只读/UI 操作，不在写名单中
@@ -443,6 +447,6 @@ describe('register.ts 分类计数注释', () => {
       }
     }
     expect(mismatches).toEqual([]);
-    expect(total).toBe(358);
+    expect(total).toBe(380);
   });
 });

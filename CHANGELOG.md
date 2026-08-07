@@ -1,4 +1,40 @@
 # Changelog
+## Unreleased
+
+### New tools — expanded EditorInterface coverage (17 tools)
+The editor tier now reaches deeper into `EditorInterface` (Godot 4.6+). All are live-editor bridge tools.
+
+- `editor_save_scene_as` — save the current scene under a new `res://` path (with optional preview).
+- `editor_close_scene` — close the currently open scene (uses the real `EditorInterface.close_scene()` added in Godot 4.6; falls back gracefully on older builds).
+- `editor_get_open_scenes` / `editor_get_unsaved_scenes` — list open / dirty scenes.
+- `editor_mark_scene_unsaved` — flag the current scene as dirty.
+- `editor_play_current_scene` / `editor_get_playing_scene` — play the edited scene and report which scene is running.
+- `editor_get_filesystem_selection` — return the filesystem dock selection (directory, current path, selected paths).
+- `editor_open_script_at_line` — open a script and jump to a line/column.
+- `editor_show_toast` — push an info/warning/error toast to the editor toaster.
+- `editor_set_distraction_free` / `editor_set_movie_maker` — toggle distraction-free and movie-maker modes.
+- `editor_get_3d_snap` — report 3D editor snap settings.
+- `editor_get_paths` — report editor data/config/cache/project-settings directory paths.
+- `editor_restart` — restart the editor (requires `confirm=true`; optional save). Destructive.
+- `editor_is_playing` — quick "is the editor playing?" probe.
+- `editor_select_node` — select a node in the edited scene (optionally set a property on it).
+
+### New tools — game-run log reading (Logs category, 5 tools)
+Godot only writes `user://logs/godot.log` for **game runs** (the editor never logs), so these read the on-disk game log, not the editor console.
+
+- `read_game_log` — tail the current `godot.log`, filter by level (error/warning/script/shader) or pattern, list rotated backups.
+- `list_game_logs` — list the active log plus rotated `godot<timestamp>.log` files (newest first).
+- `clear_game_logs` — delete rotated logs (optionally the active one too) — a write tool.
+- `get_user_data_dir` — resolve the OS-specific `user://` data directory for the project.
+- `configure_file_logging` — toggle file logging, set the log path, and cap rotated-file count in `project.godot` — a write tool.
+
+### Cleanup
+- Removed two dead `plugin.gd` dispatch keys: a duplicate `read_current_scene` (identical to `get_current_scene_tree`) and `export_project` (project export is driven from the MCP side via the Godot CLI, not the bridge).
+- Extended the `WRITE_TOOLS` read-only-mode whitelist to cover every new write tool, so `--read-only` now correctly blocks `editor_save_scene_as`, `editor_close_scene`, `editor_mark_scene_unsaved`, `editor_play_current_scene`, `editor_set_distraction_free`, `editor_set_movie_maker`, `editor_restart`, `editor_select_node`, `clear_game_logs`, and `configure_file_logging`.
+
+### Tooling
+- Hardened `test/smoke_all_tools.mjs`: bridge-tool detection now uses the `editor_`/`runtime_` name prefix (robust against handler placement and runtime method selection), and the method-reconciliation parser now captures runtime ternary method names. The full 380-tool smoke now passes with 0 timeouts and 0 crashes, and flags 0 unexposed plugin commands.
+
 ## v1.10.0 (2026-08-05)
 
 ### Critical — three tools wrote `ext_resource` references that Godot cannot load

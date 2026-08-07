@@ -9,6 +9,7 @@ import { toolError, ErrorCode } from '../utils/errors.js';
 import { ToolResult } from '../utils/types.js';
 import fs from 'node:fs';
 import { readTextFile, findFilesByExtension, resolveProjectPath, writeTextFile } from '../utils/file_utils.js';
+import { generateUid, uidTextToId } from '../utils/uid.js';
 
 // ---- Tool Schemas ----
 
@@ -56,17 +57,29 @@ export function handleGetUid(
       return { content: [{ type: 'text', text: `No UID found in ${args.path}.` }] };
     }
 
-    // For .gd scripts — check if uid="uid://..." is in first few lines
-    if (ext === 'gd') {
-      const { content } = readTextFile(absPath);
-      const uidMatch = content.match(/uid="([^"]+)"/);
-      if (uidMatch) {
-        return { content: [{ type: 'text', text: `UID: ${uidMatch[1]}\nFile: ${args.path}\nType: Script` }] };
-      }
+    // Everything else (.gd scripts, .png/.svg/.ogg imported assets, shaders, ...)
+    // stores its UID in a sidecar "<file>.uid" written by the editor's filesystem
+    // scanner — see editor/file_system/editor_file_system.cpp (open(path + ".uid", WRITE)).
+    // It is a plain text file containing exactly one "uid://..." token.
+    const sidecar = absPath + '.uid';
+    if (fs.existsSync(sidecar)) {
+      const uid = fs.readFileSync(sidecar, 'utf-8').trim();
+      const kind = ext === 'gd' ? 'Script' : 'Asset';
+      const valid = uidTextToId(uid) >= 0n;
+      return {
+        content: [{
+          type: 'text',
+          text: `UID: ${uid}\nFile: ${args.path}\nSidecar: ${args.path}.uid\nType: ${kind}${valid ? '' : '\nWARNING: this UID is not decodable by Godot (invalid base-34 text).'}`,
+        }],
+      };
     }
 
-    // For other files — check .godot/uid_cache.bin (binary, limited)
-    return { content: [{ type: 'text', text: `UID lookup not supported for file type: .${ext}. Only .tscn, .tres, and .gd files store UIDs inline.` }] };
+    return {
+      content: [{
+        type: 'text',
+        text: `No UID for ${args.path}.\n\n.tscn/.tres store the UID inline in their header; every other file type (.gd, textures, audio, shaders) uses a "<file>.uid" sidecar created when the editor scans the filesystem. Neither was found — run fix_missing_uids, or open the project in the Godot editor once.`,
+      }],
+    };
   } catch (err: any) {
     return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
   }
@@ -120,9 +133,8 @@ export function handleUpdateProjectUids(
           lines.push(`  ${m.type}: ${m.file}`);
         }
         lines.push('');
-        lines.push('To fix: open the project in Godot 4.x and run Project → Tools → Update UIDs,');
-        lines.push('or save each scene individually. File-based UID generation is not possible');
-        lines.push('(UIDs must be cryptographically unique and registered in uid_cache.bin).');
+        lines.push('To fix: run fix_missing_uids (mints spec-correct base-34 UIDs in place),');
+        lines.push('or open the project in Godot 4.x and use Project → Tools → Update UIDs.');
       }
     } else {
       lines.push(`UID Check Complete: ${sceneFiles.length + tresFiles.length} files scanned`);
@@ -149,14 +161,13 @@ export function handleListMissingUids(projectRoot: string): ToolResult {
 
 // ---- Additional UID tools (Tier1) ----
 
-function generateUid(): string {
-  const alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789';
-  let s = '';
-  for (let i = 0; i < 12; i++) {
-    s += alphabet[Math.floor(Math.random() * alphabet.length)];
-  }
-  return `uid://${s}`;
-}
+// NOTE: generateUid() intentionally comes from ../utils/uid.js.
+// A local copy used to live here with the alphabet
+// 'abcdefghijklmnopqrstuvwxyz0123456789' (36 chars, INCLUDING 'z').
+// Godot's real alphabet is base-34: 'a'..'y' (0-24) then '0'..'9' (25-33) —
+// see core/io/resource_uid.cpp: char_count = 'z'-'a' (=25), base = char_count + ('9'-'0') (=34).
+// 'z' is NOT a valid UID character, so that generator emitted UIDs which
+// ResourceUID::text_to_id() rejects (-1) roughly half the time.
 
 export const fixMissingUidsSchema = {};
 
@@ -194,6 +205,19 @@ export function handleFixMissingUids(projectRoot: string): ToolResult {
         }
       } catch {
         failedFiles.push(file);
+      }
+    }
+
+    // .gd scripts keep their UID in a "<file>.uid" sidecar, not inline.
+    for (const file of findFilesByExtension(projectRoot, ['.gd'])) {
+      try {
+        const absPath = resolveProjectPath(projectRoot, file);
+        const sidecar = absPath + '.uid';
+        if (fs.existsSync(sidecar)) continue;
+        writeTextFile(sidecar, generateUid() + '\n', true);
+        fixedFiles.push(file + '.uid');
+      } catch {
+        failedFiles.push(file + '.uid');
       }
     }
 
