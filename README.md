@@ -197,7 +197,7 @@ npx @yanhuifair/godot-mcp --enable-plugin -p .
 | Category | Tools | Description |
 |---|---|---|
 | Editor | 140 | Live editor control — select, play, undo, save, breakpoints, file ops, performance |
-| Project | 21 | Config, input map, file ops, autoloads, validation, unused assets |
+| Project | 24 | Config, input map, file ops, autoloads, export presets, validation, unused assets |
 | Scene | 22 | Scene CRUD — nodes, signals, transforms, collision, sprites |
 | Script + Shader | 21 | GDScript/Shader CRUD, structure analysis, code injection, validation |
 | Domain | 14 | Curve, Gradient, Path, Skeleton, ReflectionProbe, MultiMesh, NoiseTexture |
@@ -216,7 +216,7 @@ npx @yanhuifair/godot-mcp --enable-plugin -p .
 | Import | 3 | .import file read/write |
 | TileMap | 5 | TileSet resources, TileMapLayer inspection |
 | Navigation | 6 | NavigationRegion, NavigationMesh |
-| Translation | 5 | CSV/PO translation files |
+| Translation | 8 | CSV/PO translation files, .po authoring, registration |
 | Joints | 5 | Physics joints — create, configure, list |
 | UID | 4 | File UID query, batch update, missing UID detection |
 | 2D Geometry | 4 | CollisionPolygon2D, shape point editing |
@@ -571,6 +571,27 @@ Point your client at the built entry file:
 ```json
 { "command": "node", "args": ["/absolute/path/to/Godot-MCP/dist/index.js", "-p", "."] }
 ```
+
+### Verify your installation
+
+After any install method, confirm everything is in place:
+
+| Check | How | Expected |
+|---|---|---|
+| Server version | `npx @yanhuifair/godot-mcp --version` | A version number (e.g. `1.11.1`) |
+| Plugin files | Look in `addons/godot-mcp/` | `plugin.cfg`, `plugin.gd`, `runtime_bridge.gd` |
+| Plugin enabled | Open `project.godot` | `[editor_plugins]` has `enabled = PackedStringArray("res://addons/godot-mcp/plugin.cfg")` |
+| Server starts | `npx @yanhuifair/godot-mcp -p .` (Ctrl+C to stop) | Prints the tool count, e.g. `386 tools` |
+| Editor bridge | Open the project in Godot | Output log shows `[Godot MCP] Plugin v… loaded — TCP on 127.0.0.1:9876` |
+
+**Install troubleshooting**
+
+| Symptom | Fix |
+|---|---|
+| `npx: command not found` | Install [Node.js 18+](https://nodejs.org) and make sure it is on your `PATH`. |
+| `addons/` is still missing after running | You must run in the project root (`-p .` means the current directory) or pass an absolute `-p /path/to/project` — see the note at the top of this section. |
+| Godot still reports an old plugin version | Close Godot, delete `addons/godot-mcp`, re-run with `npx @yanhuifair/godot-mcp@latest --enable-plugin -p .`, reopen the project. |
+| Plugin loads but tools return `EDITOR_NOT_REACHABLE` | Project → Project Settings → Plugins → make sure **Godot MCP** is enabled, then reload the project. |
 
 ### Upgrading to the latest version
 
@@ -1389,6 +1410,37 @@ The following examples show what you can ask your AI assistant. Each maps to one
 | "Step through the debugger and show local variables" | `editor_debug_step` + `editor_get_debug_variables` |
 | "Stop the running game" | `stop_project` |
 | "Export the project for macOS" | `export_project` |
+
+### Worked Walkthroughs
+
+The tables above are the building blocks; here are two complete sessions showing how the tools compose.
+
+**Walkthrough 1 — Build a player scene from scratch (no Godot needed for the file work)**
+
+```
+1. "Create a 2D scene saved as player.tscn with a CharacterBody2D root named Player"
+   → create_scene
+2. "Add a CollisionShape2D with a CapsuleShape2D sized to the sprite, and a
+   Sprite2D loading textures/player.png"                                    → add_node, set_collision_shape, load_sprite
+3. "Create scripts/player.gd with _physics_process reading ui_left/ui_right/
+   ui_up/ui_down and moving at 300 px/s, then attach it to Player"          → create_script, attach_script
+4. "Instance Player into main.tscn at (100, 200)"                           → add_node (instance)
+5. "Run the current scene"                                                  → editor_play_current_scene
+```
+
+Every step is a real file/editor mutation — run `editor_undo` or press **Ctrl+Z** in Godot to step back through any of them.
+
+**Walkthrough 2 — Freeze and inspect the running game**
+
+```
+1. "Run the game"                                                           → run_project / editor_play_current_scene
+2. "Freeze it"                                                              → runtime_freeze
+3. "Show the Player node's position, velocity, and is_on_floor()"           → runtime_get_node + runtime_call_method
+4. "Step one frame and show position again"                                 → runtime_step + runtime_get_node
+5. "Resume"                                                                 → runtime_resume
+```
+
+This is the fastest way to answer "what was the player actually doing at that exact frame?" — freeze, inspect, step, repeat.
 
 ---
 

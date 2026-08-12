@@ -572,6 +572,27 @@ node dist/index.js -p /path/to/your/godot/project
 { "command": "node", "args": ["/absolute/path/to/Godot-MCP/dist/index.js", "-p", "."] }
 ```
 
+### 验证安装
+
+任选一种方式装完后，按下面的表确认一切就位：
+
+| 检查项 | 怎么做 | 预期结果 |
+|---|---|---|
+| 服务器版本 | `npx @yanhuifair/godot-mcp --version` | 一个版本号（如 `1.11.1`） |
+| 插件文件 | 看 `addons/godot-mcp/` 目录 | 有 `plugin.cfg`、`plugin.gd`、`runtime_bridge.gd` |
+| 插件已启用 | 打开 `project.godot` | `[editor_plugins]` 里有 `enabled = PackedStringArray("res://addons/godot-mcp/plugin.cfg")` |
+| 服务器能启动 | `npx @yanhuifair/godot-mcp -p .`（Ctrl+C 结束） | 打印工具数量，如 `386 tools` |
+| 编辑器桥 | 在 Godot 里打开项目 | 输出台出现 `[Godot MCP] Plugin v… loaded — TCP on 127.0.0.1:9876` |
+
+**安装常见问题**
+
+| 现象 | 解决 |
+|---|---|
+| `npx: command not found` | 安装 [Node.js 18+](https://nodejs.org) 并确保它在 `PATH` 里。 |
+| 跑完命令 `addons/` 还是不存在 | 必须在项目根目录运行（`-p .` 的 `.` 指当前目录），或者用绝对路径 `-p /完整/路径/到/项目`——见本节开头的说明。 |
+| Godot 里还是旧插件版本 | 关掉 Godot，删掉 `addons/godot-mcp`，用 `npx @yanhuifair/godot-mcp@latest --enable-plugin -p .` 重装，再重新打开项目。 |
+| 插件加载了但工具报 `EDITOR_NOT_REACHABLE` | 项目 → 项目设置 → 插件 → 确认 **Godot MCP** 已勾选启用，然后重新加载项目。 |
+
 ### 升级到最新版本
 
 `npx` 每次都会拉取最新版本，所以安装用的那条命令同时也是升级命令：
@@ -1389,6 +1410,37 @@ npx -y @yanhuifair/godot-mcp -p /path/to/your/godot/project -t all --port 3000
 | "单步调试并显示局部变量" | `editor_debug_step` + `editor_get_debug_variables` |
 | "停止正在运行的游戏" | `stop_project` |
 | "为 macOS 导出项目" | `export_project` |
+
+### 完整操作演示
+
+上面的表格是积木，下面两个完整会话演示这些工具如何组合。
+
+**演示 1 —— 从零搭建玩家场景（纯文件操作，不需要 Godot 开着）**
+
+```
+1. "新建一个保存为 player.tscn 的 2D 场景，根节点是名为 Player 的 CharacterBody2D"
+   → create_scene
+2. "添加一个 CollisionShape2D，碰撞形状用适配精灵的 CapsuleShape2D，再加一个
+   Sprite2D 加载 textures/player.png"                                      → add_node、set_collision_shape、load_sprite
+3. "创建 scripts/player.gd，写 _physics_process 读取 ui_left/ui_right/ui_up/
+   ui_down，以 300 px/s 移动，然后挂到 Player 上"                           → create_script、attach_script
+4. "把 Player 实例化进 main.tscn，位置 (100, 200)"                         → add_node（实例化）
+5. "运行当前场景"                                                           → editor_play_current_scene
+```
+
+每一步都是真实的文件/编辑器改动——想回退就调用 `editor_undo` 或在 Godot 里按 **Ctrl+Z**。
+
+**演示 2 —— 冻结并检查运行中的游戏**
+
+```
+1. "运行游戏"                                                               → run_project / editor_play_current_scene
+2. "冻结它"                                                                 → runtime_freeze
+3. "显示 Player 节点的 position、velocity 和 is_on_floor()"                  → runtime_get_node + runtime_call_method
+4. "步进一帧，再显示一次 position"                                          → runtime_step + runtime_get_node
+5. "恢复运行"                                                               → runtime_resume
+```
+
+这是回答「那一帧玩家到底在干什么」最快的办法：冻结 → 检查 → 步进 → 再看。
 
 ---
 
