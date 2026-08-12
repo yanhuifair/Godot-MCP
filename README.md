@@ -104,7 +104,7 @@ npx @yanhuifair/godot-mcp --enable-plugin -p .
 > `npx @yanhuifair/godot-mcp --enable-plugin -p /Users/me/games/my-game`
 
 > **Always installs the latest version.** `npx` fetches the newest release every time. To force it or pin a specific version:
-> `npx @yanhuifair/godot-mcp@latest --enable-plugin -p .` (latest) · `npx @yanhuifair/godot-mcp@1.11.0 --enable-plugin -p .` (pinned)
+> `npx @yanhuifair/godot-mcp@latest --enable-plugin -p .` (latest) · `npx @yanhuifair/godot-mcp@1.11.1 --enable-plugin -p .` (pinned)
 
 **What this does:** copies the plugin into `addons/godot-mcp/` and switches it on inside `project.godot`. Nothing to click in Godot.
 
@@ -511,7 +511,7 @@ Starts: Stdio + SSE (`/sse`) + Streamable HTTP (`/mcp`) + Health Check (`/health
 
 ```bash
 curl http://127.0.0.1:3000/health
-# {"status":"ok","version":"1.11.0","projectRoot":"/path/to/project","endpoints":{...}}
+# {"status":"ok","version":"1.11.1","projectRoot":"/path/to/project","endpoints":{...}}
 ```
 
 ---
@@ -586,14 +586,14 @@ rm -rf addons/godot-mcp && npx -y @yanhuifair/godot-mcp@latest --enable-plugin -
 
 > On Windows PowerShell use `rm -r addons/godot-mcp` (no `-f` flag).
 
-- **Pin a version** — `npx @yanhuifair/godot-mcp@1.11.0 …`; **force latest** — `npx @yanhuifair/godot-mcp@latest …`.
+- **Pin a version** — `npx @yanhuifair/godot-mcp@1.11.1 …`; **force latest** — `npx @yanhuifair/godot-mcp@latest …`.
 - **Global install** — `npm update -g @yanhuifair/godot-mcp`.
 - **From source** — `git pull && npm run build`.
 - **Check your version** — `npx @yanhuifair/godot-mcp --version`.
 
 > **Upgrading from v1.9.0?** That release shipped an editor plugin whose `runtime_bridge.gd` failed to parse in Godot 4.7 (a `_input` function colliding with the built-in `Node._input`, plus an untyped `_resolve`). If your editor logs those parse errors, delete `addons/godot-mcp` and re-run `--enable-plugin` to install the fixed plugin.
 
-See [CHANGELOG](CHANGELOG.md) for the complete history. **v1.11.0** added export-preset writing (`create_export_preset` / `update_export_preset` / `remove_export_preset`), localization writing (`create_po_translation` / `register_translation` / `unregister_translation`), and a read-only / path-sandbox security pass.
+See [CHANGELOG](CHANGELOG.md) for the complete history. **v1.11.1** added export-preset writing (`create_export_preset` / `update_export_preset` / `remove_export_preset`), localization writing (`create_po_translation` / `register_translation` / `unregister_translation`), and a read-only / path-sandbox security pass.
 
 ### Command-Line Options
 
@@ -1937,13 +1937,13 @@ npm run check:godot  # Load every fixture in a real headless Godot and verify
 
 ```bash
 npm run vsix
-# Output: godot-mcp-1.11.0.vsix
+# Output: godot-mcp-1.11.1.vsix
 ```
 
 Install in VS Code:
 
 ```bash
-code --install-extension godot-mcp-1.11.0.vsix
+code --install-extension godot-mcp-1.11.1.vsix
 ```
 
 ---

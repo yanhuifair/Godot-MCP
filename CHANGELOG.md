@@ -1,4 +1,16 @@
 # Changelog
+## v1.11.1 (2026-08-13)
+
+### Fix — `.import` files written by `write_import_config` were rejected by Godot 4.7
+`serializeImportConfig` emitted string values **unquoted** (`importer=texture`), which Godot 4.7's
+ConfigFile parser rejects with `Unexpected identifier 'texture'` — so the tool corrupted every
+`.import` file it touched. Values are now quoted (`importer="texture"`), numbers/booleans/arrays/dicts
+stay bare, and multi-line dict values (`metadata={...}`) are preserved on round-trip. `test/test-project/icon.svg.import` was re-normalized to the Godot-native format, and `test/parsers.test.ts` gained two regression tests.
+
+### Docs
+- README / README-zh: new "Upgrading to the latest version" section (npx upgrade one-liner, plugin-refresh steps, v1.9.0 `runtime_bridge.gd` note) plus an explicit "installs latest by default" note in Quick Start.
+- Fixed stale write-tool counts (164 → 218) in `src/index.ts` `--help` and `README-zh.md`.
+
 ## v1.11.0 (2026-08-13)
 
 ### New tools — expanded EditorInterface coverage (17 tools)
