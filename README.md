@@ -103,6 +103,9 @@ npx @yanhuifair/godot-mcp --enable-plugin -p .
 > The `-p .` means "this folder". You can also pass an absolute path from anywhere:
 > `npx @yanhuifair/godot-mcp --enable-plugin -p /Users/me/games/my-game`
 
+> **Always installs the latest version.** `npx` fetches the newest release every time. To force it or pin a specific version:
+> `npx @yanhuifair/godot-mcp@latest --enable-plugin -p .` (latest) · `npx @yanhuifair/godot-mcp@1.11.0 --enable-plugin -p .` (pinned)
+
 **What this does:** copies the plugin into `addons/godot-mcp/` and switches it on inside `project.godot`. Nothing to click in Godot.
 
 **How to confirm it worked:** you should now see an `addons/godot-mcp/` folder in your project. If Godot is already open, reload the project (Project → Reload Current Project) so it picks up the plugin.

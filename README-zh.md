@@ -103,6 +103,9 @@ npx @yanhuifair/godot-mcp --enable-plugin -p .
 > `-p .` 表示"当前这个目录"。你也可以在任意位置用绝对路径：
 > `npx @yanhuifair/godot-mcp --enable-plugin -p /Users/me/games/my-game`
 
+> **默认就装最新版。** `npx` 每次都会拉取最新版本。要强制最新或锁定某个版本：
+> `npx @yanhuifair/godot-mcp@latest --enable-plugin -p .`（最新）· `npx @yanhuifair/godot-mcp@1.11.0 --enable-plugin -p .`（锁定）
+
 **这条命令做了什么：** 把插件复制到 `addons/godot-mcp/`，并直接在 `project.godot` 里把它打开。不需要你在 Godot 里点任何按钮。
 
 **怎么确认成功：** 项目里应该出现了 `addons/godot-mcp/` 目录。如果 Godot 已经开着，重新加载一下项目（项目 → 重新加载当前项目）让它识别插件。
