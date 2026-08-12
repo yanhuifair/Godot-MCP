@@ -1,6 +1,6 @@
 {
   "name": "@yanhuifair/godot-mcp",
-  "version": "1.10.0",
+  "version": "1.11.0",
   "description": "The most complete MCP server for Godot Engine 4.x — 358 tools. Let Claude, Cursor, Copilot, Windsurf or any MCP client edit .tscn scenes, .tres resources, GDScript and shaders, drive the live editor, and control the running game (freeze, frame-step, screenshot). Godot 3 not supported.",
   "type": "module",
   "main": "dist/index.js",

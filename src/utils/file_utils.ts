@@ -82,6 +82,14 @@ export function resolveProjectPath(projectRoot: string, relativePath: string): s
       `(resolved: "${resolved}", realRoot: "${realRoot}")`
     );
   }
+
+  // 定向拒绝导出签名凭据文件：里面是 Apple/Google 签名密钥，任何工具都不应读写它。
+  const sep = path.sep;
+  if (normalizedResolved.includes(`${sep}.godot${sep}export_credentials.cfg`)) {
+    throw new Error(
+      `Access to .godot/export_credentials.cfg is not allowed (contains export signing secrets)`
+    );
+  }
   return resolved;
 }
 

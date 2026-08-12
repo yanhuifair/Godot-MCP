@@ -242,24 +242,9 @@ export function runGodotProject(
     startedAt: new Date().toISOString(),
   };
 
-  const output: string[] = [];
-  proc.stdout?.on('data', (data: Buffer) => {
-    const lines = data.toString().split('\n');
-    for (const line of lines) {
-      if (output.length >= MAX_OUTPUT_LINES) output.shift();
-      output.push(line);
-    }
-  });
-  proc.stderr?.on('data', (data: Buffer) => {
-    const lines = data.toString().split('\n');
-    for (const line of lines) {
-      if (output.length >= MAX_OUTPUT_LINES) output.shift();
-      output.push(line);
-    }
-  });
-
-  spawnedProcesses.set(proc.pid || -1, { process: proc, output });
-  proc.unref();
+  // trackProcess 负责捕获输出、登记 map，并在进程退出 60s 后自动清理条目，
+  // 避免 run/export 进程长期积累导致 map 无限增长。
+  trackProcess(proc);
 
   return spawned;
 }
@@ -287,24 +272,7 @@ export function exportGodotProject(
     startedAt: new Date().toISOString(),
   };
 
-  const output: string[] = [];
-  proc.stdout?.on('data', (data: Buffer) => {
-    const lines = data.toString().split('\n');
-    for (const line of lines) {
-      if (output.length >= MAX_OUTPUT_LINES) output.shift();
-      output.push(line);
-    }
-  });
-  proc.stderr?.on('data', (data: Buffer) => {
-    const lines = data.toString().split('\n');
-    for (const line of lines) {
-      if (output.length >= MAX_OUTPUT_LINES) output.shift();
-      output.push(line);
-    }
-  });
-
-  spawnedProcesses.set(proc.pid || -1, { process: proc, output });
-  proc.unref();
+  trackProcess(proc);
 
   return spawned;
 }
@@ -330,7 +298,9 @@ export function getRecentOutput(clear?: boolean): string[] {
   }
 
   if (clear) {
-    spawnedProcesses.clear();
+    // 只清输出缓冲，绝不能清空整个 map —— 否则 stop_project/cleanupProcesses
+    // 会失去对仍在运行的 Godot 进程的句柄，无法再 kill。
+    for (const data of spawnedProcesses.values()) data.output.length = 0;
   }
 
   return allOutput;
@@ -502,10 +472,21 @@ export async function detectRunningGodot(): Promise<{ running: boolean; editor: 
       output = stdout;
     }
 
-    // Filter to Godot-related lines (was: `ps aux | grep -i '[Gg]odot' | grep -v grep`)
+    // Filter to Godot-related lines. 关键：按「可执行文件名」匹配而不是整个命令行，
+    // 否则服务器自身进程（命令行路径常含 "Godot-MCP"）会被误判为正在运行的 Godot，
+    // 导致 is_editor_running 永远返回 true。
+    // ps aux 列：USER PID %CPU %MEM VSZ RSS TTY STAT START TIME COMMAND
+    // COMMAND 是第 11 列（下标 10），其首个 token 为可执行文件路径。
     const lines = output
       .split('\n')
-      .filter(l => /godot/i.test(l) && !/grep/.test(l) && l.trim().length > 0);
+      .filter((l) => {
+        if (!/godot/i.test(l) || /grep/.test(l) || l.trim().length === 0) return false;
+        const parts = l.trim().split(/\s+/);
+        if (parts.length < 11) return false;
+        const exeName = (parts[10].split('/').pop() || '').toLowerCase();
+        // node/npx/WorkBuddy 等宿主进程即使路径含 "godot" 也不应算 Godot
+        return exeName.startsWith('godot');
+      });
 
     if (lines.length === 0) return result;
 

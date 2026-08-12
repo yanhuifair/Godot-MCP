@@ -13,12 +13,9 @@ default_model = "deepseek-flash"
 temperature       = 0.0
 # reasoning_language = "zh"   # visible reasoning language: auto|zh|en
 # auto_plan_classifier = "deepseek-flash"   # optional; only used for borderline tasks
-soft_compact_ratio  = 0.5   # notice only; keeps cache-first prefix intact
 compact_ratio       = 0.8   # try compacting when prompt reaches this fraction
-compact_force_ratio = 0.9   # force compacting at this high-water mark
 # keep                = ["errors"]   # compaction keep policy: errors, user_marked
 # recent_keep         = 2   # minimum recent messages kept verbatim
-cold_resume_prune   = true   # elide stale tool results when reopening a session past the provider cache window
 # planner_model = "deepseek-pro"   # optional: enable two-model collaboration
 # subagent_model = "deepseek-pro"   # optional default for runAs=subagent skills
 # subagent_models = { review = "deepseek-pro", security_review = "deepseek-pro" }   # per-skill overrides

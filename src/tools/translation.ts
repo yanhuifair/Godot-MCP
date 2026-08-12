@@ -12,7 +12,8 @@ import { toolError, ErrorCode } from '../utils/errors.js';
 import { ToolResult } from '../utils/types.js';
 import fs from 'node:fs';
 import path from 'node:path';
-import { readTextFile, resolveProjectPath, findFilesByExtension, writeTextFile } from '../utils/file_utils.js';
+import { readTextFile, resolveProjectPath, findFilesByExtension, writeTextFile, toResPath } from '../utils/file_utils.js';
+import { parseConfig, serializeConfig } from '../parsers/config_parser.js';
 
 // ---- Tool Schemas ----
 
@@ -382,5 +383,207 @@ export function handleAddTranslationKey(
     return { content: [{ type: 'text', text: `Added key "${args.key}" to ${args.path}` }] };
   } catch (err: any) {
     return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
+  }
+}
+
+// ============================================================
+// Localization Registration (project.godot)
+// ============================================================
+//
+// Godot only loads a translation file if it is listed in the project setting
+// `internationalization/locale/translations`
+// (core/config/project_settings.cpp: GLOBAL_DEF_INTERNAL(..., PackedStringArray())).
+// In project.godot that lands in the `[internationalization]` section as
+//   locale/translations=PackedStringArray("res://localization/zh_CN.po")
+// Creating a .po/.csv without registering it is a silent no-op at runtime,
+// which is why these tools exist alongside create_translation.
+
+const TRANSLATIONS_SECTION = 'internationalization';
+const TRANSLATIONS_KEY = 'locale/translations';
+
+/** Parse `PackedStringArray("a", "b")` into its string entries. */
+function parsePackedStringArray(raw: string | undefined): string[] {
+  if (!raw) return [];
+  const inner = raw.trim().replace(/^PackedStringArray\s*\(/, '').replace(/\)\s*$/, '');
+  const out: string[] = [];
+  // Only double-quoted entries are valid here; this also skips stray commas.
+  for (const m of inner.matchAll(/"((?:[^"\\]|\\.)*)"/g)) {
+    out.push(m[1].replace(/\\"/g, '"'));
+  }
+  return out;
+}
+
+/** Serialize string entries back into `PackedStringArray(...)`. */
+function serializePackedStringArray(values: string[]): string {
+  return `PackedStringArray(${values.map(v => JSON.stringify(v)).join(', ')})`;
+}
+
+export const registerTranslationSchema = {
+  path: z.string().describe('Translation file to register, e.g. "localization/zh_CN.po" or "res://localization/ui.en.translation"'),
+};
+
+export const unregisterTranslationSchema = {
+  path: z.string().describe('Translation file to remove from the project translation list'),
+};
+
+export const createPoTranslationSchema = {
+  path: z.string().describe('Output path for the new .po file, e.g. "localization/zh_CN.po"'),
+  language: z.string().optional().default('en').describe('Language code written into the .po header, e.g. "zh_CN"'),
+  entries: z.record(z.string()).optional().describe('Map of msgid to msgstr, e.g. {"HELLO":"你好"}'),
+  register: z.boolean().optional().default(false).describe('Also register the file in project.godot so Godot actually loads it'),
+};
+
+/**
+ * Read the registered translation list from project.godot.
+ * Returns the parsed config alongside the entries so callers can write back.
+ */
+function loadRegisteredTranslations(projectRoot: string) {
+  const cfgPath = resolveProjectPath(projectRoot, 'project.godot');
+  const { content } = readTextFile(cfgPath);
+  const cfg = parseConfig(content);
+  const raw = cfg.sections[TRANSLATIONS_SECTION]?.[TRANSLATIONS_KEY];
+  return { cfgPath, cfg, entries: parsePackedStringArray(raw) };
+}
+
+/** Register a translation file so Godot loads it at runtime. */
+export function handleRegisterTranslation(
+  projectRoot: string,
+  args: { path: string }
+): ToolResult {
+  try {
+    const resPath = toResPath(args.path);
+
+    // Warn early rather than registering a path that will never resolve.
+    const absPath = resolveProjectPath(projectRoot, resPath.replace(/^res:\/\//, ''));
+    const exists = fs.existsSync(absPath);
+
+    const { cfgPath, cfg, entries } = loadRegisteredTranslations(projectRoot);
+    if (entries.includes(resPath)) {
+      return { content: [{ type: 'text', text: `Already registered: ${resPath}` }] };
+    }
+
+    entries.push(resPath);
+    if (!cfg.sections[TRANSLATIONS_SECTION]) cfg.sections[TRANSLATIONS_SECTION] = {};
+    cfg.sections[TRANSLATIONS_SECTION][TRANSLATIONS_KEY] = serializePackedStringArray(entries);
+    writeTextFile(cfgPath, serializeConfig(cfg), true);
+
+    const warning = exists ? '' : `\nWarning: ${resPath} does not exist yet — Godot will skip it until the file is created.`;
+    return {
+      content: [{
+        type: 'text',
+        text: `Registered translation: ${resPath}\n` +
+          `[${TRANSLATIONS_SECTION}] ${TRANSLATIONS_KEY} now has ${entries.length} entry(ies):\n` +
+          entries.map(e => `  - ${e}`).join('\n') + warning,
+      }],
+    };
+  } catch (err: any) {
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error registering translation: ${err.message}`);
+  }
+}
+
+/** Remove a translation file from the project translation list. */
+export function handleUnregisterTranslation(
+  projectRoot: string,
+  args: { path: string }
+): ToolResult {
+  try {
+    const resPath = toResPath(args.path);
+    const { cfgPath, cfg, entries } = loadRegisteredTranslations(projectRoot);
+
+    const idx = entries.indexOf(resPath);
+    if (idx === -1) {
+      return toolError(
+        ErrorCode.NOT_FOUND,
+        `${resPath} is not registered. Currently registered: ${entries.length ? entries.join(', ') : '(none)'}.`
+      );
+    }
+
+    entries.splice(idx, 1);
+    if (!cfg.sections[TRANSLATIONS_SECTION]) cfg.sections[TRANSLATIONS_SECTION] = {};
+    if (entries.length === 0) {
+      // Godot's default is an empty PackedStringArray; drop the key entirely so
+      // project.godot stays close to what the editor itself would write.
+      delete cfg.sections[TRANSLATIONS_SECTION][TRANSLATIONS_KEY];
+    } else {
+      cfg.sections[TRANSLATIONS_SECTION][TRANSLATIONS_KEY] = serializePackedStringArray(entries);
+    }
+    writeTextFile(cfgPath, serializeConfig(cfg), true);
+
+    return {
+      content: [{
+        type: 'text',
+        text: `Unregistered translation: ${resPath}\n` +
+          `${entries.length} entry(ies) remain${entries.length ? ':\n' + entries.map(e => `  - ${e}`).join('\n') : '.'}`,
+      }],
+    };
+  } catch (err: any) {
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error unregistering translation: ${err.message}`);
+  }
+}
+
+/**
+ * Create a Gettext .po translation file.
+ * create_translation only emits .csv, but .po is what Godot's own
+ * "Generate POT" localization workflow produces, so this closes that gap.
+ */
+export function handleCreatePoTranslation(
+  projectRoot: string,
+  args: { path: string; language?: string; entries?: Record<string, string>; register?: boolean }
+): ToolResult {
+  try {
+    if (!args.path.endsWith('.po')) {
+      return toolError(ErrorCode.INVALID_ARGUMENT, `Path must end with .po (got "${args.path}"). Use create_translation for .csv.`);
+    }
+
+    const language = args.language ?? 'en';
+    const entries = args.entries ?? {};
+
+    // Standard gettext header. The empty msgid carries the metadata block;
+    // Godot's TranslationLoaderPO reads Language and Content-Type from it.
+    const lines: string[] = [
+      '# Translation file for the Godot project.',
+      `# Language: ${language}`,
+      'msgid ""',
+      'msgstr ""',
+      '"Content-Type: text/plain; charset=UTF-8\\n"',
+      `"Language: ${language}\\n"`,
+      '',
+    ];
+
+    // Escape per gettext rules so multi-line or quoted values stay valid.
+    const esc = (s: string) => s
+      .replace(/\\/g, '\\\\')
+      .replace(/"/g, '\\"')
+      .replace(/\n/g, '\\n');
+
+    for (const [msgid, msgstr] of Object.entries(entries)) {
+      lines.push(`msgid "${esc(msgid)}"`);
+      lines.push(`msgstr "${esc(msgstr)}"`);
+      lines.push('');
+    }
+
+    // Normalize `res://` the same way handleRegisterTranslation does, otherwise
+    // path.resolve() would turn "res://locale/en.po" into "<project>/res:/locale/en.po".
+    const relPath = args.path.replace(/^res:\/\//, '');
+    const absPath = resolveProjectPath(projectRoot, relPath);
+    writeTextFile(absPath, lines.join('\n'), true);
+
+    let registered = '';
+    if (args.register) {
+      const result = handleRegisterTranslation(projectRoot, { path: args.path });
+      // Surface the registration outcome rather than silently swallowing it.
+      registered = `\n${(result.content[0] as { text: string }).text}`;
+    }
+
+    return {
+      content: [{
+        type: 'text',
+        text: `Created .po translation: ${args.path}\n` +
+          `  language: ${language}\n` +
+          `  entries: ${Object.keys(entries).length}` + registered,
+      }],
+    };
+  } catch (err: any) {
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error creating .po translation: ${err.message}`);
   }
 }

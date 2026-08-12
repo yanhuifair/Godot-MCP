@@ -98,6 +98,28 @@ export const WRITE_TOOLS: ReadonlySet<string> = new Set([
   'editor_play_current_scene', 'editor_set_distraction_free', 'editor_set_movie_maker',
   'editor_restart', 'editor_select_node',
   'clear_game_logs', 'configure_file_logging',
+  // ---- 新增 export-preset 写工具 (v1.11.0) ----
+  'create_export_preset', 'update_export_preset', 'remove_export_preset',
+  // ---- 新增 localization 写工具 (v1.11.0) ----
+  'create_po_translation', 'register_translation', 'unregister_translation',
+  // ---- 安全审计补漏 (v1.11.0)：editor 副作用工具 + fix_missing_uids ----
+  // 这些工具此前不在白名单，read-only 模式会放行对场景/编辑器状态的修改。
+  'editor_clear_errors', 'editor_copy', 'editor_cut', 'editor_paste',
+  'editor_pause', 'editor_unpause', 'editor_toggle_grid', 'editor_toggle_snap',
+  'editor_create_camera', 'editor_create_csg_box', 'editor_create_csg_cylinder',
+  'editor_create_csg_merge', 'editor_create_csg_polygon', 'editor_create_csg_sphere',
+  'editor_create_gpu_particles', 'editor_create_mesh_instance',
+  'editor_create_multiplayer_spawner', 'editor_create_multiplayer_synchronizer',
+  'editor_set_animated_sprite_param', 'editor_set_area_param',
+  'editor_set_audio_listener_param', 'editor_set_audio_player_param',
+  'editor_set_camera_param', 'editor_set_character_body_param',
+  'editor_set_container_param', 'editor_set_decal_param', 'editor_set_marker_param',
+  'editor_set_multiplayer_spawner_param', 'editor_set_multiplayer_synchronizer_param',
+  'editor_set_occluder_param', 'editor_set_parallax_param', 'editor_set_particles_param',
+  'editor_set_rich_text_param', 'editor_set_soft_body_param',
+  'editor_set_tab_container_param', 'editor_set_video_player_param',
+  'editor_set_viewport_param',
+  'fix_missing_uids',
 ]);
 
 /** 该工具是否为写/副作用操作（read-only 模式下应被拒绝）。 */

@@ -350,7 +350,7 @@ describe('WRITE_TOOLS 名单完整性', () => {
       'write_', 'create_', 'delete_', 'move_', 'edit_', 'add_', 'remove_',
       'set_', 'rename_', 'duplicate_', 'update_', 'compile_', 'transform_',
       'attach_', 'load_', 'connect_', 'disconnect_', 'launch_', 'run_',
-      'export_', 'stop_', 'capture_', 'bake_', 'reimport_',
+      'export_', 'stop_', 'capture_', 'bake_', 'reimport_', 'fix_',
     ];
 
     // editor_* 工具中写/副作用操作的完整名单（editor_take_screenshot 会通过插件落盘文件）
@@ -375,6 +375,22 @@ describe('WRITE_TOOLS 名单完整性', () => {
       'editor_save_scene_as', 'editor_close_scene', 'editor_mark_scene_unsaved',
       'editor_play_current_scene', 'editor_set_distraction_free', 'editor_set_movie_maker',
       'editor_restart', 'editor_select_node',
+      // v1.11.0 安全审计补漏：editor 写/副作用工具
+      'editor_clear_errors', 'editor_copy', 'editor_cut', 'editor_paste',
+      'editor_pause', 'editor_unpause', 'editor_toggle_grid', 'editor_toggle_snap',
+      'editor_create_camera', 'editor_create_csg_box', 'editor_create_csg_cylinder',
+      'editor_create_csg_merge', 'editor_create_csg_polygon', 'editor_create_csg_sphere',
+      'editor_create_gpu_particles', 'editor_create_mesh_instance',
+      'editor_create_multiplayer_spawner', 'editor_create_multiplayer_synchronizer',
+      'editor_set_animated_sprite_param', 'editor_set_area_param',
+      'editor_set_audio_listener_param', 'editor_set_audio_player_param',
+      'editor_set_camera_param', 'editor_set_character_body_param',
+      'editor_set_container_param', 'editor_set_decal_param', 'editor_set_marker_param',
+      'editor_set_multiplayer_spawner_param', 'editor_set_multiplayer_synchronizer_param',
+      'editor_set_occluder_param', 'editor_set_parallax_param', 'editor_set_particles_param',
+      'editor_set_rich_text_param', 'editor_set_soft_body_param',
+      'editor_set_tab_container_param', 'editor_set_video_player_param',
+      'editor_set_viewport_param',
     ];
 
     // 已知例外：这些工具虽命中前缀但是只读/UI 操作，不在写名单中
@@ -447,6 +463,6 @@ describe('register.ts 分类计数注释', () => {
       }
     }
     expect(mismatches).toEqual([]);
-    expect(total).toBe(380);
+    expect(total).toBe(386);
   });
 });

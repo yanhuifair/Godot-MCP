@@ -72,7 +72,13 @@ export function parseConfig(content: string): ConfigDocument {
     // Key-value line: key = value
     const eqIndex = trimmed.indexOf('=');
     if (eqIndex > 0) {
-      const key = trimmed.slice(0, eqIndex).trim();
+      let key = trimmed.slice(0, eqIndex).trim();
+      // Godot quotes keys that contain spaces/special chars (e.g. the
+      // export_presets.cfg runnable_presets section uses `"Windows Desktop"`).
+      // Unquote so the stored key matches the logical name.
+      if (key.startsWith('"') && key.endsWith('"') && key.length >= 2) {
+        key = key.slice(1, -1);
+      }
       let value = trimmed.slice(eqIndex + 1).trim();
 
       // Check for multi-line value start

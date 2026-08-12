@@ -2,13 +2,13 @@
 
 # Godot MCP
 
-### The most complete MCP server for Godot Engine — **380 tools** that give your AI assistant real hands inside your game project.
+### The most complete MCP server for Godot Engine — **386 tools** that give your AI assistant real hands inside your game project.
 
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE.md)
 [![CI](https://github.com/yanhuifair/Godot-MCP/actions/workflows/ci.yml/badge.svg)](https://github.com/yanhuifair/Godot-MCP/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/@yanhuifair/godot-mcp)](https://www.npmjs.com/package/@yanhuifair/godot-mcp)
 [![npm downloads](https://img.shields.io/npm/dm/@yanhuifair/godot-mcp)](https://www.npmjs.com/package/@yanhuifair/godot-mcp)
-[![Tools](https://img.shields.io/badge/tools-380-orange)](#all-tools)
+[![Tools](https://img.shields.io/badge/tools-386-orange)](#all-tools)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-green)](.)
 [![Godot](https://img.shields.io/badge/godot-4.x-blue)](https://godotengine.org)
 
@@ -24,9 +24,9 @@
 - 🎛️ **Drives the live editor** — select nodes, connect signals, author visual shaders, bake lightmaps, set breakpoints, step the debugger, run and stop the game.
 - ↩️ **Every scene edit is undoable** — add, remove, rename, move, reparent, duplicate and instantiate all register on Godot's native undo stack. If the AI gets it wrong, **Ctrl+Z** puts it back.
 - 🎮 **Reaches inside the running game** — inspect the live scene tree, call methods, inject input, **freeze the game, step it one frame at a time, and screenshot the result.** No other public Godot MCP does this.
-- 🔎 **Stays usable at scale** — `search_tools` finds the right tool out of 380, `get_status` tells you exactly what is connected, and every error returns a typed code plus a repair hint.
+- 🔎 **Stays usable at scale** — `search_tools` finds the right tool out of 386, `get_status` tells you exactly what is connected, and every error returns a typed code plus a repair hint.
 
-**380 tools · 30 categories · 18 AI clients · 4 communication paths · one-command setup.**
+**386 tools · 30 categories · 18 AI clients · 4 communication paths · one-command setup.**
 
 ```bash
 npx @yanhuifair/godot-mcp --enable-plugin -p .
@@ -44,7 +44,7 @@ npx @yanhuifair/godot-mcp --enable-plugin -p .
 
 | | **Godot MCP** | Other Godot MCP servers |
 |---|---|---|
-| **Tool count** | **380** across 30 categories | 16 – 156 |
+| **Tool count** | **386** across 30 categories | 16 – 156 |
 | **Works without Godot running** | ✅ Native `.tscn` / `.tres` / `.godot` parsers | ⚠️ Usually needs a live editor |
 | **Live editor control** | ✅ 140 tools — play, debug, breakpoints, viewport, bake | Partial |
 | **Undoable AI edits** | ✅ **Every scene mutation is one Ctrl+Z away** — native `EditorUndoRedoManager` actions | ❌ Edits are permanent |
@@ -112,7 +112,7 @@ npx @yanhuifair/godot-mcp --enable-plugin -p .
 
 Only if you want the **live editor** and **live game** tools (play the scene, read the current selection, set breakpoints, bake lightmaps, freeze the running game…).
 
-Over **220 of the 380 tools** — everything that reads and writes `.tscn`, `.tres`, `.gd`, shaders, project settings, etc. — work **without the plugin and without Godot even being open**. If that's all you need, skip to Step 2.
+Over **220 of the 386 tools** — everything that reads and writes `.tscn`, `.tres`, `.gd`, shaders, project settings, etc. — work **without the plugin and without Godot even being open**. If that's all you need, skip to Step 2.
 </details>
 
 ### Step 2 — Point Your AI Client at the Server
@@ -151,7 +151,7 @@ You should get back the tool count and whether the editor / runtime bridges are 
 "Run the game and take a screenshot"
 ```
 
-With 380 tools, the AI can't see them all at once — tell it to **`search_tools`** when it isn't sure what's available (e.g. *"search_tools for animation"*).
+With 386 tools, the AI can't see them all at once — tell it to **`search_tools`** when it isn't sure what's available (e.g. *"search_tools for animation"*).
 
 <details>
 <summary>Something not working?</summary>
@@ -173,7 +173,7 @@ With 380 tools, the AI can't see them all at once — tell it to **`search_tools
 
 ## What You Can Do
 
-Godot MCP provides comprehensive coverage of the Godot 4.x engine through 380 tools in 30 categories.
+Godot MCP provides comprehensive coverage of the Godot 4.x engine through 386 tools in 30 categories.
 
 ### Quick Demo
 
@@ -224,7 +224,7 @@ npx @yanhuifair/godot-mcp --enable-plugin -p .
 | Logs | 5 | Read game-run logs (`user://logs/godot.log`), list/rotate, clear, locate user-data dir, configure file logging |
 | Runtime (game) | 11 | Control the running game — tree, properties, methods, signals, input, freeze/step, screenshot |
 
-**Total: 380 tools across 30 categories**
+**Total: 386 tools across 30 categories**
 
 ### Core Capabilities in Detail
 
@@ -281,7 +281,7 @@ Inspect TileSet resources and TileMapLayer nodes. List and read NavigationRegion
   |   Claude/etc.)   |                                        |                  |
   +-----------------+                                        |  +-------------+ |
                                                              |  | Tool Registry| |
-                                                             |  |  (380 tools) | |
+                                                             |  |  (386 tools) | |
                                                              |  +------+------+ |
                                                              |         |        |
                                                              |    +----v-----+  |
@@ -323,7 +323,7 @@ godot-mcp/
 │   ├── index.ts              # CLI entry point, argument parsing, transport dispatch
 │   ├── server.ts             # MCP server factory, tool registration, request routing
 │   ├── tools/                # tool handler files (one group per category)
-│   │   ├── register.ts       # Centralized registration (380 tools)
+│   │   ├── register.ts       # Centralized registration (386 tools)
 │   │   ├── project.ts        # Project management tools
 │   │   ├── scene.ts          # Scene editing tools
 │   │   ├── script.ts         # Script and shader tools
@@ -417,7 +417,7 @@ To accommodate AI clients that may use either `snake_case` or `camelCase` parame
 
 - **Path traversal protection**: All file operations validate that resolved paths stay within the project root
 - **Automatic backups**: Write operations on script and scene files create `.bak` backup copies
-- **Read-only mode**: `--read-only` (or `GODOT_MCP_READ_ONLY=true`) rejects the 174 write/side-effect tools (write_, create_, delete_, move_, set_, edit_, editor_* mutations, run/export/launch, …) via a maintained whitelist — they are hidden from `tools/list` and blocked with a `READ_ONLY` error if called directly
+- **Read-only mode**: `--read-only` (or `GODOT_MCP_READ_ONLY=true`) rejects the 218 write/side-effect tools (write_, create_, delete_, move_, set_, edit_, editor_* mutations, run/export/launch, …) via a maintained whitelist — they are hidden from `tools/list` and blocked with a `READ_ONLY` error if called directly
 - **TCP only on loopback**: The editor plugin's TCP bridge binds `127.0.0.1` only, never the LAN
 - **Optional token auth**: Set `GODOT_MCP_TOKEN` to require a bearer token on HTTP (`/mcp`, `/sse`) and an `auth` handshake on the plugin TCP bridge; non-loopback HTTP binds are refused without it
 - **Undoable editor mutations**: Every scene-changing editor command (`editor_add_node`, `editor_remove_node`, `editor_set_node_properties`, `editor_rename_node`, `editor_move_node`, `editor_move_node_3d`, `editor_reparent_node`, `editor_duplicate_node`, `editor_delete_selected`, `editor_instantiate_scene`, …) is committed through Godot's native `EditorUndoRedoManager`, so a single **Ctrl+Z** (or `editor_undo`) reverts what the AI just did
@@ -508,7 +508,7 @@ Starts: Stdio + SSE (`/sse`) + Streamable HTTP (`/mcp`) + Health Check (`/health
 
 ```bash
 curl http://127.0.0.1:3000/health
-# {"status":"ok","version":"1.10.0","projectRoot":"/path/to/project","endpoints":{...}}
+# {"status":"ok","version":"1.11.0","projectRoot":"/path/to/project","endpoints":{...}}
 ```
 
 ---
@@ -575,7 +575,7 @@ Point your client at the built entry file:
 | `-g, --godot-path <path>` | Path to the Godot executable. Auto-detected if omitted (see the detection order below). |
 | `--enable-plugin` | Copy the editor plugin into `addons/` **and** switch it on in `project.godot`. Requires `-p`. **This is the one you want.** |
 | `--install-addons` | Copy the plugin files only — you enable it yourself in Godot's Plugins tab. |
-| `--read-only` | Safe mode: rejects the 174 tools that write files or cause side effects. Great for letting an AI explore an unfamiliar project. |
+| `--read-only` | Safe mode: rejects the 218 tools that write files or cause side effects. Great for letting an AI explore an unfamiliar project. |
 | `-t, --transport <mode>` | `stdio` (default) · `sse` · `streamable-http` · `all`. See [Transport Modes](#transport-modes). |
 | `--port <number>` | HTTP port for `sse` / `streamable-http`. Default `3000`. |
 | `--host <string>` | HTTP bind address. Default `127.0.0.1`. Binding anything else **requires** `GODOT_MCP_TOKEN`. |
@@ -594,7 +594,7 @@ npx @yanhuifair/godot-mcp -p . -t streamable-http --port 8080
 | Variable | Description |
 |---|---|
 | `GODOT_PATH` | Path to Godot binary (optional, auto-detected) |
-| `GODOT_MCP_READ_ONLY` | `true` — enable read-only mode (rejects 174 write/side-effect tools) |
+| `GODOT_MCP_READ_ONLY` | `true` — enable read-only mode (rejects 218 write/side-effect tools) |
 | `GODOT_MCP_TOKEN` | Auth token. HTTP: required when binding a non-loopback host. Plugin TCP bridge: enables the `auth` handshake on port 9876 |
 | `GODOT_MCP_TEST_PROJECT` | Path to test project for integration tests |
 | `GODOT_PROJECT` | Target project for the `sync-addons` build hook |
@@ -705,7 +705,7 @@ claude mcp add godot-mcp -e GODOT_PATH=/Applications/Godot.app/Contents/MacOS/Go
   -- npx -y @yanhuifair/godot-mcp -p .
 ```
 
-**3. Verify.** Start `claude`, then type `/mcp`. You should see `godot-mcp` with a **connected** status. Press Enter on it to browse the 380 tools.
+**3. Verify.** Start `claude`, then type `/mcp`. You should see `godot-mcp` with a **connected** status. Press Enter on it to browse the 386 tools.
 
 **4. First prompt:**
 
@@ -753,7 +753,7 @@ You can also let Cursor create the file for you: **Settings → Tools & Integrat
 
 > Use `search_tools` to find the tileset tools, then tell me which TileSets exist in this project.
 
-> **Tool limit warning:** Cursor only sends ~40–80 tools to the model at a time. Godot MCP ships 380. Keep `search_tools` in your rules file (see [Make Your Agent Use the Tools Well](#make-your-agent-use-the-tools-well)) so the model looks a tool up instead of hallucinating one.
+> **Tool limit warning:** Cursor only sends ~40–80 tools to the model at a time. Godot MCP ships 386. Keep `search_tools` in your rules file (see [Make Your Agent Use the Tools Well](#make-your-agent-use-the-tools-well)) so the model looks a tool up instead of hallucinating one.
 
 ---
 
@@ -856,7 +856,7 @@ Equivalent hand-written config:
 ```
 
 - `trust: true` skips the per-call confirmation prompt. Convenient, but it also means the AI can write files without asking — pair it with `--read-only` if you want a safety net.
-- `includeTools` / `excludeTools` accept arrays of tool names if you want to hand the model a curated subset instead of all 380.
+- `includeTools` / `excludeTools` accept arrays of tool names if you want to hand the model a curated subset instead of all 386.
 
 **2. Verify.** Run `gemini`, then `/mcp` — it lists connected servers and their tools. `gemini mcp list` works outside a session.
 
@@ -1068,7 +1068,7 @@ If your IDE launches processes without your shell's `PATH`, replace `"npx"` with
 Two OpenCode-specific gotchas:
 
 - `command` is a **single array**, not `command` + `args`.
-- The default tool-discovery `timeout` is **5000 ms**. Listing 380 tools plus a cold `npx` download regularly blows past that — bump it to `30000` as shown or the server will silently show zero tools.
+- The default tool-discovery `timeout` is **5000 ms**. Listing 386 tools plus a cold `npx` download regularly blows past that — bump it to `30000` as shown or the server will silently show zero tools.
 
 **2. Verify.** Start `opencode` in that folder. The MCP server appears at startup; tools are namespaced `godot-mcp_*`.
 
@@ -1231,14 +1231,14 @@ See [Transport Modes](#transport-modes) for the full details.
 
 ### Make Your Agent Use the Tools Well
 
-380 tools is more than most models can keep straight, and many clients only forward a slice of them to the model. Two minutes of setup fixes this.
+386 tools is more than most models can keep straight, and many clients only forward a slice of them to the model. Two minutes of setup fixes this.
 
 **1. Drop a rules file in your project.** Agents auto-read these: `AGENTS.md` (Codex, OpenCode, Cursor, Gemini CLI, Zed), `CLAUDE.md` (Claude Code), `.cursor/rules/*.mdc` (Cursor), `.clinerules` (Cline / Roo Code), `.github/copilot-instructions.md` (Copilot).
 
 ```markdown
 ## Godot MCP
 
-This project has the `godot-mcp` server attached (380 tools).
+This project has the `godot-mcp` server attached (386 tools).
 
 - Never guess a tool name. Call `search_tools` with a keyword first —
   e.g. search_tools("tileset"), search_tools("animation"), search_tools("navmesh").
@@ -1262,7 +1262,7 @@ This project has the `godot-mcp` server attached (380 tools).
 **3. Two prompts worth memorizing:**
 
 > `get_status` — what is currently reachable (editor? running game?) and how many tools are loaded.
-> `search_tools("<keyword>")` — the right tool name, ranked, without burning context on a 380-item list.
+> `search_tools("<keyword>")` — the right tool name, ranked, without burning context on a 386-item list.
 
 ---
 
@@ -1459,7 +1459,7 @@ If the runtime tools return a `RUNTIME_NOT_REACHABLE` error, run `get_status` �
 
 ### Tool Discovery & Diagnostics (Meta, 2 tools)
 
-With 380 tools, guessing the right name wastes tokens. Two discovery tools help:
+With 386 tools, guessing the right name wastes tokens. Two discovery tools help:
 
 | Tool | Description |
 |---|---|
@@ -1605,7 +1605,7 @@ Click each category to expand and see all tools with descriptions.
 </details>
 
 <details>
-<summary>Project (21 tools) — Config, input map, file ops, autoloads, validation</summary>
+<summary>Project (24 tools) — Config, input map, file ops, autoloads, export presets, validation</summary>
 
 | Tool | Description |
 |---|---|
@@ -1613,6 +1613,9 @@ Click each category to expand and see all tools with descriptions.
 | `read_project_config` | Read and parse project.godot. |
 | `write_project_config` | Write a config value to project.godot. |
 | `read_export_presets` | Read export presets from export_presets.cfg. |
+| `create_export_preset` | Create an export preset in export_presets.cfg (Windows Desktop/Linux/macOS/Android/iOS/Web). |
+| `update_export_preset` | Update fields/options of an existing export preset (by name or index). |
+| `remove_export_preset` | Remove an export preset and renumber the remaining ones. |
 | `read_input_map` | Read input map with key bindings. |
 | `write_input_action` | Create a new input action. |
 | `remove_input_action` | Remove an input action. |
@@ -1822,7 +1825,7 @@ Click each category to expand and see all tools with descriptions.
 
 **Navigation (3):** `list_nav_regions`, `read_nav_region`, `create_nav_mesh`
 
-**Translation (3):** `list_translations`, `read_translation`, `create_translation`
+**Translation (8):** `list_translations`, `read_translation`, `create_translation`, `write_translation`, `add_translation_key`, `create_po_translation`, `register_translation`, `unregister_translation`
 
 **Joints (3):** `create_joint`, `set_joint_param`, `list_joints`
 
@@ -1885,7 +1888,7 @@ npm run check:godot  # Load every fixture in a real headless Godot and verify
 | `--host` | HTTP bind address (default: 127.0.0.1) |
 | `--install-addons` | Copy editor plugin to target Godot project |
 | `--enable-plugin` | Install and auto-enable the editor plugin |
-| `--read-only` | Reject 174 write/side-effect tools (security mode) |
+| `--read-only` | Reject 218 write/side-effect tools (security mode) |
 | `--no-sse` | Disable SSE endpoint |
 | `--no-streamable-http` | Disable Streamable HTTP endpoint |
 | `-h, --help` | Show help |
@@ -1906,13 +1909,13 @@ npm run check:godot  # Load every fixture in a real headless Godot and verify
 
 ```bash
 npm run vsix
-# Output: godot-mcp-1.10.0.vsix
+# Output: godot-mcp-1.11.0.vsix
 ```
 
 Install in VS Code:
 
 ```bash
-code --install-extension godot-mcp-1.10.0.vsix
+code --install-extension godot-mcp-1.11.0.vsix
 ```
 
 ---
@@ -1937,8 +1940,8 @@ No. Godot **4.x** only. Godot 3's file formats and editor APIs differ too much t
 **Which AI clients work with it?**
 Any MCP-compatible client. Verified with Claude Desktop, Claude Code, Cursor, VS Code (Copilot), Windsurf, Codex, Cline, Roo Code, Aider, Cody, Goose, and Continue.
 
-**How does the AI pick the right tool out of 380?**
-Use `search_tools` — it ranks the catalog by keyword against tool names and descriptions, so the AI can find `add_audio_bus_effect` without loading all 380 schemas into context. `get_status` reports which subsystems (editor bridge, game runtime) are currently reachable.
+**How does the AI pick the right tool out of 386?**
+Use `search_tools` — it ranks the catalog by keyword against tool names and descriptions, so the AI can find `add_audio_bus_effect` without loading all 386 schemas into context. `get_status` reports which subsystems (editor bridge, game runtime) are currently reachable.
 
 **What makes the runtime tools different from the editor tools?**
 Editor tools talk to the Godot **editor**. Runtime tools talk to the **running game** through a lightweight autoload on `127.0.0.1:9877`. That's what enables freezing the game, stepping an exact number of frames, and screenshotting a precise gameplay moment.

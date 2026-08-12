@@ -18,6 +18,7 @@ import {
   handleValidateProject, handleListGroups, handleDuplicateScene,
   handleDuplicateResource, handleCreateDirectory,
   handleWriteInputAction, handleRemoveInputAction, handleAddInputBinding,
+  handleCreateExportPreset, handleUpdateExportPreset, handleRemoveExportPreset,
   listProjectFilesSchema, readProjectConfigSchema, searchInProjectSchema,
   readInputMapSchema, deleteFileSchema, moveFileSchema, writeProjectConfigSchema,
   readExportPresetsSchema, generateProjectReportSchema, listAutoloadsSchema,
@@ -25,6 +26,7 @@ import {
   validateProjectSchema, listGroupsSchema, duplicateSceneSchema,
   duplicateResourceSchema, createDirectorySchema,
   writeInputActionSchema, removeInputActionSchema, addInputBindingSchema,
+  createExportPresetSchema, updateExportPresetSchema, removeExportPresetSchema,
 } from './project.js';
 
 // Scene tools
@@ -292,8 +294,10 @@ import {
 import {
   handleListTranslations, handleReadTranslation, handleCreateTranslation,
   handleWriteTranslation, handleAddTranslationKey,
+  handleRegisterTranslation, handleUnregisterTranslation, handleCreatePoTranslation,
   listTranslationsSchema, readTranslationSchema, createTranslationSchema,
   writeTranslationSchema, addTranslationKeySchema,
+  registerTranslationSchema, unregisterTranslationSchema, createPoTranslationSchema,
 } from './translation.js';
 
 // UID, Joint, Geometry
@@ -392,7 +396,7 @@ import {
 // ---- Registration ----
 
 export function registerAllTools(registry: ToolRegistry): void {
-  // Project (21)
+  // Project (24)
   registry.setCategory('Project');
   registry.register({ name: 'list_project_files', description: 'List files and directories in the Godot project.', schema: listProjectFilesSchema, handler: handleListProjectFiles });
   registry.register({ name: 'read_project_config', description: 'Read and parse project.godot.', schema: readProjectConfigSchema, handler: handleReadProjectConfig });
@@ -400,6 +404,9 @@ export function registerAllTools(registry: ToolRegistry): void {
   registry.register({ name: 'read_input_map', description: 'Read input map with key bindings.', schema: readInputMapSchema, handler: (root) => handleReadInputMap(root) });
   registry.register({ name: 'write_project_config', description: 'Write a config value to project.godot.', schema: writeProjectConfigSchema, handler: handleWriteProjectConfig });
   registry.register({ name: 'read_export_presets', description: 'Read export presets from export_presets.cfg.', schema: readExportPresetsSchema, handler: (root) => handleReadExportPresets(root) });
+  registry.register({ name: 'create_export_preset', description: 'Create an export preset in export_presets.cfg (Windows Desktop/Linux/macOS/Android/iOS/Web).', schema: createExportPresetSchema, handler: handleCreateExportPreset });
+  registry.register({ name: 'update_export_preset', description: 'Update fields/options of an existing export preset (by name or index).', schema: updateExportPresetSchema, handler: handleUpdateExportPreset });
+  registry.register({ name: 'remove_export_preset', description: 'Remove an export preset and renumber the remaining ones.', schema: removeExportPresetSchema, handler: handleRemoveExportPreset });
   registry.register({ name: 'delete_file', description: 'Delete a file with .bak backup.', schema: deleteFileSchema, handler: handleDeleteFile });
   registry.register({ name: 'move_file', description: 'Move/rename a file within project.', schema: moveFileSchema, handler: handleMoveFile });
   registry.register({ name: 'generate_project_report', description: 'Generate comprehensive project overview.', schema: generateProjectReportSchema, handler: (root) => handleGenerateProjectReport(root) });
@@ -752,13 +759,16 @@ export function registerAllTools(registry: ToolRegistry): void {
   registry.register({ name: 'create_nav_link', description: 'Create a NavigationLink3D between two points.', schema: createNavLinkSchema, handler: handleCreateNavLink });
   registry.register({ name: 'read_nav_obstacle', description: 'Read NavigationObstacle nodes across scenes.', schema: readNavObstacleSchema, handler: handleReadNavObstacle });
 
-  // Translation (5)
+  // Translation (8)
   registry.setCategory('Translation');
   registry.register({ name: 'list_translations', description: 'List translation files.', schema: listTranslationsSchema, handler: handleListTranslations });
   registry.register({ name: 'read_translation', description: 'Read translation file.', schema: readTranslationSchema, handler: handleReadTranslation });
   registry.register({ name: 'create_translation', description: 'Create translation CSV.', schema: createTranslationSchema, handler: handleCreateTranslation });
   registry.register({ name: 'write_translation', description: 'Write a full translation CSV (keys + entries).', schema: writeTranslationSchema, handler: handleWriteTranslation });
   registry.register({ name: 'add_translation_key', description: 'Append a translation key/row to an existing CSV.', schema: addTranslationKeySchema, handler: handleAddTranslationKey });
+  registry.register({ name: 'create_po_translation', description: 'Create a Gettext .po translation file (optionally registering it).', schema: createPoTranslationSchema, handler: handleCreatePoTranslation });
+  registry.register({ name: 'register_translation', description: 'Register a translation file in project.godot so Godot loads it.', schema: registerTranslationSchema, handler: handleRegisterTranslation });
+  registry.register({ name: 'unregister_translation', description: 'Remove a translation file from the project translation list.', schema: unregisterTranslationSchema, handler: handleUnregisterTranslation });
 
   // Diff (5)
   registry.setCategory('Diff');

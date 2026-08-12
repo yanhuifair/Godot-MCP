@@ -276,15 +276,21 @@ describe('Input Map Reader', () => {
 });
 
 describe('Export Project', () => {
-  it('export_project returns error if Godot not found', async () => {
+  it('export_project sandboxes output_path (absolute path rejected)', async () => {
     const { handleExportProject } = await import('../src/tools/godot.js');
     const result = handleExportProject(testDir, {
       preset: 'Windows Desktop',
       output_path: '/tmp/build.exe',
     });
-    if (result.isError) {
-      expect(result.content[0].text).toContain('Godot binary not found');
-    }
+    // An absolute output_path must never be passed through to Godot. With the
+    // engine installed the handler rejects it via the path sandbox; without the
+    // engine it errors on the missing binary. Either way it must be an error —
+    // a silent pass-through of an absolute path is the regression we guard.
+    expect(result.isError).toBe(true);
+    const text = result.content[0].text;
+    expect(
+      text.includes('Absolute path not allowed') || text.includes('Godot binary not found')
+    ).toBe(true);
   });
 });
 

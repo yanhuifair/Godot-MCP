@@ -28,12 +28,12 @@ import pathMod from 'node:path';
 export const getGodotVersionSchema = {};
 
 export const launchEditorSchema = {
-  project_path: z.string().optional().describe('Project path (default: current project root)'),
+  project_path: z.string().optional().describe('Project path (default: current project root; must resolve inside the project root)'),
   scene: z.string().optional().describe('Scene to open on launch (e.g. "res://main.tscn")'),
 };
 
 export const runProjectSchema = {
-  project_path: z.string().optional().describe('Project path (default: current project root)'),
+  project_path: z.string().optional().describe('Project path (default: current project root; must resolve inside the project root)'),
   scene: z.string().optional().describe('Specific scene to run'),
   headless: z.boolean().optional().default(false).describe('Run in headless mode (no window)'),
   debug: z.boolean().optional().default(false).describe('Run with debugger'),
@@ -46,8 +46,8 @@ export const monitorOutputSchema = {
 
 export const exportProjectSchema = {
   preset: z.string().min(1).describe('Export preset name (as defined in your export_presets.cfg, e.g. "Windows Desktop", "Linux/X11")'),
-  output_path: z.string().min(1).describe('Output file path (absolute or relative) for the exported build'),
-  project_path: z.string().optional().describe('Project path (default: current project root)'),
+  output_path: z.string().min(1).describe('Output file path for the exported build (resolved inside the project root)'),
+  project_path: z.string().optional().describe('Project path (default: current project root; must resolve inside the project root)'),
 };
 
 export const captureScreenshotSchema = {
@@ -102,7 +102,9 @@ export function handleLaunchEditor(
             return toolError(ErrorCode.GODOT_NOT_FOUND, 'Godot binary not found. Set GODOT_PATH or install Godot.');
     }
 
-    const projectPath = args.project_path || projectRoot;
+    const projectPath = args.project_path
+      ? resolveProjectPath(projectRoot, args.project_path)
+      : projectRoot;
     const result = launchGodotEditor(binaryPath, projectPath, args.scene);
 
     return {
@@ -123,7 +125,9 @@ export function handleRunProject(
             return toolError(ErrorCode.GODOT_NOT_FOUND, 'Godot binary not found. Set GODOT_PATH or install Godot.');
     }
 
-    const projectPath = args.project_path || projectRoot;
+    const projectPath = args.project_path
+      ? resolveProjectPath(projectRoot, args.project_path)
+      : projectRoot;
     const result = runGodotProject(binaryPath, projectPath, {
       scene: args.scene,
       headless: args.headless,
@@ -190,11 +194,16 @@ export function handleExportProject(
             return toolError(ErrorCode.GODOT_NOT_FOUND, 'Godot binary not found. Set GODOT_PATH or install Godot.');
     }
 
-    const projectPath = args.project_path || projectRoot;
-    const result = exportGodotProject(binaryPath, projectPath, args.preset, args.output_path);
+    // 沙箱约束：project_path 与 output_path 都必须解析到当前项目根目录内。
+    // output_path 若不写死，Godot 会把导出产物写到任意路径（任意文件写入）。
+    const projectPath = args.project_path
+      ? resolveProjectPath(projectRoot, args.project_path)
+      : projectRoot;
+    const outputPath = resolveProjectPath(projectRoot, args.output_path);
+    const result = exportGodotProject(binaryPath, projectPath, args.preset, outputPath);
 
     return {
-      content: [{ type: 'text', text: `Export started. PID: ${result.pid}\nPreset: ${args.preset}\nOutput: ${args.output_path}\nCommand: ${result.command}\n\nUse monitor_output to check build progress.` }],
+      content: [{ type: 'text', text: `Export started. PID: ${result.pid}\nPreset: ${args.preset}\nOutput: ${outputPath}\nCommand: ${result.command}\n\nUse monitor_output to check build progress.` }],
     };
   } catch (err: any) {
         return toolError(ErrorCode.INTERNAL_ERROR, `Error exporting project: ${err.message}`);

@@ -1,5 +1,5 @@
 # Changelog
-## Unreleased
+## v1.11.0 (2026-08-13)
 
 ### New tools — expanded EditorInterface coverage (17 tools)
 The editor tier now reaches deeper into `EditorInterface` (Godot 4.6+). All are live-editor bridge tools.
@@ -28,12 +28,37 @@ Godot only writes `user://logs/godot.log` for **game runs** (the editor never lo
 - `get_user_data_dir` — resolve the OS-specific `user://` data directory for the project.
 - `configure_file_logging` — toggle file logging, set the log path, and cap rotated-file count in `project.godot` — a write tool.
 
+### New tools — export preset writing (Project category, 3 tools)
+Previously `export_presets.cfg` was read-only. These write it, matching Godot's own `editor_export.cpp` `_save()` layout so the editor re-saves with no spurious diff.
+
+- `create_export_preset` — create a preset for Windows Desktop / Linux / macOS / Android / iOS / Web, with the mandatory `export_filter`, default `build/<name>.<ext>` path, and the runnable mapping (platform-name key is quoted, e.g. `"Windows Desktop"`, because Godot strips spaces from unquoted config keys).
+- `update_export_preset` — update typed fields (`export_path`, `export_filter`, `include_filter`, `exclude_filter`, `custom_features`, `dedicated_server`, `runnable`) plus raw `fields` / `options` escape hatches; manages the one-runnable-per-platform slot.
+- `remove_export_preset` — delete a preset and renumber the rest (Godot's `load_config` stops at the first missing `preset.N` index, so renumbering is required or later presets silently vanish).
+
+### New tools — localization writing (Translation category, 3 tools)
+Previously only CSV/PO *reading* and CSV *writing* existed. These close the localization authoring gap.
+
+- `create_po_translation` — write a Gettext `.po` file (header `Language`/`Content-Type` + `msgid`/`msgstr` pairs, with proper escaping). Optionally registers it.
+- `register_translation` — add a file to `internationalization/locale/translations` in `project.godot` so Godot actually loads it at runtime.
+- `unregister_translation` — remove a file from that list (drops the key entirely when empty).
+
+### Security audit fixes
+A full pass over the read-only whitelist, path resolution, and process management surfaced and closed the following gaps:
+
+- **Read-only mode bypass closed (high)** — 38 tools that mutate files or editor state were missing from the `WRITE_TOOLS` whitelist and were callable in `--read-only` mode: `fix_missing_uids` (writes `.tscn`/`.tres`/`.uid` files), 19 `editor_set_*_param` property setters, 10 `editor_create_*` scene-node creators, `editor_cut`/`editor_paste`/`editor_copy`, `editor_pause`/`editor_unpause`, `editor_toggle_grid`/`editor_toggle_snap`, `editor_clear_errors`. All are now blocked in read-only mode. `test/structural.test.ts` gained `fix_` in its write-prefix check plus the full new `editorWriteTools` list so future gaps fail CI.
+- **`export_project` arbitrary-file-write closed (high)** — `output_path` was passed verbatim to Godot, which writes the build to any absolute path on disk. It is now resolved inside the project root (sandbox), as are `launch_editor`/`run_project` `project_path` overrides, so Godot can no longer be pointed at arbitrary project directories to execute scripts.
+- **`monitor_output(clear=true)` no longer breaks `stop_project` (high)** — it cleared the entire spawned-process map while Godot was still running, so `stop_project`/`cleanupProcesses` lost the handles and could not kill anything. It now only clears the output buffers.
+- **Export signing secrets protected (medium)** — `resolveProjectPath` now refuses `.godot/export_credentials.cfg`, which `read_script`/`write_script` (extension-agnostic) could previously read or overwrite.
+- **`is_editor_running` false-positive fixed (medium)** — process detection matched any command line containing "godot" (`/godot/i`), which the server's own process always satisfies when run from a `Godot-MCP`-named path, so it always reported an editor running. It now matches on the executable name instead.
+- **Spawn bookkeeping hardened (medium)** — `run_project`/`export_project` spawned processes never registered the 60-second exit cleanup timer, so the process map grew without bound; they now reuse the same `trackProcess()` path as `launch_editor`.
+- Docs: `--read-only` help text and README counts updated to the current 218 write/side-effect tools.
+
 ### Cleanup
 - Removed two dead `plugin.gd` dispatch keys: a duplicate `read_current_scene` (identical to `get_current_scene_tree`) and `export_project` (project export is driven from the MCP side via the Godot CLI, not the bridge).
 - Extended the `WRITE_TOOLS` read-only-mode whitelist to cover every new write tool, so `--read-only` now correctly blocks `editor_save_scene_as`, `editor_close_scene`, `editor_mark_scene_unsaved`, `editor_play_current_scene`, `editor_set_distraction_free`, `editor_set_movie_maker`, `editor_restart`, `editor_select_node`, `clear_game_logs`, and `configure_file_logging`.
 
 ### Tooling
-- Hardened `test/smoke_all_tools.mjs`: bridge-tool detection now uses the `editor_`/`runtime_` name prefix (robust against handler placement and runtime method selection), and the method-reconciliation parser now captures runtime ternary method names. The full 380-tool smoke now passes with 0 timeouts and 0 crashes, and flags 0 unexposed plugin commands.
+- Hardened `test/smoke_all_tools.mjs`: bridge-tool detection now uses the `editor_`/`runtime_` name prefix (robust against handler placement and runtime method selection), and the method-reconciliation parser now captures runtime ternary method names. The full 386-tool smoke now passes with 0 timeouts and 0 crashes, and flags 0 unexposed plugin commands.
 
 ## v1.10.0 (2026-08-05)
 
