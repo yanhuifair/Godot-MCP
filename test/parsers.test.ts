@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { parseConfig, serializeConfig } from '../src/parsers/config_parser.js';
 import { parseScene, serializeScene, generateSceneTemplate } from '../src/parsers/scene_parser.js';
 import { parseResource, isBinaryResource } from '../src/parsers/resource_parser.js';
+import { parseImportConfig, serializeImportConfig } from '../src/utils/import_parser.js';
 import { findProjectRoot } from '../src/utils/file_utils.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -131,6 +132,70 @@ describe('Resource Parser', () => {
   it('detects text-based .tres as non-binary', () => {
     const content = read('sample_material.tres');
     expect(isBinaryResource(content)).toBe(false);
+  });
+});
+
+// ---- Import Parser ----
+
+describe('Import Parser', () => {
+  it('quotes string values and keeps numbers/bools/arrays bare (Godot 4.x native format)', () => {
+    // Godot 4.x writes .import values typed: strings quoted, literals bare.
+    // An unquoted `importer=texture` makes Godot throw "Unexpected identifier".
+    const native = [
+      '[remap]',
+      '',
+      'importer="texture"',
+      'type="CompressedTexture2D"',
+      'uid="uid://dgpmcv5q8imjc"',
+      '',
+      '[deps]',
+      '',
+      'source_file="res://icon.svg"',
+      'dest_files=["res://.godot/imported/icon.ctex"]',
+      '',
+      '[params]',
+      '',
+      'compress/mode=0',
+      'compress/high_quality=false',
+      'svg/scale=1.0',
+    ].join('\n');
+
+    const out = serializeImportConfig(parseImportConfig(native));
+
+    // String values must be (re-)quoted.
+    expect(out).toContain('importer="texture"');
+    expect(out).toContain('type="CompressedTexture2D"');
+    expect(out).toContain('uid="uid://dgpmcv5q8imjc"');
+    expect(out).toContain('source_file="res://icon.svg"');
+    // Literals stay bare.
+    expect(out).toContain('compress/mode=0');
+    expect(out).toContain('compress/high_quality=false');
+    expect(out).toContain('svg/scale=1.0');
+    expect(out).toContain('dest_files=["res://.godot/imported/icon.ctex"]');
+    // No unquoted string value may leak (e.g. `importer=texture`).
+    expect(out).not.toMatch(/^importer=texture$/m);
+    expect(out).not.toMatch(/^type=CompressedTexture2D$/m);
+  });
+
+  it('preserves multi-line metadata dicts', () => {
+    const native = [
+      '[remap]',
+      '',
+      'importer="texture"',
+      'metadata={',
+      '"vram_texture": false',
+      '}',
+    ].join('\n');
+
+    const cfg = parseImportConfig(native);
+    expect(cfg.remap.metadata).toContain('"vram_texture": false');
+
+    const out = serializeImportConfig(cfg);
+    expect(out).toContain('metadata={');
+    expect(out).toContain('"vram_texture": false');
+    expect(out).toContain('}');
+    // The dict must not be quoted (that would corrupt the literal).
+    expect(out).not.toContain('metadata="{');
   });
 });
 
