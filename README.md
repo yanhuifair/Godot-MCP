@@ -100,7 +100,7 @@ Open a terminal, `cd` into your Godot project folder (the one containing `projec
 npx @yanhuifair/godot-mcp --enable-plugin -p .
 ```
 
-> The `-p .` means "this folder". You can also pass an absolute path from anywhere:
+> **Run this from your project root** — the folder containing `project.godot` — because `-p .` means "the current directory". If you run it from anywhere else, pass an absolute path instead:
 > `npx @yanhuifair/godot-mcp --enable-plugin -p /Users/me/games/my-game`
 
 > **Always installs the latest version.** `npx` fetches the newest release every time. To force it or pin a specific version:
@@ -519,6 +519,8 @@ curl http://127.0.0.1:3000/health
 ## Installation
 
 > **Read this first.** In normal use you never launch this server yourself — your AI client launches it in the background using the `command` from its config file. The commands below are for **installing the package** and for **manual/advanced runs** (HTTP transports, debugging, CI).
+
+> **Where to run these commands:** from anywhere — but if you pass `-p .`, the `.` refers to your *current* directory, so it must be your Godot project root (the folder containing `project.godot`). When in doubt, pass an absolute path: `-p /full/path/to/project`.
 
 ### Which method should I use?
 
