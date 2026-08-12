@@ -26,7 +26,7 @@
 - 🎮 **Reaches inside the running game** — inspect the live scene tree, call methods, inject input, **freeze the game, step it one frame at a time, and screenshot the result.** No other public Godot MCP does this.
 - 🔎 **Stays usable at scale** — `search_tools` finds the right tool out of 386, `get_status` tells you exactly what is connected, and every error returns a typed code plus a repair hint.
 
-**386 tools · 30 categories · 18 AI clients · 4 communication paths · one-command setup.**
+**386 tools · 30 categories · 22 AI clients · 4 communication paths · one-command setup.**
 
 ```bash
 npx @yanhuifair/godot-mcp --enable-plugin -p .
@@ -683,6 +683,10 @@ Godot MCP is a **plain stdio MCP server** — anything that speaks MCP can drive
 | [Continue](#continue) | `~/.continue/config.yaml` | `mcpServers` |
 | [Cherry Studio](#cherry-studio) | Settings → MCP servers (UI) | `mcpServers` |
 | [Goose](#goose) | `~/.config/goose/config.yaml` | `extensions` |
+| [Hermes](#hermes) | `~/.hermes/config.yaml` | `mcp_servers` |
+| [OpenClaw](#openclaw) | `~/.openclaw/openclaw.json` | `mcp.servers` |
+| [Reasonix](#reasonix) | `reasonix.toml` · `~/.reasonix/config.toml` | `[[plugins]]` |
+| [WorkBuddy / CodeBuddy](#workbuddy--codebuddy) | `~/.workbuddy/mcp.json` (Connectors panel) | `mcpServers` |
 | [Aider](#aider) | `.aider.conf.yml` | `mcp-servers-file` |
 | [Anything else](#any-other-mcp-client) | — | see below |
 
@@ -1251,6 +1255,110 @@ aider --mcp-servers '{"mcpServers":{"godot-mcp":{"command":"npx","args":["-y","@
 ```yaml
 mcp-servers-file: ./mcp.json
 ```
+
+---
+
+### Hermes
+
+**1. Add via CLI:**
+
+```bash
+hermes mcp add godot-mcp --command "npx" --args "-y" "@yanhuifair/godot-mcp" "-p" "/path/to/your/godot/project"
+```
+
+Or edit `~/.hermes/config.yaml` directly:
+
+```yaml
+mcp_servers:
+  godot-mcp:
+    command: "npx"
+    args: ["-y", "@yanhuifair/godot-mcp", "-p", "/path/to/your/godot/project"]
+```
+
+**2. Reload and verify.** In a session run `/reload-mcp`, then `hermes mcp list` / `hermes mcp test godot-mcp`. Tools appear prefixed `mcp_godot-mcp_*`.
+
+---
+
+### OpenClaw
+
+**1. Add the server** (CLI, or Control UI → Settings → MCP → Add server):
+
+```bash
+openclaw mcp add godot-mcp \
+  --command npx \
+  --arg "-y" --arg "@yanhuifair/godot-mcp" --arg "-p" --arg "/path/to/your/godot/project" \
+  --cwd /path/to/your/godot/project
+```
+
+Or write it directly into `~/.openclaw/openclaw.json`:
+
+```json5
+{
+  "mcp": {
+    "servers": {
+      "godot-mcp": {
+        "command": "npx",
+        "args": ["-y", "@yanhuifair/godot-mcp", "-p", "."],
+        "cwd": "/path/to/your/godot/project",
+        "enabled": true
+      }
+    }
+  }
+}
+```
+
+**2. Verify the connection** — a saved definition proves nothing:
+
+```bash
+openclaw mcp doctor godot-mcp --probe
+```
+
+Restart the Gateway / agent (or `openclaw mcp reload`) so it picks up the new definition.
+
+---
+
+### Reasonix
+
+**1. Add a `[[plugins]]` entry** in `reasonix.toml` (project) or `~/.reasonix/config.toml` (global):
+
+```toml
+[[plugins]]
+name    = "godot-mcp"
+command = "npx"
+args    = ["-y", "@yanhuifair/godot-mcp", "-p", "."]
+```
+
+**2. Restart Reasonix** and ask it to call `get_status` — the `godot-mcp_*` tools appear in its tool list.
+
+---
+
+### WorkBuddy / CodeBuddy
+
+**1. Add a custom MCP connector.** Open the **Connectors** panel → **Custom** (top-right), and add a server with:
+
+```
+command: npx
+args:    -y  @yanhuifair/godot-mcp  -p  /path/to/your/godot/project
+```
+
+This saves to `~/.workbuddy/mcp.json` under `mcpServers`:
+
+```json
+{
+  "mcpServers": {
+    "godot-mcp": {
+      "command": "npx",
+      "args": ["-y", "@yanhuifair/godot-mcp", "-p", "."]
+    }
+  }
+}
+```
+
+**2. Trust it.** WorkBuddy keeps a new server inactive until you open it in the connectors list and click **Trust**. Then start a new session.
+
+**3. Verify.** Ask:
+
+> use godot-mcp to run get_status and list all scenes
 
 ---
 

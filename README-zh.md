@@ -26,7 +26,7 @@
 - 🎮 **深入正在运行的游戏** — 检查实时场景树、调用方法、注入输入，**冻结游戏、逐帧步进、并对结果截图**。这是目前唯一能做到这一点的公开 Godot MCP。
 - 🔎 **规模化仍然好用** — `search_tools` 从 386 个工具中精准定位，`get_status` 直接告诉你哪些子系统已连接，每个错误都返回类型化错误码和修复建议。
 
-**386 个工具 · 30 个分类 · 18 种 AI 客户端 · 4 条通信路径 · 一条命令完成配置。**
+**386 个工具 · 30 个分类 · 22 种 AI 客户端 · 4 条通信路径 · 一条命令完成配置。**
 
 ```bash
 npx @yanhuifair/godot-mcp --enable-plugin -p .
@@ -683,6 +683,10 @@ Godot MCP 是一个**标准的 stdio MCP 服务器**——任何支持 MCP 的�
 | [Continue](#continue) | `~/.continue/config.yaml` | `mcpServers` |
 | [Cherry Studio](#cherry-studio) | 设置 → MCP 服务器（图形界面） | `mcpServers` |
 | [Goose](#goose) | `~/.config/goose/config.yaml` | `extensions` |
+| [Hermes](#hermes) | `~/.hermes/config.yaml` | `mcp_servers` |
+| [OpenClaw](#openclaw) | `~/.openclaw/openclaw.json` | `mcp.servers` |
+| [Reasonix](#reasonix) | `reasonix.toml` · `~/.reasonix/config.toml` | `[[plugins]]` |
+| [WorkBuddy / CodeBuddy](#workbuddy--codebuddy) | `~/.workbuddy/mcp.json`（连接器面板） | `mcpServers` |
 | [Aider](#aider) | `.aider.conf.yml` | `mcp-servers-file` |
 | [其他任何客户端](#其他任何-mcp-客户端) | — | 见下文 |
 
@@ -1251,6 +1255,110 @@ aider --mcp-servers '{"mcpServers":{"godot-mcp":{"command":"npx","args":["-y","@
 ```yaml
 mcp-servers-file: ./mcp.json
 ```
+
+---
+
+### Hermes
+
+**1. 通过命令行添加：**
+
+```bash
+hermes mcp add godot-mcp --command "npx" --args "-y" "@yanhuifair/godot-mcp" "-p" "/path/to/your/godot/project"
+```
+
+或直接编辑 `~/.hermes/config.yaml`：
+
+```yaml
+mcp_servers:
+  godot-mcp:
+    command: "npx"
+    args: ["-y", "@yanhuifair/godot-mcp", "-p", "/path/to/your/godot/project"]
+```
+
+**2. 重载并验证。** 在会话里运行 `/reload-mcp`，然后 `hermes mcp list` / `hermes mcp test godot-mcp`。工具会以 `mcp_godot-mcp_*` 前缀出现。
+
+---
+
+### OpenClaw
+
+**1. 添加服务器**（命令行，或 Control UI → 设置 → MCP → 添加服务器）：
+
+```bash
+openclaw mcp add godot-mcp \
+  --command npx \
+  --arg "-y" --arg "@yanhuifair/godot-mcp" --arg "-p" --arg "/path/to/your/godot/project" \
+  --cwd /path/to/your/godot/project
+```
+
+或直接写进 `~/.openclaw/openclaw.json`：
+
+```json5
+{
+  "mcp": {
+    "servers": {
+      "godot-mcp": {
+        "command": "npx",
+        "args": ["-y", "@yanhuifair/godot-mcp", "-p", "."],
+        "cwd": "/path/to/your/godot/project",
+        "enabled": true
+      }
+    }
+  }
+}
+```
+
+**2. 验证连接** —— 保存定义不等于能连上：
+
+```bash
+openclaw mcp doctor godot-mcp --probe
+```
+
+重启 Gateway / agent（或 `openclaw mcp reload`）让新定义生效。
+
+---
+
+### Reasonix
+
+**1. 在 `reasonix.toml`（项目）或 `~/.reasonix/config.toml`（全局）加一条 `[[plugins]]`：**
+
+```toml
+[[plugins]]
+name    = "godot-mcp"
+command = "npx"
+args    = ["-y", "@yanhuifair/godot-mcp", "-p", "."]
+```
+
+**2. 重启 Reasonix**，让它调用 `get_status` 即可——`godot-mcp_*` 工具会出现在它的工具列表里。
+
+---
+
+### WorkBuddy / CodeBuddy
+
+**1. 添加自定义 MCP 连接器。** 打开**连接器**面板 → 右上角**自定义**入口，添加一个服务器：
+
+```
+command: npx
+args:    -y  @yanhuifair/godot-mcp  -p  /path/to/your/godot/project
+```
+
+会保存到 `~/.workbuddy/mcp.json` 的 `mcpServers` 下：
+
+```json
+{
+  "mcpServers": {
+    "godot-mcp": {
+      "command": "npx",
+      "args": ["-y", "@yanhuifair/godot-mcp", "-p", "."]
+    }
+  }
+}
+```
+
+**2. 信任它。** WorkBuddy 不会自动激活新服务器——需要在连接器列表里打开它并点击**信任**，然后新开一个会话。
+
+**3. 验证。** 问它：
+
+> 用 godot-mcp 运行 get_status 并列出所有场景
 
 ---
 
