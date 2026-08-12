@@ -73,4 +73,4 @@ network = true
 [[plugins]]
 name    = "godot-mcp"
 command = "node"
-args    = ["/Users/Fair/Desktop/GodotMCP/dist/index.js"]
+args    = ["/Users/Fair/Desktop/Godot-MCP/dist/index.js"]
