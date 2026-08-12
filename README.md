@@ -567,6 +567,31 @@ Point your client at the built entry file:
 { "command": "node", "args": ["/absolute/path/to/Godot-MCP/dist/index.js", "-p", "."] }
 ```
 
+### Upgrading to the latest version
+
+`npx` always fetches the newest release, so the same one-liner that installs also upgrades:
+
+```bash
+npx -y @yanhuifair/godot-mcp@latest --enable-plugin -p .
+```
+
+**To refresh the editor plugin** (the files in `addons/godot-mcp/`), delete the old copy first, then re-run — otherwise stale plugin files can linger:
+
+```bash
+rm -rf addons/godot-mcp && npx -y @yanhuifair/godot-mcp@latest --enable-plugin -p .
+```
+
+> On Windows PowerShell use `rm -r addons/godot-mcp` (no `-f` flag).
+
+- **Pin a version** — `npx @yanhuifair/godot-mcp@1.11.0 …`; **force latest** — `npx @yanhuifair/godot-mcp@latest …`.
+- **Global install** — `npm update -g @yanhuifair/godot-mcp`.
+- **From source** — `git pull && npm run build`.
+- **Check your version** — `npx @yanhuifair/godot-mcp --version`.
+
+> **Upgrading from v1.9.0?** That release shipped an editor plugin whose `runtime_bridge.gd` failed to parse in Godot 4.7 (a `_input` function colliding with the built-in `Node._input`, plus an untyped `_resolve`). If your editor logs those parse errors, delete `addons/godot-mcp` and re-run `--enable-plugin` to install the fixed plugin.
+
+See [CHANGELOG](CHANGELOG.md) for the complete history. **v1.11.0** added export-preset writing (`create_export_preset` / `update_export_preset` / `remove_export_preset`), localization writing (`create_po_translation` / `register_translation` / `unregister_translation`), and a read-only / path-sandbox security pass.
+
 ### Command-Line Options
 
 | Flag | What it does |
