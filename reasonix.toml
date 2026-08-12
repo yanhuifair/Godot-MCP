@@ -72,5 +72,5 @@ network = true
 
 [[plugins]]
 name    = "godot-mcp"
-command = "node"
-args    = ["/Users/Fair/Desktop/Godot-MCP/dist/index.js"]
+command = "npx"
+args    = ["-y", "@yanhuifair/godot-mcp", "-p", "."]
