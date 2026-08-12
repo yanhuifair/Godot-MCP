@@ -1,4 +1,10 @@
 # Changelog
+## v1.11.2 (2026-08-13)
+
+### Docs & config
+- README / README-zh: new AI-client configs for **Hermes**, **OpenClaw**, **Reasonix** and **WorkBuddy / CodeBuddy**; "Pick Your Client" tables and the client count (18 → 22) updated.
+- `reasonix.toml`: godot-mcp plugin now uses the portable `npx -y @yanhuifair/godot-mcp -p .` form (was a machine-specific `node` path).
+
 ## v1.11.1 (2026-08-13)
 
 ### Fix — `.import` files written by `write_import_config` were rejected by Godot 4.7

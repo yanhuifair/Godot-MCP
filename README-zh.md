@@ -104,7 +104,7 @@ npx @yanhuifair/godot-mcp --enable-plugin -p .
 > `npx @yanhuifair/godot-mcp --enable-plugin -p /Users/me/games/my-game`
 
 > **默认就装最新版。** `npx` 每次都会拉取最新版本。要强制最新或锁定某个版本：
-> `npx @yanhuifair/godot-mcp@latest --enable-plugin -p .`（最新）· `npx @yanhuifair/godot-mcp@1.11.1 --enable-plugin -p .`（锁定）
+> `npx @yanhuifair/godot-mcp@latest --enable-plugin -p .`（最新）· `npx @yanhuifair/godot-mcp@1.11.2 --enable-plugin -p .`（锁定）
 
 **这条命令做了什么：** 把插件复制到 `addons/godot-mcp/`，并直接在 `project.godot` 里把它打开。不需要你在 Godot 里点任何按钮。
 
@@ -511,7 +511,7 @@ npx @yanhuifair/godot-mcp -t all --port 3000 -p /path/to/your/godot/project
 
 ```bash
 curl http://127.0.0.1:3000/health
-# {"status":"ok","version":"1.11.1","projectRoot":"/path/to/project","endpoints":{...}}
+# {"status":"ok","version":"1.11.2","projectRoot":"/path/to/project","endpoints":{...}}
 ```
 
 ---
@@ -578,7 +578,7 @@ node dist/index.js -p /path/to/your/godot/project
 
 | 检查项 | 怎么做 | 预期结果 |
 |---|---|---|
-| 服务器版本 | `npx @yanhuifair/godot-mcp --version` | 一个版本号（如 `1.11.1`） |
+| 服务器版本 | `npx @yanhuifair/godot-mcp --version` | 一个版本号（如 `1.11.2`） |
 | 插件文件 | 看 `addons/godot-mcp/` 目录 | 有 `plugin.cfg`、`plugin.gd`、`runtime_bridge.gd` |
 | 插件已启用 | 打开 `project.godot` | `[editor_plugins]` 里有 `enabled = PackedStringArray("res://addons/godot-mcp/plugin.cfg")` |
 | 服务器能启动 | `npx @yanhuifair/godot-mcp -p .`（Ctrl+C 结束） | 打印工具数量，如 `386 tools` |
@@ -609,14 +609,14 @@ rm -rf addons/godot-mcp && npx -y @yanhuifair/godot-mcp@latest --enable-plugin -
 
 > Windows PowerShell 请用 `rm -r addons/godot-mcp`（不带 `-f`）。
 
-- **锁定某个版本** —— `npx @yanhuifair/godot-mcp@1.11.1 …`；**强制用最新** —— `npx @yanhuifair/godot-mcp@latest …`。
+- **锁定某个版本** —— `npx @yanhuifair/godot-mcp@1.11.2 …`；**强制用最新** —— `npx @yanhuifair/godot-mcp@latest …`。
 - **全局安装** —— `npm update -g @yanhuifair/godot-mcp`。
 - **从源码构建** —— `git pull && npm run build`。
 - **查看当前版本** —— `npx @yanhuifair/godot-mcp --version`。
 
 > **从 v1.9.0 升级？** 那个版本自带的编辑器插件里 `runtime_bridge.gd` 在 Godot 4.7 会解析失败（`_input` 函数与内置的 `Node._input` 冲突，且 `_resolve` 缺少返回类型）。如果编辑器报这些解析错误，删掉 `addons/godot-mcp` 再重跑 `--enable-plugin` 即可装上修复后的插件。
 
-完整变更历史见 [CHANGELOG](CHANGELOG.md)。**v1.11.1** 新增了导出预设写入（`create_export_preset` / `update_export_preset` / `remove_export_preset`）、本地化写入（`create_po_translation` / `register_translation` / `unregister_translation`），以及一轮只读模式 / 路径沙箱安全加固。
+完整变更历史见 [CHANGELOG](CHANGELOG.md)。**v1.11.2** 新增了导出预设写入（`create_export_preset` / `update_export_preset` / `remove_export_preset`）、本地化写入（`create_po_translation` / `register_translation` / `unregister_translation`），以及一轮只读模式 / 路径沙箱安全加固。
 
 ### 命令行参数
 
@@ -2099,13 +2099,13 @@ npm run check:godot  # 在真实的无头 Godot 中加载全部测试资源，�
 
 ```bash
 npm run vsix
-# 输出: godot-mcp-1.11.1.vsix
+# 输出: godot-mcp-1.11.2.vsix
 ```
 
 在 VS Code 中安装：
 
 ```bash
-code --install-extension godot-mcp-1.11.1.vsix
+code --install-extension godot-mcp-1.11.2.vsix
 ```
 
 ---
