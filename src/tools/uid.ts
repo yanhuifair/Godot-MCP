@@ -96,6 +96,7 @@ export function handleUpdateProjectUids(
 
     const missingUids: { file: string; type: string }[] = [];
     const fixedFiles: string[] = [];
+    const unreadable: { file: string; reason: string }[] = [];
 
     for (const file of [...sceneFiles, ...tresFiles]) {
       try {
@@ -118,23 +119,36 @@ export function handleUpdateProjectUids(
         } else if (!args.check_only) {
           fixedFiles.push(file);
         }
-      } catch { /* skip */ }
+      } catch (err: any) {
+        // 读失败以前被静默吞掉，于是 check_only 会理直气壮地报
+        // 「All N files have UIDs.」——实际有文件压根没读成功。如实计入待修清单。
+        unreadable.push({ file, reason: err?.message ?? String(err) });
+      }
     }
 
     const lines: string[] = [];
 
     if (args.check_only) {
-      if (missingUids.length === 0) {
+      if (missingUids.length === 0 && unreadable.length === 0) {
         lines.push(`All ${sceneFiles.length + tresFiles.length} files have UIDs.`);
       } else {
-        lines.push(`Missing UIDs: ${missingUids.length} files`);
-        lines.push('');
-        for (const m of missingUids) {
-          lines.push(`  ${m.type}: ${m.file}`);
+        if (missingUids.length > 0) {
+          lines.push(`Missing UIDs: ${missingUids.length} files`);
+          lines.push('');
+          for (const m of missingUids) {
+            lines.push(`  ${m.type}: ${m.file}`);
+          }
+          lines.push('');
+          lines.push('To fix: run fix_missing_uids (mints spec-correct base-34 UIDs in place),');
+          lines.push('or open the project in Godot 4.x and use Project → Tools → Update UIDs.');
         }
-        lines.push('');
-        lines.push('To fix: run fix_missing_uids (mints spec-correct base-34 UIDs in place),');
-        lines.push('or open the project in Godot 4.x and use Project → Tools → Update UIDs.');
+        if (unreadable.length > 0) {
+          if (missingUids.length > 0) lines.push('');
+          lines.push(`Unreadable: ${unreadable.length} files (status UNKNOWN — they were not checked)`);
+          for (const u of unreadable) {
+            lines.push(`  ${u.file}: ${u.reason}`);
+          }
+        }
       }
     } else {
       lines.push(`UID Check Complete: ${sceneFiles.length + tresFiles.length} files scanned`);
@@ -145,6 +159,13 @@ export function handleUpdateProjectUids(
         lines.push('Files missing UIDs (need Godot editor to fix):');
         for (const m of missingUids) {
           lines.push(`  ${m.type}: ${m.file}`);
+        }
+      }
+      if (unreadable.length > 0) {
+        lines.push('');
+        lines.push(`Unreadable: ${unreadable.length} files (not checked)`);
+        for (const u of unreadable) {
+          lines.push(`  ${u.file}: ${u.reason}`);
         }
       }
     }

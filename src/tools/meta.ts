@@ -4,7 +4,7 @@
 // Godot MCP Server — Meta / Discovery / Diagnostics
 // ============================================================
 // Helps the AI client navigate the (large) tool catalog and diagnose
-// which subsystems are available — directly addressing the "345 tools
+// which subsystems are available — directly addressing the "386 tools
 // won't fit a client tool budget" and "opaque failures" problems.
 
 import { z } from 'zod';
@@ -104,7 +104,7 @@ export async function handleGetStatus(args: { probe_runtime?: boolean }): Promis
 
   out.push(`Tools total   : ${total}`);
   out.push('', 'Subsystems available via this server:');
-  out.push('  • 345+ file-path tools (edit .tscn/.tres/.gd/.import without the editor)');
+  out.push('  • 235 file-path tools (edit .tscn/.tres/.gd/.import without the editor)');
   out.push('  • editor bridge (live scene/node/script/debugger control on :9876)');
   out.push('  • ClassDB introspection (editor_get_class_list / _method_list / _property_list / _signal_list)');
   out.push('  • live-game runtime bridge (runtime_* tools, requires autoload)');

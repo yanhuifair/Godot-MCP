@@ -1,4 +1,51 @@
 # Changelog
+## v1.12.0 (2026-09-21)
+
+### Security — full audit, three sandbox escapes fixed (all proven by PoC)
+
+Every item below was reproduced with a runnable proof-of-concept before the fix and re-run after it.
+
+- **Arbitrary file read via `log_path` (high).** `read_game_log` resolved `debug/file_logging/log_path` from `project.godot` and, for an **absolute** path, read it verbatim — with no sandbox check at all. A cloned, untrusted project could set `log_path="/etc/hosts"` and the tool returned the file (`isError: false`). It also bypassed the `.godot/export_credentials.cfg` guard, and because `read_game_log` is *not* a write tool, `--read-only` (the mode the README recommends for unfamiliar projects) did not stop it. All four path forms are now sandboxed: `user://` inside the Godot user-data dir, `res://` and relative paths inside the project root, and absolute paths only if they land inside one of those two — re-checked through the standard sandbox so the credentials guard still applies.
+- **Config injection → code execution (high).** `write_project_config` passed `section` / `key` / `value` straight into `project.godot` line by line. A newline in `value` injected a whole new section — e.g. `[autoload] Evil="*res://evil.gd"`, and autoloads execute on editor/game start. Line breaks are now rejected for all three fields, section/key names are validated against structural characters, and the export-preset / autoload / log-path writers escape their values (`cfgQuote`). `cfgValue` no longer passes a multi-line quoted or `Object(...)` literal through untouched.
+- **Symlink write escape (medium).** `resolveProjectPath` only called `realpathSync` when the target already existed, so a symlinked directory inside the project passed the prefix check and writes followed the link outside the root. The parent chain is now realpath-resolved even for not-yet-existing targets. Case-insensitive prefix comparison is also limited to Windows/macOS, so a sibling `/a/PROJ` can no longer impersonate `/a/proj` on Linux.
+
+### Security — hardening
+- `GET /health` no longer discloses the absolute `projectRoot` unless the request is loopback or carries a valid `GODOT_MCP_TOKEN` (it is intentionally unauthenticated for probes, but must not leak paths on a LAN/remote deployment).
+- `list_projects` accepted any `directory` and enumerated up to 4 levels deep, echoing absolute paths. It is now confined to the project root and the server working directory; `GODOT_MCP_SCAN_ROOT=<dir>` widens it deliberately.
+
+### Fixed — silent failures that produced false success
+- `edit_scene` skipped operations whose `node_path` did not resolve and reported success regardless: removing a nonexistent node printed `- removed "X"` while the file was untouched. `editScene` now returns a report, every caller surfaces "Not applied", and a batch where **nothing** applied returns an error instead of a success message. Unknown actions are reported too.
+- `list_missing_uids --check-only` could print `All N files have UIDs.` while some files had failed to read. Unreadable files are now counted and listed as `status UNKNOWN`.
+- Unreadable directories/files during `list_project_files`, `search_in_project` and `findFilesByExtension` are no longer treated as "empty"; they are logged to stderr.
+- `read_export_presets` reported a permission/IO error as "No export_presets.cfg found in this project" (i.e. "your export config is gone"). Only a genuine `ENOENT` says that now.
+- Malformed JSON frames from the editor plugin are logged instead of dropped silently (which left the caller waiting for the 30 s TCP timeout).
+
+### Fixed — `project.godot` round-trip damage
+- `serializeConfig` moved **all** comments to the top of the file, losing which section each belonged to, and dropped blank lines — so writing a single key reshuffled the whole file. Comments are now anchored to the key they follow and emitted in place; section spacing matches Godot's own writer. Round-trips are byte-stable.
+- Writing a plain unquoted value (e.g. `My Game`) produced invalid `project.godot` syntax; such values are now written as proper string literals.
+
+### Fixed — error reporting
+- `INTERNAL_ERROR` (the busiest code by far — 236 call sites) had **no** entry in `SOLUTION_MAP`, so the most common errors returned zero repair hints. Added, along with `BINARY_UNSUPPORTED` and `PROCESS_ERROR`.
+- `read_resource` reported a binary `.res` as `INTERNAL_ERROR` ("server broke") instead of `BINARY_UNSUPPORTED` ("unsupported format").
+- Process failures in `launch_editor` / `run_project` / `stop_project` now use `PROCESS_ERROR`, and CLI failures use `GODOT_CLI_ERROR`, instead of everything being `INTERNAL_ERROR`.
+
+### Tests
+- New `test/sandbox.test.ts` (20 tests): path traversal, symlink escape (read **and** write), credentials-file access, `log_path` boundary cases, config-injection attempts, comment placement and round-trip stability, and the `edit_scene` false-success cases. Previously **nothing** in `test/` covered the path sandbox — which is why the symlink escape went unnoticed.
+- New doc-drift gates in `test/structural.test.ts`: the shields badge, hero heading, stated total, the per-category table sum (and its row count) in both READMEs, and `package.json`'s `description` must all equal the real registry count. This immediately caught `package.json` still advertising "358 tools" on npm. Also asserts every `src/**/*.ts` keeps its licence header.
+- `test/smoke_all_tools.mjs` printed `PASSED` but never exited (the stub servers kept the event loop alive) — it now exits explicitly, so it can run in CI.
+- `test/test_all.mjs` ran **directly against the tracked fixture** `test/test-project`, so every run dirtied `project.godot` and inherited state left over from the previous run. It now copies the project to a temp directory first (as the smoke suite already did) and cleans up on exit.
+- Suite total: **223 tests (153 runnable + 70 integration)**.
+
+### CI
+- Node matrix 18/20 → **20/22** (18 is EOL; 22 is the local dev version), added `tsc --noEmit`, `test_all.mjs` and `smoke_all_tools.mjs` — none of which CI ran before.
+- Integration job now installs **Godot 4.7.2** (matching local verification) instead of 4.4.1, and also runs the real-engine `check:godot` load gate.
+
+### Docs & housekeeping
+- `package.json`: `description` said "358 tools" (this is the subtitle shown on npm) → 386; `engines.node` `>=18` → `>=20`.
+- README / README-zh: stale test counts (197/127) → 223/153; `get_status` said "345+ file-path tools" → 235.
+- Removed dead code: `sendEditorCommandRaw`, `isEditorHealthy` (+ its write-only health cache), `killProcess`, `shutdownGameBridge`. `PROCESS_ERROR` and `BINARY_UNSUPPORTED` are no longer unused enum members.
+- `reasonix.toml`: restored the `[[plugins]]` godot-mcp entry, which had been stripped by a CLI rewrite of the file.
+
 ## v1.11.2 (2026-08-13)
 
 ### Docs & config

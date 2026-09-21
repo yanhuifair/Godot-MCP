@@ -56,9 +56,22 @@ export interface GodotDocument {
 
 // ---- Config Types ----
 
+export interface ConfigComment {
+  /** 该注释紧跟在哪个 key 之后；null 表示位于该 section 第一条 key 之前。 */
+  afterKey: string | null;
+  text: string;
+}
+
 export interface ConfigDocument {
   sections: Record<string, Record<string, string>>;
+  /** 文件级注释（第一个 [section] 之前的部分）。 */
   comments?: string[];
+  /**
+   * section 内部的注释，按「它在哪个 key 之后」锚定。
+   * 若不做这个区分，序列化时只能把段内注释全部倒到文件头，
+   * 注释与它描述的配置项就失联了（每次改一个键都会重排整个文件）。
+   */
+  sectionComments?: Record<string, ConfigComment[]>;
 }
 
 // ---- Resource Types ----

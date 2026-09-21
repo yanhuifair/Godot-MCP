@@ -465,11 +465,32 @@ function emitFlatNode(lines: string[], entry: FlatNodeEntry): void {
 // Scene Editing
 // ============================================================
 
+/** 一条被跳过的操作。以前这些跳过是静默的，调用方会误以为改成功了。 */
+export interface SceneEditSkip {
+  action: string;
+  target: string;
+  reason: string;
+}
+
+/** 操作执行报告（可选传入，用于把「没做成的事」如实回报给用户）。 */
+export interface SceneEditReport {
+  applied: number;
+  skipped: SceneEditSkip[];
+}
+
 /**
  * Parse a scene, apply operations, and return the modified string.
+ *
+ * 传入 `report` 时会记录每次失败/跳过。**必须传**——不传的话「删了一个不存在的
+ * 节点」和「真的删掉了」在返回值上完全一样，调用方只能报一个假成功。
  */
-export function editScene(content: string, operations: SceneOperation[]): string {
+export function editScene(content: string, operations: SceneOperation[], report?: SceneEditReport): string {
   const doc = parseScene(content);
+
+  /** 记一条未执行的操作。 */
+  const skipped = (action: string, target: string, reason: string) => {
+    report?.skipped.push({ action, target, reason });
+  };
 
   // Flatten nodes for operation targeting
   const flatMap = new Map<string, { node: NodeDefinition; parentPath: string }>();
@@ -552,6 +573,7 @@ export function editScene(content: string, operations: SceneOperation[]): string
           };
           doc.nodes.push(newRoot);
           doc.nodes = buildNodeHierarchy(doc.nodes);
+          if (report) report.applied++;
           break;
         }
 
@@ -571,13 +593,20 @@ export function editScene(content: string, operations: SceneOperation[]): string
         flatMap.set(newFull, entry);
         if (!byName.has(newNode.name)) byName.set(newNode.name, []);
         byName.get(newNode.name)!.push(entry);
+        if (report) report.applied++;
         break;
       }
 
       case 'modify_node': {
-        if (!op.node_path) continue;
+        if (!op.node_path) {
+          skipped('modify_node', '(missing node_path)', 'node_path is required');
+          break;
+        }
         const info = resolveNode(op.node_path);
-        if (!info) continue;
+        if (!info) {
+          skipped('modify_node', op.node_path, 'no node in this scene matches that path');
+          break;
+        }
         if (op.properties) {
           Object.assign(info.node.properties, op.properties);
         }
@@ -587,13 +616,20 @@ export function editScene(content: string, operations: SceneOperation[]): string
         if (op.groups) {
           info.node.groups = op.groups;
         }
+        if (report) report.applied++;
         break;
       }
 
       case 'remove_node': {
-        if (!op.node_path) continue;
+        if (!op.node_path) {
+          skipped('remove_node', '(missing node_path)', 'node_path is required');
+          break;
+        }
         const info = resolveNode(op.node_path);
-        if (!info) continue;
+        if (!info) {
+          skipped('remove_node', op.node_path, 'no node in this scene matches that path');
+          break;
+        }
 
         if (info.parentPath === '') {
           // Root node - remove from doc.nodes
@@ -605,11 +641,15 @@ export function editScene(content: string, operations: SceneOperation[]): string
             parentInfo.node.children = parentInfo.node.children.filter(c => c !== info.node);
           }
         }
+        if (report) report.applied++;
         break;
       }
 
       case 'add_connection': {
-        if (!op.signal || !op.from_node || !op.to_node || !op.method_name) continue;
+        if (!op.signal || !op.from_node || !op.to_node || !op.method_name) {
+          skipped('add_connection', op.signal || '(missing signal)', 'signal, from_node, to_node and method_name are all required');
+          break;
+        }
         doc.connections.push({
           signal: op.signal,
           from: op.from_node,
@@ -618,22 +658,38 @@ export function editScene(content: string, operations: SceneOperation[]): string
           flags: op.flags,
           unbinds: op.unbinds,
         });
+        if (report) report.applied++;
         break;
       }
 
       case 'remove_connection': {
-        if (!op.signal || !op.from_node || !op.to_node || !op.method_name) continue;
+        if (!op.signal || !op.from_node || !op.to_node || !op.method_name) {
+          skipped('remove_connection', op.signal || '(missing signal)', 'signal, from_node, to_node and method_name are all required');
+          break;
+        }
+        const before = doc.connections.length;
         doc.connections = doc.connections.filter(c =>
           !(c.signal === op.signal && c.from === op.from_node &&
             c.to === op.to_node && c.method === op.method_name)
         );
+        if (doc.connections.length === before) {
+          skipped('remove_connection', `${op.from_node} → ${op.to_node}.${op.method_name}`, 'no matching connection in this scene');
+          break;
+        }
+        if (report) report.applied++;
         break;
       }
 
       case 'clone_node': {
-        if (!op.clone_source) continue;
+        if (!op.clone_source) {
+          skipped('clone_node', '(missing clone_source)', 'clone_source is required');
+          break;
+        }
         const srcInfo = resolveNode(op.clone_source);
-        if (!srcInfo) continue;
+        if (!srcInfo) {
+          skipped('clone_node', op.clone_source, 'no node in this scene matches that path');
+          break;
+        }
 
         // Deep clone the node
         const clone = deepCloneNode(srcInfo.node);
@@ -649,6 +705,7 @@ export function editScene(content: string, operations: SceneOperation[]): string
           // rather than dropping the operation silently.
           clone.parent = undefined;
           doc.nodes.push(clone);
+          if (report) report.applied++;
           break;
         }
 
@@ -659,6 +716,11 @@ export function editScene(content: string, operations: SceneOperation[]): string
         flatMap.set(`${parentFull}/${clone.name}`, cloneEntry);
         if (!byName.has(clone.name)) byName.set(clone.name, []);
         byName.get(clone.name)!.push(cloneEntry);
+        if (report) report.applied++;
+        break;
+      }
+      default: {
+        skipped(String((op as any).action ?? '(unknown)'), '', 'unknown action — supported: add_node, modify_node, remove_node, add_connection, remove_connection, clone_node');
         break;
       }
     }

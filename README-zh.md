@@ -104,7 +104,7 @@ npx @yanhuifair/godot-mcp --enable-plugin -p .
 > `npx @yanhuifair/godot-mcp --enable-plugin -p /Users/me/games/my-game`
 
 > **默认就装最新版。** `npx` 每次都会拉取最新版本。要强制最新或锁定某个版本：
-> `npx @yanhuifair/godot-mcp@latest --enable-plugin -p .`（最新）· `npx @yanhuifair/godot-mcp@1.11.2 --enable-plugin -p .`（锁定）
+> `npx @yanhuifair/godot-mcp@latest --enable-plugin -p .`（最新）· `npx @yanhuifair/godot-mcp@1.12.0 --enable-plugin -p .`（锁定）
 
 **这条命令做了什么：** 把插件复制到 `addons/godot-mcp/`，并直接在 `project.godot` 里把它打开。不需要你在 Godot 里点任何按钮。
 
@@ -358,7 +358,7 @@ godot-mcp/
 │   └── godot-mcp/            # Godot 编辑器插件
 │       ├── plugin.cfg         # 插件元数据
 │       └── plugin.gd          # stdin 读取器、TCP 服务器、102 个命令处理器
-├── test/                     # Vitest 套件（197 个测试：127 个可运行 + 70 个集成需要真实 Godot 项目）+ 旧版 .mjs 套件
+├── test/                     # Vitest 套件（219 个测试：149 个可运行 + 70 个集成需要真实 Godot 项目）+ 旧版 .mjs 套件
 │   ├── test_all.mjs          # 旧版独立套件（176 项工具检查）
 │   ├── test_editor.mjs       # Editor 桥 TCP 测试
 │   ├── test_runner.mjs       # 早期集成测试
@@ -418,7 +418,9 @@ godot-mcp/
 
 ### 安全保障
 
-- **路径穿越防护**：所有文件操作验证解析后的路径保持在项目根目录内
+- **路径穿越防护**：所有文件操作验证解析后的路径保持在项目根目录内——含符号链接逃逸（即使目标文件还不存在，也会对父目录链做 realpath 解析），以及 `.godot/export_credentials.cfg` 签名密钥（任何工具都不得读写）
+- **工程配置里的路径也当不可信输入**：`project.godot` 中的 `log_path` 只能指向工程根或 Godot 用户数据目录；`list_projects` 只扫描工程根与服务器工作目录（确有需要可用 `GODOT_MCP_SCAN_ROOT` 显式放宽）
+- **不做配置注入**：写入 `section` / `key` / `value` 时拒绝换行与结构字符，值永远无法在 `project.godot` 里凭空新增一个段（被注入的 `[autoload]` 会执行脚本）
 - **自动备份**：脚本和场景文件的写操作会创建 `.bak` 备份副本
 - **只读模式**：`--read-only`（或 `GODOT_MCP_READ_ONLY=true`）通过维护的白名单拒绝218 个写/副作用工具（write_、create_、delete_、move_、set_、edit_、editor_* 变更类、run/export/launch 等）——它们从 `tools/list` 中隐藏，直接调用时返回 `READ_ONLY` 错误
 - **TCP 仅限本机**：编辑器插件的 TCP 桥只绑定 `127.0.0.1`，绝不暴露到局域网
@@ -511,7 +513,7 @@ npx @yanhuifair/godot-mcp -t all --port 3000 -p /path/to/your/godot/project
 
 ```bash
 curl http://127.0.0.1:3000/health
-# {"status":"ok","version":"1.11.2","projectRoot":"/path/to/project","endpoints":{...}}
+# {"status":"ok","version":"1.12.0","projectRoot":"/path/to/project","endpoints":{...}}
 ```
 
 ---
@@ -541,7 +543,7 @@ npx -y @yanhuifair/godot-mcp -p /path/to/your/godot/project
 ### 方式 B —— 全局安装
 
 ```bash
-npm install -g @yanhuifair/godot-mcp
+npm install -g @yanhuifair/godot-mcp@latest
 
 # 之后在任意位置都能直接用命令名调用
 godot-mcp -p /path/to/your/godot/project
@@ -578,7 +580,7 @@ node dist/index.js -p /path/to/your/godot/project
 
 | 检查项 | 怎么做 | 预期结果 |
 |---|---|---|
-| 服务器版本 | `npx @yanhuifair/godot-mcp --version` | 一个版本号（如 `1.11.2`） |
+| 服务器版本 | `npx @yanhuifair/godot-mcp --version` | 一个版本号（如 `1.12.0`） |
 | 插件文件 | 看 `addons/godot-mcp/` 目录 | 有 `plugin.cfg`、`plugin.gd`、`runtime_bridge.gd` |
 | 插件已启用 | 打开 `project.godot` | `[editor_plugins]` 里有 `enabled = PackedStringArray("res://addons/godot-mcp/plugin.cfg")` |
 | 服务器能启动 | `npx @yanhuifair/godot-mcp -p .`（Ctrl+C 结束） | 打印工具数量，如 `386 tools` |
@@ -609,14 +611,14 @@ rm -rf addons/godot-mcp && npx -y @yanhuifair/godot-mcp@latest --enable-plugin -
 
 > Windows PowerShell 请用 `rm -r addons/godot-mcp`（不带 `-f`）。
 
-- **锁定某个版本** —— `npx @yanhuifair/godot-mcp@1.11.2 …`；**强制用最新** —— `npx @yanhuifair/godot-mcp@latest …`。
+- **锁定某个版本** —— `npx @yanhuifair/godot-mcp@1.12.0 …`；**强制用最新** —— `npx @yanhuifair/godot-mcp@latest …`。
 - **全局安装** —— `npm update -g @yanhuifair/godot-mcp`。
 - **从源码构建** —— `git pull && npm run build`。
 - **查看当前版本** —— `npx @yanhuifair/godot-mcp --version`。
 
 > **从 v1.9.0 升级？** 那个版本自带的编辑器插件里 `runtime_bridge.gd` 在 Godot 4.7 会解析失败（`_input` 函数与内置的 `Node._input` 冲突，且 `_resolve` 缺少返回类型）。如果编辑器报这些解析错误，删掉 `addons/godot-mcp` 再重跑 `--enable-plugin` 即可装上修复后的插件。
 
-完整变更历史见 [CHANGELOG](CHANGELOG.md)。**v1.11.2** 新增了导出预设写入（`create_export_preset` / `update_export_preset` / `remove_export_preset`）、本地化写入（`create_po_translation` / `register_translation` / `unregister_translation`），以及一轮只读模式 / 路径沙箱安全加固。
+完整变更历史见 [CHANGELOG](CHANGELOG.md)。**v1.12.0** 是一次安全版本：修掉了三个已用 PoC 证实的沙箱逃逸（`log_path` 任意文件读取、`write_project_config` 注入 `[autoload]`、`resolveProjectPath` 符号链接写逃逸），终结了 `edit_scene` 对未执行操作谎报成功，重写 `project.godot` 时不再打乱注释位置，并新增 20 项沙箱回归测试与文档漂移门禁。
 
 ### 命令行参数
 
@@ -2061,7 +2063,7 @@ npx @yanhuifair/godot-mcp --enable-plugin -p /path/to/your/godot/project
 npm install          # 安装依赖
 npm run build        # 构建 TypeScript 到 dist/
 npm run dev          # 开发模式（tsx 热重载）
-npm test             # 运行 vitest 套件（197 个测试：127 个可运行 + 70 个集成需要真实 Godot 项目）；node test/test_all.mjs 运行 176 项旧版检查
+npm test             # 运行 vitest 套件（219 个测试：149 个可运行 + 70 个集成需要真实 Godot 项目）；node test/test_all.mjs 运行 176 项旧版检查
 npm run test:watch   # 监听模式
 npm run check:godot  # 在真实的无头 Godot 中加载全部测试资源，校验
                      # ext_resource 路径、UID 与 SubResource 引用（需已安装 Godot）
@@ -2099,13 +2101,13 @@ npm run check:godot  # 在真实的无头 Godot 中加载全部测试资源，�
 
 ```bash
 npm run vsix
-# 输出: godot-mcp-1.11.2.vsix
+# 输出: godot-mcp-1.12.0.vsix
 ```
 
 在 VS Code 中安装：
 
 ```bash
-code --install-extension godot-mcp-1.11.2.vsix
+code --install-extension godot-mcp-1.12.0.vsix
 ```
 
 ---

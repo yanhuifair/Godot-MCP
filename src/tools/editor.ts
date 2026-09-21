@@ -20,7 +20,6 @@ const EDITOR_PORT = 9876;
 const TCP_CONNECT_TIMEOUT = 800;   // quick probe for an existing editor on 127.0.0.1
 const TCP_RESPONSE_TIMEOUT = 30000; // per-request response wait (heavy ops: bake, reimport, run_gdscript)
 const SPAWN_TIMEOUT = 15000;
-const HEALTH_CACHE_MS = 60000;  // 60s health cache (was 30s)
 const MAX_RESTART_ATTEMPTS = 3;
 const RESPONSE_MARKER = '__MCP__:';
 
@@ -28,8 +27,6 @@ let _editorProcess: ChildProcess | null = null;
 let _pendingRequests: Map<number, { resolve: (value: any) => void; reject: (err: Error) => void }> = new Map();
 let _stdoutBuffer = '';
 let _projectRoot: string | null = null;
-let _lastHealthCheck = 0;
-let _lastHealthStatus = false;
 let _useTcp: boolean | null = null; // null = unknown, true = TCP, false = spawn
 let _restartAttempts = 0;
 /** Monotonic request id so concurrent commands never collide in the pending Maps. */
@@ -87,8 +84,6 @@ function getTcpConnection(): Promise<net.Socket> {
       client.removeListener('error', onConnectError);
       _tcpClient = client;
       _tcpConnecting = null;
-      _lastHealthCheck = Date.now();
-      _lastHealthStatus = true;
       _useTcp = true;
 
       // 插件若配置了 auth_token（GODOT_MCP_TOKEN），TCP 连接必须先完成 auth 握手。
@@ -117,12 +112,15 @@ function getTcpConnection(): Promise<net.Socket> {
                 pending.resolve(response.result);
               }
             }
-          } catch {}
+          } catch {
+            // 插件偶尔会给出不完整/非 JSON 的一行（例如握手期的裸文本）。
+            // 静默吞掉会让调用方只能干等 TCP_RESPONSE_TIMEOUT，所以至少留个痕。
+            console.error(`[Godot MCP] Ignoring malformed editor response: ${line.slice(0, 200)}`);
+          }
         }
       });
 
       client.on('error', () => {
-        _lastHealthStatus = false;
         _tcpClient = null;
         _useTcp = null; // connection lost → re-probe / spawn fallback on next call
         for (const [, p] of _tcpPending) {
@@ -204,13 +202,6 @@ export async function probeEditor(probeTimeoutMs = 1500): Promise<any | null> {
   }
 }
 
-/** 绕过业务错误检查的原始通道（供本身就要读 result.error 的命令使用）。 */
-export function sendEditorCommandRaw(method: string, params: Record<string, any> = {}): Promise<any> {
-  if (_useTcp === true) return sendViaTcp(method, params);
-  if (_useTcp === false) return sendViaSpawn(method, params);
-  return sendViaTcp(method, params).catch(() => sendViaSpawn(method, params));
-}
-
 // ---- TCP mode (persistent connection to already-running Godot) ----
 
 async function sendViaTcp(method: string, params: Record<string, any> = {}): Promise<any> {
@@ -272,8 +263,6 @@ function ensureEditorProcess(): ChildProcess {
               resolver.reject(new Error(json.error.message || 'Editor error'));
             } else {
               resolver.resolve(json.result);
-              _lastHealthCheck = Date.now();
-              _lastHealthStatus = true;
             }
           }
         } catch { /* skip malformed */ }
@@ -288,7 +277,6 @@ function ensureEditorProcess(): ChildProcess {
 
   _editorProcess.on('exit', (code) => {
     console.error(`[Godot MCP] Editor process exited (code=${code})`);
-    _lastHealthStatus = false;
     for (const [, resolver] of _pendingRequests) {
       resolver.reject(new Error(`Editor process exited (code=${code})`));
     }
@@ -309,7 +297,6 @@ function ensureEditorProcess(): ChildProcess {
 
   _editorProcess.on('error', (err) => {
     console.error(`[Godot MCP] Failed to spawn editor: ${err.message}`);
-    _lastHealthStatus = false;
     _editorProcess = null;
     for (const [, resolver] of _pendingRequests) {
       resolver.reject(new Error(`Editor spawn error: ${err.message}`));
@@ -342,8 +329,7 @@ function sendViaSpawn(method: string, params: Record<string, any> = {}): Promise
         }
       }, SPAWN_TIMEOUT);
     } catch (err: any) {
-      _lastHealthStatus = false;
-      reject(new Error(`Editor not available: ${err.message}`));
+        reject(new Error(`Editor not available: ${err.message}`));
     }
   });
 }
@@ -352,12 +338,6 @@ function sendViaSpawn(method: string, params: Record<string, any> = {}): Promise
 export function initEditorBridge(projectRoot: string): void {
   _projectRoot = projectRoot;
   _restartAttempts = 0;
-}
-
-/** Check if editor is currently reachable */
-export function isEditorHealthy(): boolean {
-  if (Date.now() - _lastHealthCheck < HEALTH_CACHE_MS) return _lastHealthStatus;
-  return false;
 }
 
 /** Shut down the editor process gracefully */

@@ -469,6 +469,11 @@ async function main() {
   const fatal = crashed.length + timedOut.length + missingEditor.length + missingRuntime.length;
   if (fatal > 0) { console.log(`\n${R}FAILED${N}`); process.exit(1); }
   console.log(`\n${G}PASSED${N}`);
+
+  // 必须显式退出：桩服务和桥接层会留下未 unref 的 socket/定时器，光靠
+  // server.close() 不足以让事件循环排空。不退出的话脚本会一直挂着——
+  // 以前在终端里要 Ctrl+C，放进 CI 就是挂满作业超时。
+  process.exit(0);
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });

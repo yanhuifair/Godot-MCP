@@ -85,6 +85,27 @@ const SOLUTION_MAP: Partial<Record<ErrorCode, string[]>> = {
   [ErrorCode.PERMISSION_DENIED]: [
     'Check file permissions on the target path.',
   ],
+  // INTERNAL_ERROR 是所有兜底 catch 的落点，用量最大——以前这里没有条目，
+  // 于是 200+ 处错误一条修复建议都拿不到，反而是最需要指引的那一类。
+  [ErrorCode.INTERNAL_ERROR]: [
+    'This is an unhandled error — the message above carries the real reason (a Node error code, ' +
+      'a filesystem error, or an error string straight from Godot).',
+    'Check that the project is a valid Godot 4.x project: get_status reports the resolved project ' +
+      'root, whether the editor plugin is connected, and whether a game is running.',
+    'If the message mentions a file, confirm the path is project-relative and the file exists ' +
+      '(list_project_files, or read_scene for .tscn).',
+  ],
+  [ErrorCode.BINARY_UNSUPPORTED]: [
+    'This file is in Godot\'s binary format. Re-save it as text in the editor ' +
+      '(Scene → Save As → .tscn / .tres, and for resources use "Save as text"), then retry.',
+    'Binary .res/.scn files cannot be read or edited by the file parsers — the editor bridge ' +
+      'tools (editor_*) can still work with the open scene.',
+  ],
+  [ErrorCode.PROCESS_ERROR]: [
+    'A Godot child process failed to start, exited early, or could not be killed. ' +
+      'Run the same command manually in a terminal to see its stderr.',
+    'Check GODOT_PATH / GODOT_BIN points at a working Godot 4.x binary (get_godot_version verifies it).',
+  ],
 };
 
 /**

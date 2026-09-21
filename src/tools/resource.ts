@@ -154,7 +154,9 @@ export function handleReadResource(
     if (absPath.endsWith('.res')) {
       const buffer = fs.readFileSync(absPath);
       if (isBinaryResource(buffer)) {
-                return toolError(ErrorCode.INTERNAL_ERROR, `Cannot read "${args.path}": .res (binary) format is not supported. Only .tres (text) resources are readable.`);
+        // 这是「格式不支持」，不是「服务器内部错误」——报 INTERNAL_ERROR 会把
+        // 用户引向排查服务器，而正确动作是去编辑器里另存为文本格式。
+        return toolError(ErrorCode.BINARY_UNSUPPORTED, `Cannot read "${args.path}": .res (binary) format is not supported. Only .tres (text) resources are readable.`);
       }
     }
 

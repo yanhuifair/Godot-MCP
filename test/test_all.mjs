@@ -3,10 +3,22 @@
 // ============================================================
 import { resolve, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { readFileSync } from "node:fs";
+import { cpSync, rmSync, mkdtempSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const P = resolve(__dirname, "test-project");
+
+// 绝不直接写 tracked fixture：这个套件里有大量 create → mutate → cleanup 的用例，
+// 跑一次就会把 test/test-project/project.godot 改脏（并让下次运行继承了上次的残留状态）。
+// 与 smoke_all_tools.mjs 一样，把工程复制到临时目录后再跑。
+const SRC_PROJECT = resolve(__dirname, "test-project");
+const SANDBOX = mkdtempSync(join(tmpdir(), "godot-mcp-legacy-"));
+const P = join(SANDBOX, "test-project");
+cpSync(SRC_PROJECT, P, { recursive: true });
+
+const cleanup = () => { try { rmSync(SANDBOX, { recursive: true, force: true }); } catch { /* best effort */ } };
+process.on("exit", cleanup);
+process.on("SIGINT", () => { cleanup(); process.exit(130); });
 const G = "\x1b[32m",
   R = "\x1b[31m",
   Y = "\x1b[33m",

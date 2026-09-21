@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import pathMod from 'node:path';
 import { ToolResult, SceneOperation, SceneTemplateType, GodotDocument, NodeDefinition } from '../utils/types.js';
 import { readTextFile, writeTextFile, findFilesByExtension, findProjectRoot, resolveProjectPath, toResPath } from '../utils/file_utils.js';
-import { parseScene, serializeScene, generateSceneTemplate, editScene } from '../parsers/scene_parser.js';
+import { parseScene, serializeScene, generateSceneTemplate, editScene, SceneEditReport } from '../parsers/scene_parser.js';
 
 // ---- Tool Schemas ----
 
@@ -205,6 +205,34 @@ export function handleCreateScene(
   }
 }
 
+/**
+ * 一次操作全部落空时给出**错误**，而不是「成功」。
+ *
+ * 背景：editScene 以前对找不到的 node_path 直接跳过，调用方无条件回报
+ * "removed X" —— 删一个不存在的节点，用户看到成功、文件却没变。
+ * 返回 null 表示至少有一条生效了（部分失败由 skippedNote 补充说明）。
+ */
+function allOpsFailed(scenePath: string, report: SceneEditReport): ToolResult | null {
+  if (report.skipped.length === 0 || report.applied > 0) return null;
+  const detail = report.skipped
+    .map((s) => `  - ${s.action} ${s.target}: ${s.reason}`)
+    .join('\n');
+  return toolError(
+    ErrorCode.NOT_FOUND,
+    `No operation was applied to ${scenePath} — the file was left untouched.`,
+    `Skipped:\n${detail}\n\nUse read_scene (or get_scene_tree) to confirm the node paths first.`
+  );
+}
+
+/** 部分成功时，把没做成的那几条如实附在成功消息后面。 */
+function skippedNote(report: SceneEditReport): string {
+  if (report.skipped.length === 0) return '';
+  const detail = report.skipped
+    .map((s) => `  - ${s.action} ${s.target}: ${s.reason}`)
+    .join('\n');
+  return `\n\nNot applied (${report.skipped.length} of ${report.skipped.length + report.applied}):\n${detail}`;
+}
+
 export function handleEditScene(
   projectRoot: string,
   args: { path: string; operations: SceneOperation[] }
@@ -212,7 +240,10 @@ export function handleEditScene(
   try {
     const absPath = resolveProjectPath(projectRoot, args.path);
     const { content } = readTextFile(absPath);
-    const modified = editScene(content, args.operations);
+    const report: SceneEditReport = { applied: 0, skipped: [] };
+    const modified = editScene(content, args.operations, report);
+    const failed = allOpsFailed(args.path, report);
+    if (failed) return failed;
     writeTextFile(absPath, modified, true); // backup enabled
 
     const opsSummary = args.operations.map(op => {
@@ -228,7 +259,7 @@ export function handleEditScene(
     }).join('\n');
 
     return {
-      content: [{ type: 'text', text: `Scene edited: ${args.path}\n\nOperations:\n${opsSummary}` }],
+      content: [{ type: 'text', text: `Scene edited: ${args.path} (${report.applied}/${args.operations.length} applied)\n\nOperations:\n${opsSummary}${skippedNote(report)}` }],
     };
   } catch (err: any) {
         return toolError(ErrorCode.INTERNAL_ERROR, `Error editing scene: ${err.message}`);
@@ -731,7 +762,10 @@ export function handleTransformNode(
     }
 
     const ops: SceneOperation[] = [{ action: 'modify_node', node_path: args.node_path, properties: props }];
-    const modified = editScene(content, ops);
+    const report: SceneEditReport = { applied: 0, skipped: [] };
+    const modified = editScene(content, ops, report);
+    const failed = allOpsFailed(args.scene_path, report);
+    if (failed) return failed;
     writeTextFile(absPath, modified, true);
 
     const changed: string[] = [];
@@ -757,7 +791,10 @@ export function handleRenameNode(
     const absPath = resolveProjectPath(projectRoot, args.scene_path);
     const { content } = readTextFile(absPath);
     const ops: SceneOperation[] = [{ action: 'modify_node', node_path: args.node_path, new_name: args.new_name }];
-    const modified = editScene(content, ops);
+    const report: SceneEditReport = { applied: 0, skipped: [] };
+    const modified = editScene(content, ops, report);
+    const failed = allOpsFailed(args.scene_path, report);
+    if (failed) return failed;
     writeTextFile(absPath, modified, true);
     return { content: [{ type: 'text', text: `Node renamed: "${args.node_path}" → "${args.new_name}" in ${args.scene_path}` }] };
   } catch (err: any) {
@@ -775,7 +812,10 @@ export function handleAttachScript(
     const absPath = resolveProjectPath(projectRoot, args.scene_path);
     const { content } = readTextFile(absPath);
     const ops: SceneOperation[] = [{ action: 'modify_node', node_path: args.node_path, properties: { script: `ExtResource("${args.script_path}")` } }];
-    const modified = editScene(content, ops);
+    const report: SceneEditReport = { applied: 0, skipped: [] };
+    const modified = editScene(content, ops, report);
+    const failed = allOpsFailed(args.scene_path, report);
+    if (failed) return failed;
     writeTextFile(absPath, modified, true);
     return { content: [{ type: 'text', text: `Script "${args.script_path}" attached to "${args.node_path}" in ${args.scene_path}` }] };
   } catch (err: any) {
@@ -889,7 +929,11 @@ export function handleSetCollisionShape(
     const ops: SceneOperation[] = [
       { action: 'modify_node', node_path: args.node_path, properties: { shape: reference } },
     ];
-    writeTextFile(absPath, editScene(withResource, ops), true);
+    const report: SceneEditReport = { applied: 0, skipped: [] };
+    const modified = editScene(withResource, ops, report);
+    const failed = allOpsFailed(args.scene_path, report);
+    if (failed) return failed;
+    writeTextFile(absPath, modified, true);
 
     return {
       content: [{ type: 'text', text: `Assigned ${description} to "${args.node_path}" as ${reference} in ${args.scene_path}` }],
@@ -909,7 +953,10 @@ function doSceneOp(projectRoot: string, scenePath: string, op: SceneOperation, l
     // 注意：此函数是同步的，被同步 handler 调用。Node.js 是单线程事件循环，
     // 同步文件操作天然串行——MCP 工具调用是串行的，所以实际不存在并发问题。
     const { content } = readTextFile(absPath);
-    const modified = editScene(content, [op]);
+    const report: SceneEditReport = { applied: 0, skipped: [] };
+    const modified = editScene(content, [op], report);
+    const failed = allOpsFailed(scenePath, report);
+    if (failed) return failed;
     writeTextFile(absPath, modified, true);
     return { content: [{ type: 'text', text: label }] };
   } catch (err: any) {

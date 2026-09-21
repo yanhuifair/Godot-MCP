@@ -466,3 +466,86 @@ describe('register.ts 分类计数注释', () => {
     expect(total).toBe(386);
   });
 });
+
+// ============================================================
+// 文档一致性（防漂移）
+//
+// 审计发现过两次同类问题：package.json 的 description 还写着 358，
+// 而 README 已经是 386；README 的 Feature 表分类数与总数不自洽。
+// 这些数字没有任何门禁看着，改注册表时必然漂移。这里钉死。
+// ============================================================
+
+describe('文档与注册表一致性', () => {
+  const repoRoot = path.resolve(import.meta.dirname ?? process.cwd(), '..');
+
+  /** 注册表的真实工具数——所有文档声明都必须与它相等。 */
+  async function registryCount(): Promise<number> {
+    const src = fs.readFileSync(path.join(repoRoot, 'src', 'tools', 'register.ts'), 'utf-8');
+    return [...src.matchAll(/name:\s*'([a-z0-9_]+)'/g)].length;
+  }
+
+  /** 解析 README 的「功能概览 / Feature Overview」表：行数 + 工具数求和。 */
+  function featureTable(content: string): { sum: number; rows: number } {
+    const lines = content.split('\n');
+    const start = lines.findIndex((l) => /^### (Feature Overview|功能概览)/.test(l));
+    if (start < 0) throw new Error('Feature Overview section not found');
+    let sum = 0;
+    let rows = 0;
+    for (let i = start + 1; i < lines.length; i++) {
+      if (/^\*\*(Total|总计)/.test(lines[i])) break;
+      const m = lines[i].match(/^\|[^|]+\|\s*(\d+)\s*\|/);
+      if (m) {
+        sum += parseInt(m[1], 10);
+        rows++;
+      }
+    }
+    return { sum, rows };
+  }
+
+  for (const file of ['README.md', 'README-zh.md']) {
+    it(`${file}: 徽章/标题/总计/分类表求和 都等于注册表工具数`, async () => {
+      const total = await registryCount();
+      const content = fs.readFileSync(path.join(repoRoot, file), 'utf-8');
+
+      const badge = content.match(/badge\/tools-(\d+)-/);
+      expect(badge, 'shields 徽章的工具数').not.toBeNull();
+      expect(Number(badge![1])).toBe(total);
+
+      const heroEn = content.match(/\*\*(\d+) tools\*\*/);
+      const heroZh = content.match(/\*\*(\d+) 个工具\*\*/);
+      const hero = heroEn?.[1] ?? heroZh?.[1];
+      expect(hero, '标题里的工具数').toBeDefined();
+      expect(Number(hero)).toBe(total);
+
+      const statedEn = content.match(/Total:\s*(\d+) tools across (\d+) categories/);
+      const statedZh = content.match(/总计：(\d+) 个工具，(\d+) 个分类/);
+      const stated = statedEn ?? statedZh;
+      expect(stated, 'Total 行').not.toBeNull();
+      expect(Number(stated![1])).toBe(total);
+
+      const table = featureTable(content);
+      expect(table.rows, '分类表行数').toBe(Number(stated![2]));
+      expect(table.sum, '分类表各行求和').toBe(total);
+    });
+  }
+
+  it('package.json 的 description 与注册表工具数一致（npm 页面直接显示它）', async () => {
+    const total = await registryCount();
+    const pkg = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf-8'));
+    const m = String(pkg.description).match(/(\d+)\s*tools/);
+    expect(m, 'description 里应写明工具数').not.toBeNull();
+    expect(Number(m![1])).toBe(total);
+  });
+
+  it('src 下每个 .ts 都有版权头（允许 shebang 先于注释）', () => {
+    const walk = (dir: string): string[] =>
+      fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+        e.isDirectory() ? walk(path.join(dir, e.name)) : e.name.endsWith('.ts') ? [path.join(dir, e.name)] : []
+      );
+    const missing = walk(path.join(repoRoot, 'src')).filter((f) => {
+      const head = fs.readFileSync(f, 'utf-8').split('\n').slice(0, 3).join('\n');
+      return !head.includes('Copyright (c) 2026 FairYan') || !head.includes('SPDX-License-Identifier: AGPL-3.0-or-later');
+    });
+    expect(missing).toEqual([]);
+  });
+});

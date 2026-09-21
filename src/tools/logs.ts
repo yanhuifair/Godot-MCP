@@ -35,8 +35,8 @@ import path from 'node:path';
 import os from 'node:os';
 import { toolError, ErrorCode } from '../utils/errors.js';
 import { ToolResult } from '../utils/types.js';
-import { readTextFile, resolveProjectPath, writeTextFile } from '../utils/file_utils.js';
-import { parseConfig, serializeConfig } from '../parsers/config_parser.js';
+import { readTextFile, resolveProjectPath, resolveWithin, isPathWithin, writeTextFile } from '../utils/file_utils.js';
+import { parseConfig, serializeConfig, cfgQuote } from '../parsers/config_parser.js';
 
 // ---- user:// resolution -------------------------------------------------
 
@@ -87,6 +87,11 @@ export interface UserDirInfo {
   logDirAbs: string;    // directory holding the logs
   loggingEnabled: boolean;
   maxLogFiles: number;
+  /**
+   * 非 null 表示 project.godot 里的 log_path 指向沙箱之外（工程根与用户数据目录
+   * 都不包含它），已拒绝读取。值是那个被拒绝的原始路径，用于向用户解释。
+   */
+  sandboxViolation: string | null;
 }
 
 function unquote(v: string | undefined): string {
@@ -125,15 +130,38 @@ export function resolveUserDir(projectRoot: string): UserDirInfo {
   const logPath = unquote(dbg['file_logging/log_path']) || 'user://logs/godot.log';
   const maxLogFiles = parseInt(unquote(dbg['file_logging/max_log_files']) || '5', 10);
 
+  // log_path 来自 project.godot —— 而 project.godot 可能是从网上 clone 下来的
+  // 不可信工程。因此四条分支全部要落进沙箱：user:// 限制在用户数据目录内，
+  // res:// 与相对路径限制在工程根内，绝对路径必须落在两者之一。
+  // 否则一个 clone 来的工程把 log_path 指向 /etc/passwd，我们就会照读不误
+  // （实测可读出 /etc/hosts 全文），而且绕过 .godot/export_credentials.cfg 拦截。
   let logFileAbs: string;
-  if (logPath.startsWith('user://')) {
-    logFileAbs = path.join(dir, logPath.slice('user://'.length));
-  } else if (logPath.startsWith('res://')) {
-    logFileAbs = path.join(projectRoot, logPath.slice('res://'.length));
-  } else if (path.isAbsolute(logPath)) {
-    logFileAbs = logPath;
-  } else {
-    logFileAbs = path.join(projectRoot, logPath);
+  let sandboxViolation: string | null = null;
+  try {
+    if (logPath.startsWith('user://')) {
+      logFileAbs = resolveWithin(dir, logPath.slice('user://'.length), 'user data directory');
+    } else if (logPath.startsWith('res://')) {
+      logFileAbs = resolveProjectPath(projectRoot, logPath.slice('res://'.length));
+    } else if (path.isAbsolute(logPath)) {
+      // 绝对路径：即便落在允许的根内，也必须再走一次标准沙箱 ——
+      // 那里才有 .godot/export_credentials.cfg 的定向拦截与符号链接解析。
+      if (isPathWithin(projectRoot, logPath)) {
+        logFileAbs = resolveProjectPath(projectRoot, path.relative(projectRoot, logPath));
+      } else if (isPathWithin(dir, logPath)) {
+        logFileAbs = resolveWithin(dir, path.relative(dir, logPath), 'user data directory');
+      } else {
+        sandboxViolation = logPath;
+        logFileAbs = path.resolve(logPath); // 仅供展示，绝不被读取
+      }
+    } else {
+      logFileAbs = resolveProjectPath(projectRoot, logPath);
+    }
+  } catch (err) {
+    sandboxViolation = logPath;
+    logFileAbs = path.resolve(projectRoot, logPath);
+    console.error(
+      `[Godot MCP] Refusing out-of-sandbox log path "${logPath}": ${(err as Error).message}`
+    );
   }
 
   return {
@@ -146,11 +174,14 @@ export function resolveUserDir(projectRoot: string): UserDirInfo {
     logDirAbs: path.dirname(logFileAbs),
     loggingEnabled,
     maxLogFiles,
+    sandboxViolation,
   };
 }
 
 /** List log files in the log directory, newest first. */
 function listLogFiles(info: UserDirInfo): { name: string; abs: string; size: number; mtime: Date }[] {
+  // 沙箱违规时连目录都不碰（logDirAbs 指向工程外）。
+  if (info.sandboxViolation) return [];
   if (!fs.existsSync(info.logDirAbs)) return [];
   const base = path.basename(info.logFileAbs);
   const stem = base.replace(/\.[^.]*$/, '');
@@ -235,12 +266,32 @@ export const configureFileLoggingSchema = {
 
 // ---- Handlers -----------------------------------------------------------
 
+/**
+ * project.godot 里的 log_path 指到沙箱之外时统一拒绝。
+ * 绝不读取、绝不删除，并把「为什么」和「怎么改」一起给出来，避免用户只看到
+ * 一个没有上下文的路径错误。
+ */
+function sandboxRefusal(info: UserDirInfo): ToolResult | null {
+  if (!info.sandboxViolation) return null;
+  return toolError(
+    ErrorCode.PATH_TRAVERSAL,
+    `Refusing to touch this log path: "${info.sandboxViolation}"`,
+    'This path comes from debug/file_logging/log_path in project.godot. It is either outside ' +
+      'the project (and outside the Godot user data directory), or it points at a file the ' +
+      'server never reads, such as .godot/export_credentials.cfg. ' +
+      'Set log_path back to the default "user://logs/godot.log" (Project Settings → Debug → ' +
+      'File Logging → Log Path), or point it somewhere inside your project.'
+  );
+}
+
 export function handleReadGameLog(
   projectRoot: string,
   args: { lines?: number; level?: string; pattern?: string; file?: string; from_start?: boolean }
 ): ToolResult {
   try {
     const info = resolveUserDir(projectRoot);
+    const refusal = sandboxRefusal(info);
+    if (refusal) return refusal;
     const files = listLogFiles(info);
 
     let target: string;
@@ -321,6 +372,8 @@ export function handleReadGameLog(
 export function handleListGameLogs(projectRoot: string): ToolResult {
   try {
     const info = resolveUserDir(projectRoot);
+    const refusal = sandboxRefusal(info);
+    if (refusal) return refusal;
     const files = listLogFiles(info);
 
     const lines: string[] = [
@@ -356,6 +409,8 @@ export function handleClearGameLogs(
 ): ToolResult {
   try {
     const info = resolveUserDir(projectRoot);
+    const refusal = sandboxRefusal(info);
+    if (refusal) return refusal;
     const files = listLogFiles(info);
     const current = path.basename(info.logFileAbs);
 
@@ -391,6 +446,8 @@ export function handleGetUserDataDir(
 ): ToolResult {
   try {
     const info = resolveUserDir(projectRoot);
+    const refusal = sandboxRefusal(info);
+    if (refusal) return refusal;
     const exists = fs.existsSync(info.dir);
 
     const lines: string[] = [
@@ -463,8 +520,16 @@ export function handleConfigureFileLogging(
       changed.push(`debug/file_logging/enable_file_logging = ${v}`);
     }
     if (args.log_path !== undefined) {
-      doc.sections['debug']['file_logging/log_path'] = `"${args.log_path}"`;
-      changed.push(`debug/file_logging/log_path = "${args.log_path}"`);
+      // 用 cfgQuote 转义：用户可能传含 `"` 或换行的路径，直接拼 `"${...}"`
+      // 会破坏 project.godot 的行结构（等价于配置注入）。
+      if (/[\r\n]/.test(args.log_path)) {
+        return toolError(
+          ErrorCode.INVALID_ARGUMENT,
+          'log_path must not contain a line break'
+        );
+      }
+      doc.sections['debug']['file_logging/log_path'] = cfgQuote(args.log_path);
+      changed.push(`debug/file_logging/log_path = ${cfgQuote(args.log_path)}`);
     }
     if (args.max_log_files !== undefined) {
       doc.sections['debug']['file_logging/max_log_files'] = String(args.max_log_files);

@@ -10,6 +10,17 @@ import { FileEntry, SearchMatch } from './types.js';
 import { stampUid } from './uid.js';
 
 /**
+ * 报告一处「被跳过的路径」。文件遍历里单个目录/文件不可读时跳过本身是合理的
+ * （一个坏子目录不该让整次列举失败），但**不能静默**——否则权限/IO 错误会被
+ * 伪装成「目录里什么都没有」，用户拿到少了一半的结果还以为成功了。
+ * 走 stderr（MCP 的 stdout 是 JSON-RPC 通道，绝不能污染）。
+ */
+export function warnSkippedPath(target: string, err: unknown, what = 'path'): void {
+  const code = (err as NodeJS.ErrnoException)?.code ?? 'UNKNOWN';
+  console.error(`[Godot MCP] Skipped unreadable ${what}: ${target} (${code})`);
+}
+
+/**
  * Find the Godot project root by looking for project.godot
  * Searches cwd first, then parent directories, then subdirectories.
  */
@@ -46,6 +57,36 @@ export function findProjectRoot(startDir?: string): string | null {
 }
 
 /**
+ * 把路径解析成“真实”绝对路径，**允许末段尚不存在**（新建场景/资源时文件还没有）。
+ *
+ * 从目标沿父目录向上找到第一个真实存在的祖先做 realpath，再把剩下那些不存在
+ * 的段拼回去。若直接对不存在的路径用 path.resolve，工程内的符号链接目录会被
+ * 当成普通目录字符串——校验通过、写操作却顺着链接落到工程外（沙箱逃逸）。
+ */
+function realpathAllowMissing(target: string): string {
+  let current = target;
+  const missingTail: string[] = [];
+
+  for (;;) {
+    if (fs.existsSync(current)) {
+      let real: string;
+      try {
+        real = fs.realpathSync(current);
+      } catch {
+        real = current; // 存在但不可访问（权限等）：保留原样，交给后续校验兜底
+      }
+      return missingTail.length > 0
+        ? path.join(real, ...missingTail.reverse())
+        : real;
+    }
+    const parent = path.dirname(current);
+    if (parent === current) return target; // 一路到根都不存在，原样返回
+    missingTail.push(path.basename(current));
+    current = parent;
+  }
+}
+
+/**
  * Resolve a project-relative path to an absolute path.
  */
 export function resolveProjectPath(projectRoot: string, relativePath: string): string {
@@ -65,29 +106,80 @@ export function resolveProjectPath(projectRoot: string, relativePath: string): s
   // Resolve target path (use path.resolve since file may not exist yet, e.g. for create operations)
   const resolved = path.resolve(realRoot, relativePath);
 
-  let resolvedReal: string;
-  try {
-    resolvedReal = fs.existsSync(resolved) ? fs.realpathSync(resolved) : resolved;
-  } catch (err) {
-    // 如果 resolved 本身存在但无法访问，直接用 resolved 继续
-    resolvedReal = resolved;
-  }
+  // 关键：即便目标还不存在也要把父链的符号链接解析掉，否则可被工程内的
+  // 符号链接目录带出工程根（写逃逸）。
+  const resolvedReal = realpathAllowMissing(resolved);
 
-  // Windows 文件系统不区分大小写，统一小写比较防止误报
-  const normalizedResolved = resolvedReal.toLowerCase();
-  const normalizedRoot = (realRoot + path.sep).toLowerCase();
-  if (!normalizedResolved.startsWith(normalizedRoot) && normalizedResolved !== realRoot.toLowerCase()) {
+  // 仅在大小写不敏感的文件系统上做小写比较。在 Linux（大小写敏感）上做小写
+  // 比较会让兄弟目录 /a/PROJ 冒充 /a/proj 通过校验。
+  const caseInsensitive = process.platform === 'win32' || process.platform === 'darwin';
+  const normalize = (p: string) => (caseInsensitive ? p.toLowerCase() : p);
+
+  const normalizedResolved = normalize(resolvedReal);
+  const normalizedRoot = normalize(realRoot + path.sep);
+  if (normalizedResolved !== normalize(realRoot) && !normalizedResolved.startsWith(normalizedRoot)) {
     throw new Error(
       `Path traversal detected: "${relativePath}" resolves outside project root ` +
-      `(resolved: "${resolved}", realRoot: "${realRoot}")`
+      `(resolved: "${resolved}", realPath: "${resolvedReal}", realRoot: "${realRoot}")`
     );
   }
 
   // 定向拒绝导出签名凭据文件：里面是 Apple/Google 签名密钥，任何工具都不应读写它。
+  // 用解析后的真实路径比较，符号链接绕不过去。
   const sep = path.sep;
-  if (normalizedResolved.includes(`${sep}.godot${sep}export_credentials.cfg`)) {
+  if (normalizedResolved.includes(`${normalize(sep + '.godot' + sep + 'export_credentials.cfg')}`)) {
     throw new Error(
       `Access to .godot/export_credentials.cfg is not allowed (contains export signing secrets)`
+    );
+  }
+  return resolved;
+}
+
+/**
+ * 判断 target 是否落在 root 之内（两侧都按真实路径比较，符号链接、大小写、
+ * /var↔/private/var 都会被正确归一到同一形态）。
+ */
+export function isPathWithin(root: string, target: string): boolean {
+  const real = (p: string): string => {
+    try {
+      return realpathAllowMissing(p);
+    } catch {
+      return path.resolve(p);
+    }
+  };
+  const realRoot = real(root);
+  const realTarget = real(target);
+
+  const caseInsensitive = process.platform === 'win32' || process.platform === 'darwin';
+  const normalize = (p: string) => (caseInsensitive ? p.toLowerCase() : p);
+  const nRoot = normalize(realRoot);
+  const nTarget = normalize(realTarget);
+  return nTarget === nRoot || nTarget.startsWith(nRoot + path.sep);
+}
+
+/**
+ * 把「用户数据目录」下的路径限制在该目录内（供日志等 user:// 场景复用）。
+ * 与 resolveProjectPath 同样的思路：拒绝绝对路径、解析真实路径后校验前缀。
+ */
+export function resolveWithin(root: string, relativePath: string, label = 'directory'): string {
+  if (path.isAbsolute(relativePath)) {
+    throw new Error(`Absolute path not allowed here: "${relativePath}" (must stay inside the ${label}).`);
+  }
+  let realRoot: string;
+  try {
+    realRoot = fs.existsSync(root) ? fs.realpathSync(root) : path.resolve(root);
+  } catch {
+    realRoot = path.resolve(root);
+  }
+  const resolved = path.resolve(realRoot, relativePath);
+  const resolvedReal = realpathAllowMissing(resolved);
+
+  const caseInsensitive = process.platform === 'win32' || process.platform === 'darwin';
+  const normalize = (p: string) => (caseInsensitive ? p.toLowerCase() : p);
+  if (normalize(resolvedReal) !== normalize(realRoot) &&
+      !normalize(resolvedReal).startsWith(normalize(realRoot + path.sep))) {
+    throw new Error(
+      `Path escapes the ${label}: "${relativePath}" (resolved: "${resolvedReal}", ${label}: "${realRoot}")`
     );
   }
   return resolved;
@@ -116,8 +208,9 @@ export function listFiles(
     let entries: fs.Dirent[];
     try {
       entries = fs.readdirSync(currentDir, { withFileTypes: true });
-    } catch {
-      return; // skip unreadable directories
+    } catch (err) {
+      warnSkippedPath(currentDir, err, 'directory');
+      return;
     }
 
     for (const entry of entries) {
@@ -188,7 +281,8 @@ export function searchInProject(
     let entries: fs.Dirent[];
     try {
       entries = fs.readdirSync(dir, { withFileTypes: true });
-    } catch {
+    } catch (err) {
+      warnSkippedPath(dir, err, 'directory');
       return;
     }
 
@@ -229,8 +323,8 @@ export function searchInProject(
               });
             }
           }
-        } catch {
-          // skip unreadable files
+        } catch (err) {
+          warnSkippedPath(fullPath, err, 'file');
         }
       }
     }
@@ -340,7 +434,8 @@ export function findFilesByExtension(
     let entries: fs.Dirent[];
     try {
       entries = fs.readdirSync(dir, { withFileTypes: true });
-    } catch {
+    } catch (err) {
+      warnSkippedPath(dir, err, 'directory');
       return;
     }
 

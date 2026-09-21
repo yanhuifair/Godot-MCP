@@ -5,14 +5,21 @@ on:
     branches: [master, main]
   pull_request:
 
+env:
+  # 与本地开发/验证使用的引擎版本保持一致。
+  # 之前钉在 4.4.1，CI 绿了但用户实际跑的是新版引擎——等于没测。
+  GODOT_VERSION: 4.7.2-stable
+
 jobs:
   unit:
-    name: Unit tests (Node ${{ matrix.node }})
+    name: Unit tests + gates (Node ${{ matrix.node }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        node: [18, 20]
+        # 18 已 EOL（package.json 的 engines 现在是 >=20）。
+        # 22 是本地开发版本，必须进矩阵，否则新语法/新 API 的问题只在用户那边炸。
+        node: [20, 22]
     steps:
       - uses: actions/checkout@v4
       - name: Setup Node
@@ -22,7 +29,14 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
-      - run: npx vitest run
+      - name: Type check
+        run: npx tsc --noEmit
+      - name: Vitest (unit + structural + sandbox)
+        run: npx vitest run
+      - name: Legacy tool suite
+        run: node test/test_all.mjs
+      - name: Smoke all registered tools
+        run: node test/smoke_all_tools.mjs
 
   integration:
     name: Integration (real Godot)
@@ -32,15 +46,19 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
       - run: npm ci
       - run: npm run build
-      - name: Install Godot 4.4 (Linux headless)
+      - name: Install Godot ${{ env.GODOT_VERSION }} (Linux headless)
         run: |
-          wget -q https://github.com/godotengine/godot/releases/download/4.4.1-stable/Godot_v4.4.1-stable_linux.x86_64.zip
-          unzip -q Godot_v4.4.1-stable_linux.x86_64.zip
-          sudo mv Godot_v4.4.1-stable_linux.x86_64 /usr/local/bin/godot
+          wget -q "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_linux.x86_64.zip"
+          unzip -q "Godot_v${GODOT_VERSION}_linux.x86_64.zip"
+          sudo mv "Godot_v${GODOT_VERSION}_linux.x86_64" /usr/local/bin/godot
           godot --version
       - name: Run integration tests against test/test-project
         run: GODOT_MCP_TEST_PROJECT=test/test-project npx vitest run
+      - name: Real-engine scene load gate (load_check.gd)
+        env:
+          GODOT_BIN: /usr/local/bin/godot
+        run: npm run check:godot

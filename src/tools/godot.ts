@@ -19,7 +19,7 @@ import {
   detectRunningGodot,
 } from '../utils/godot_cli.js';
 import { sendEditorCommand } from './editor.js';
-import { resolveProjectPath } from '../utils/file_utils.js';
+import { resolveProjectPath, isPathWithin, warnSkippedPath } from '../utils/file_utils.js';
 import fs from 'node:fs';
 import pathMod from 'node:path';
 
@@ -88,7 +88,7 @@ export async function handleGetGodotVersion(): Promise<ToolResult> {
       content: [{ type: 'text', text: lines.join('\n') }],
     };
   } catch (err: any) {
-        return toolError(ErrorCode.INTERNAL_ERROR, `Error getting Godot version: ${err.message}`);
+        return toolError(ErrorCode.GODOT_CLI_ERROR, `Error getting Godot version: ${err.message}`);
   }
 }
 
@@ -111,7 +111,7 @@ export function handleLaunchEditor(
       content: [{ type: 'text', text: `Godot editor launched. PID: ${result.pid}\nCommand: ${result.command}` }],
     };
   } catch (err: any) {
-        return toolError(ErrorCode.INTERNAL_ERROR, `Error launching editor: ${err.message}`);
+        return toolError(ErrorCode.PROCESS_ERROR, `Error launching editor: ${err.message}`);
   }
 }
 
@@ -142,7 +142,7 @@ export function handleRunProject(
       content: [{ type: 'text', text: details.join('\n') }],
     };
   } catch (err: any) {
-        return toolError(ErrorCode.INTERNAL_ERROR, `Error running project: ${err.message}`);
+        return toolError(ErrorCode.PROCESS_ERROR, `Error running project: ${err.message}`);
   }
 }
 
@@ -206,7 +206,7 @@ export function handleExportProject(
       content: [{ type: 'text', text: `Export started. PID: ${result.pid}\nPreset: ${args.preset}\nOutput: ${outputPath}\nCommand: ${result.command}\n\nUse monitor_output to check build progress.` }],
     };
   } catch (err: any) {
-        return toolError(ErrorCode.INTERNAL_ERROR, `Error exporting project: ${err.message}`);
+        return toolError(ErrorCode.GODOT_CLI_ERROR, `Error exporting project: ${err.message}`);
   }
 }
 
@@ -235,7 +235,7 @@ export function handleStopProject(): ToolResult {
     cleanupProcesses();
     return { content: [{ type: 'text', text: 'All running Godot processes stopped.' }] };
   } catch (err: any) {
-    return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
+    return toolError(ErrorCode.PROCESS_ERROR, `Error stopping Godot processes: ${err.message}`);
   }
 }
 
@@ -261,16 +261,37 @@ export async function handleIsEditorRunning(): Promise<ToolResult> {
 // ---- Project Discovery ----
 
 export const listProjectsSchema = {
-  directory: z.string().optional().describe('Directory to search (default: current directory)'),
+  directory: z.string().optional().describe('Directory to search (default: current directory). Must be inside the project root or the server working directory — set GODOT_MCP_SCAN_ROOT to widen the search.'),
   recursive: z.boolean().optional().default(true).describe('Search recursively (default: true)'),
 };
 
 export function handleListProjects(
-  _projectRoot: string,
+  projectRoot: string,
   args: { directory?: string; recursive?: boolean }
 ): ToolResult {
   try {
-    const startDir = args.directory || process.cwd();
+    const startDir = pathMod.resolve(args.directory || process.cwd());
+
+    // 这个工具会遍历磁盘并回显绝对路径，原本对 `directory` 完全不设限——
+    // 被提示注入的模型可以 `directory: "/Users"` 把整台机器的工程布局扫出来。
+    // 因此限定在「工程根 / 服务器工作目录」两棵子树内；确有需要时用
+    // GODOT_MCP_SCAN_ROOT 显式放宽（不设上限则只允许这两棵树）。
+    const allowedRoots = [projectRoot, process.cwd()].filter(Boolean).map((p) => pathMod.resolve(p));
+    const scanRootEnv = process.env.GODOT_MCP_SCAN_ROOT;
+    if (scanRootEnv) allowedRoots.push(pathMod.resolve(scanRootEnv));
+
+    if (!allowedRoots.some((root) => isPathWithin(root, startDir))) {
+      return toolError(
+        ErrorCode.PATH_TRAVERSAL,
+        `Refusing to scan "${startDir}" — it is outside the allowed roots.`,
+        `Allowed: ${allowedRoots.join(', ')}. Set GODOT_MCP_SCAN_ROOT=<dir> to widen the search.`
+      );
+    }
+
+    if (!fs.existsSync(startDir) || !fs.statSync(startDir).isDirectory()) {
+      return toolError(ErrorCode.NOT_FOUND, `Not a directory: ${startDir}`);
+    }
+
     const recursive = args.recursive !== false;
     const isProject = (dir: string) => fs.existsSync(pathMod.join(dir, 'project.godot'));
 
@@ -278,15 +299,19 @@ export function handleListProjects(
 
     function scan(dir: string, depth: number) {
       if (depth > 4) return;
+      let entries: fs.Dirent[];
       try {
-        const entries = fs.readdirSync(dir, { withFileTypes: true });
-        for (const entry of entries) {
-          if (!entry.isDirectory() || entry.name.startsWith('.') || entry.name === 'node_modules') continue;
-          const fullPath = pathMod.join(dir, entry.name);
-          if (isProject(fullPath)) found.push({ path: fullPath, name: entry.name });
-          if (recursive && found.length < 50) scan(fullPath, depth + 1);
-        }
-      } catch { /* permission denied */ }
+        entries = fs.readdirSync(dir, { withFileTypes: true });
+      } catch (err) {
+        warnSkippedPath(dir, err, 'directory');
+        return;
+      }
+      for (const entry of entries) {
+        if (!entry.isDirectory() || entry.name.startsWith('.') || entry.name === 'node_modules') continue;
+        const fullPath = pathMod.join(dir, entry.name);
+        if (isProject(fullPath)) found.push({ path: fullPath, name: entry.name });
+        if (recursive && found.length < 50) scan(fullPath, depth + 1);
+      }
     }
 
     if (isProject(startDir)) found.push({ path: startDir, name: pathMod.basename(startDir) });

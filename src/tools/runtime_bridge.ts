@@ -108,11 +108,3 @@ export function isGameReachable(): boolean {
   if (Date.now() - _lastHealth < GAME_HEALTH_CACHE_MS) return _lastHealthy;
   return false;
 }
-
-/** Drop any live connection (used on shutdown). */
-export function shutdownGameBridge(): void {
-  if (_client) { try { _client.destroy(); } catch {} _client = null; }
-  for (const [, p] of _pending) p.reject(new Error('Server shutting down'));
-  _pending.clear();
-  _connecting = null;
-}

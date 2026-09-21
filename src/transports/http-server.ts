@@ -90,16 +90,23 @@ export async function runHttpTransport(options: HttpTransportOptions = {}): Prom
   //   Authorization: Bearer <token>   或   ?token=<token>
   // 未设置该环境变量时服务器保持开放（与改动前行为一致，向后兼容）。
   const mcpToken = process.env.GODOT_MCP_TOKEN;
+
+  /** 请求是否携带了正确的令牌（无令牌配置时一律视为不通过，由调用方决定语义）。 */
+  const requestHasValidToken = (req: Request): boolean => {
+    if (!mcpToken) return false;
+    const header = req.headers['authorization'];
+    const fromHeader = typeof header === 'string' && header.startsWith('Bearer ')
+      ? header.slice(7)
+      : undefined;
+    const fromQuery = typeof req.query.token === 'string' ? req.query.token : undefined;
+    const provided = fromHeader ?? fromQuery;
+    return !!provided && safeTokenEqual(provided, mcpToken);
+  };
+
   if (mcpToken) {
     console.error('[Godot MCP] HTTP auth ENABLED (GODOT_MCP_TOKEN is set)');
     const authMiddleware = (req: Request, res: Response, next: NextFunction) => {
-      const header = req.headers['authorization'];
-      const fromHeader = typeof header === 'string' && header.startsWith('Bearer ')
-        ? header.slice(7)
-        : undefined;
-      const fromQuery = typeof req.query.token === 'string' ? req.query.token : undefined;
-      const provided = fromHeader ?? fromQuery;
-      if (provided && safeTokenEqual(provided, mcpToken)) return next();
+      if (requestHasValidToken(req)) return next();
       res.status(401).json({ error: 'Unauthorized: invalid or missing token' });
     };
     app.use(['/mcp', '/sse'], authMiddleware);
@@ -118,11 +125,15 @@ export async function runHttpTransport(options: HttpTransportOptions = {}): Prom
   }
 
   // ---- 健康检查 ----
-  app.get('/health', (_req: Request, res: Response) => {
+  // /health 故意不挂强制鉴权（探活工具要能用），但它不能当信息泄露口：
+  // 非 loopback 部署时它对本网段可见，回显 projectRoot 绝对路径等于告诉别人
+  // 这台机器上的目录结构。因此只有「本机请求」或「带了正确令牌」才回显路径。
+  app.get('/health', (req: Request, res: Response) => {
+    const mayRevealPaths = isLoopback || requestHasValidToken(req);
     res.json({
       status: 'ok',
-      version: '1.11.2',
-      projectRoot: getProjectRoot(),
+      version: '1.12.0',
+      ...(mayRevealPaths ? { projectRoot: getProjectRoot() } : {}),
       endpoints: {
         ...(enableSse ? { sse: `http://${host}:${port}/sse` } : {}),
         ...(enableStreamableHttp ? { streamableHttp: `http://${host}:${port}/mcp` } : {}),

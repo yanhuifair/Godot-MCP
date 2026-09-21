@@ -307,21 +307,6 @@ export function getRecentOutput(clear?: boolean): string[] {
 }
 
 /**
- * Kill a specific spawned process.
- */
-export function killProcess(pid: number): boolean {
-  const entry = spawnedProcesses.get(pid);
-  if (!entry) return false;
-
-  try {
-    entry.process.kill();
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/**
  * Clean up all spawned processes.
  */
 export function cleanupProcesses(): void {

@@ -18,7 +18,7 @@ import {
   moveFile,
   writeTextFile,
 } from '../utils/file_utils.js';
-import { parseConfig, serializeConfig } from '../parsers/config_parser.js';
+import { parseConfig, serializeConfig, cfgQuote, assertValidConfigName } from '../parsers/config_parser.js';
 import { parseScene } from '../parsers/scene_parser.js';
 import fs from 'node:fs';
 
@@ -246,6 +246,8 @@ export function handleWriteInputAction(
     return toolError(ErrorCode.ALREADY_EXISTS, `Input action "${args.action}" already exists. Use remove_input_action first or add_input_binding to extend it.`);
     }
 
+    // action 名会直接作为 project.godot 的 key 写出，必须先挡住换行/`=`。
+    assertValidConfigName('key', args.action);
     const deadzone = args.deadzone ?? 0.5;
     inputMap[args.action] = `{\n"deadzone": ${deadzone},\n"events": []\n}`;
     doc.sections['input_map'] = inputMap;
@@ -297,6 +299,8 @@ export function handleAddInputBinding(
     const doc = parseConfig(content);
 
     const inputMap = doc.sections['input_map'] || {};
+    // action 名会作为 project.godot 的 key 写出（不存在时会自动新建），先挡住换行/`=`。
+    assertValidConfigName('key', args.action);
     if (!inputMap[args.action]) {
       // Auto-create the action if it doesn't exist
       inputMap[args.action] = `{\n"deadzone": 0.5,\n"events": []\n}`;
@@ -433,19 +437,37 @@ export function handleWriteProjectConfig(
     const { content } = readTextFile(cfgPath);
     const doc = parseConfig(content);
 
+    // 这里三个参数都会被逐行写进 project.godot。区段/键名先挡住换行与结构字符；
+    // 值这里必须挡住换行——不挡的话 value 里塞
+    // "\n\n[autoload]\nEvil=\"*res://evil.gd\"" 就能凭空造出一个 autoload 段，
+    // 而 autoload 会在编辑器/游戏启动时执行脚本（已实测注入成功）。
+    // 只要不含换行，序列化器「一行一个 key」的结构就无法被打破。
+    assertValidConfigName('section', args.section);
+    assertValidConfigName('key', args.key);
+    if (/[\r\n]/.test(args.value)) {
+      return toolError(
+        ErrorCode.INVALID_ARGUMENT,
+        'value must not contain a line break — that would inject extra sections/keys into project.godot',
+        'Use a single-line value. If the string itself needs a newline, write it as an escaped \\n inside a quoted string.'
+      );
+    }
+
     if (!doc.sections[args.section]) {
       doc.sections[args.section] = {};
     }
-    doc.sections[args.section][args.key] = args.value;
+    // 沿用既有语义：已经像 Godot 字面量的（"..." / 数字 / true / Object(...) /
+    // {...} / PackedStringArray(...)）原样透传；其余按字符串字面量加引号，
+    // 顺手修掉「裸写 My Game 导致 project.godot 语法错误」这个老坑。
+    doc.sections[args.section][args.key] = cfgValue(args.value);
 
     const newContent = serializeConfig(doc);
     writeTextFile(cfgPath, newContent, true);
 
     return {
-      content: [{ type: 'text', text: `Config updated: [${args.section}] ${args.key} = ${args.value}` }],
+      content: [{ type: 'text', text: `Config updated: [${args.section}] ${args.key} = ${doc.sections[args.section][args.key]}` }],
     };
   } catch (err: any) {
-        return toolError(ErrorCode.INTERNAL_ERROR, `Error writing config: ${err.message}`);
+    return toolError(ErrorCode.INTERNAL_ERROR, `Error writing config: ${err.message}`);
   }
 }
 
@@ -458,10 +480,15 @@ export function handleReadExportPresets(projectRoot: string): ToolResult {
     try {
       const file = readTextFile(presetsPath);
       content = file.content;
-    } catch {
-      return {
-        content: [{ type: 'text', text: 'No export_presets.cfg found in this project.' }],
-      };
+    } catch (err: any) {
+      // 区分「确实没有这个文件」与「有但读不了」：把权限/IO 错误说成
+      // 「没有 export preset」会让用户以为导出配置丢了。
+      if (err?.code === 'ENOENT' || !fs.existsSync(presetsPath)) {
+        return {
+          content: [{ type: 'text', text: 'No export_presets.cfg found in this project.' }],
+        };
+      }
+      return toolError(ErrorCode.PERMISSION_DENIED, `export_presets.cfg exists but could not be read: ${err?.message ?? String(err)}`);
     }
     const lines = content.split('\n');
     const result: string[] = [];
@@ -588,16 +615,19 @@ export function handleAddAutoload(
     const { content } = readTextFile(cfgPath);
     const cfg = parseConfig(content);
 
+    // name 作为 key、path 作为引号串内容，两者都是用户输入：
+    // name 挡住换行/`=`，path 用 cfgQuote 转义（含 `"` 和换行）。
+    assertValidConfigName('key', args.name);
     if (!cfg.sections['autoload']) {
       cfg.sections['autoload'] = {};
     }
-    cfg.sections['autoload'][args.name] = `"*${args.path}"`;
+    cfg.sections['autoload'][args.name] = cfgQuote(`*${args.path}`);
 
     const newContent = serializeConfig(cfg);
     writeTextFile(cfgPath, newContent, true);
 
     return {
-      content: [{ type: 'text', text: `Autoload added: ${args.name} = "*${args.path}"` }],
+      content: [{ type: 'text', text: `Autoload added: ${args.name} = ${cfgQuote(`*${args.path}`)}` }],
     };
   } catch (err: any) {
         return toolError(ErrorCode.INTERNAL_ERROR, `Error adding autoload: ${err.message}`);
@@ -938,13 +968,22 @@ function cfgString(value: string): string {
  * written bare; anything that already looks like a Godot literal (quoted
  * string, `PackedStringArray(...)`, …) is passed through untouched so callers
  * can set exotic option values verbatim.
+ *
+ * 但「原样透传」必须排除裸换行：序列化器一行一个 key，值里带换行就等于
+ * 可以凭空插入新的 section/key。所以两条透传分支都只把换行转义掉，
+ * 其余字符保持逐字不变。
  */
 function cfgValue(value: string): string {
   const t = value.trim();
   if (t === 'true' || t === 'false') return t;
   if (/^-?\d+(\.\d+)?$/.test(t)) return t;
-  if (t.startsWith('"') && t.endsWith('"') && t.length >= 2) return t;
-  if (/^[A-Za-z_][A-Za-z0-9_]*\(.*\)$/s.test(t)) return t;
+  if (t.startsWith('"') && t.endsWith('"') && t.length >= 2) {
+    const inner = t.slice(1, -1);
+    return `"${inner.replace(/\r/g, '\\r').replace(/\n/g, '\\n')}"`;
+  }
+  if (/^[A-Za-z_][A-Za-z0-9_]*\(.*\)$/s.test(t)) {
+    return t.replace(/\r/g, '\\r').replace(/\n/g, '\\n');
+  }
   return cfgString(value);
 }
 
