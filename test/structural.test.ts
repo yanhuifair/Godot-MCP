@@ -548,4 +548,18 @@ describe('文档与注册表一致性', () => {
     });
     expect(missing).toEqual([]);
   });
+
+  it('README 里写的 `--version` 真的实现了（不能只是文档好看）', async () => {
+    const entry = path.join(repoRoot, 'dist', 'index.js');
+    if (!fs.existsSync(entry)) return; // 没构建过就跳过；CI 里先 build 再 test
+    const { spawnSync } = await import('node:child_process');
+    const pkg = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf-8'));
+
+    // 以前 `--version` 是未实现参数：被忽略后照常启动 stdio 服务器，
+    // 于是命令挂住不动，客户端只会以为它卡死了。这里必须「有输出 + 自己退出」。
+    const res = spawnSync(process.execPath, [entry, '--version'], { encoding: 'utf-8', timeout: 15000 });
+    expect(res.signal, '`--version` 必须自己退出而不是挂住').toBeNull();
+    expect(res.status).toBe(0);
+    expect(res.stdout.trim()).toBe(pkg.version);
+  });
 });

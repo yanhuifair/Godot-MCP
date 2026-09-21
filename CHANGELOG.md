@@ -1,4 +1,16 @@
 # Changelog
+## v1.12.1 (2026-09-21)
+
+### Fixed — a documented command that did not exist
+- **`--version` / `-v` was never implemented.** Both READMEs tell you to run `npx @yanhuifair/godot-mcp --version` to check your version, but the flag was silently ignored as an unknown argument — so the process went on to start the stdio server and just sat there waiting on stdin, which reads as "the command hung". It now prints the version and exits. The version is read from `package.json` at runtime rather than duplicated as a second constant, and a regression test runs the built CLI to assert it prints the right version **and terminates**.
+- The doc-drift test suite now also guards this: any flag the README advertises has to exist.
+
+### Docs
+- `README-zh.md`: fixed `拒绝218` → `拒绝 218` (4 places) and the matching `--help` typo.
+
+### Fixed — one more silent drop
+- The runtime bridge had the same `catch {}` around `JSON.parse` of incoming frames that the editor bridge had, so a malformed frame was dropped in silence and the pending call waited out its timeout. It now logs, like the editor bridge.
+
 ## v1.12.0 (2026-09-21)
 
 ### Security — full audit, three sandbox escapes fixed (all proven by PoC)
@@ -34,7 +46,7 @@ Every item below was reproduced with a runnable proof-of-concept before the fix 
 - New doc-drift gates in `test/structural.test.ts`: the shields badge, hero heading, stated total, the per-category table sum (and its row count) in both READMEs, and `package.json`'s `description` must all equal the real registry count. This immediately caught `package.json` still advertising "358 tools" on npm. Also asserts every `src/**/*.ts` keeps its licence header.
 - `test/smoke_all_tools.mjs` printed `PASSED` but never exited (the stub servers kept the event loop alive) — it now exits explicitly, so it can run in CI.
 - `test/test_all.mjs` ran **directly against the tracked fixture** `test/test-project`, so every run dirtied `project.godot` and inherited state left over from the previous run. It now copies the project to a temp directory first (as the smoke suite already did) and cleans up on exit.
-- Suite total: **223 tests (153 runnable + 70 integration)**.
+- Suite total: **223 tests (153 runnable + 70 integration)** at the time of v1.12.0; **224** after the v1.12.1 `--version` regression test.
 
 ### CI
 - Node matrix 18/20 → **20/22** (18 is EOL; 22 is the local dev version), added `tsc --noEmit`, `test_all.mjs` and `smoke_all_tools.mjs` — none of which CI ran before.

@@ -104,7 +104,7 @@ npx @yanhuifair/godot-mcp --enable-plugin -p .
 > `npx @yanhuifair/godot-mcp --enable-plugin -p /Users/me/games/my-game`
 
 > **默认就装最新版。** `npx` 每次都会拉取最新版本。要强制最新或锁定某个版本：
-> `npx @yanhuifair/godot-mcp@latest --enable-plugin -p .`（最新）· `npx @yanhuifair/godot-mcp@1.12.0 --enable-plugin -p .`（锁定）
+> `npx @yanhuifair/godot-mcp@latest --enable-plugin -p .`（最新）· `npx @yanhuifair/godot-mcp@1.12.1 --enable-plugin -p .`（锁定）
 
 **这条命令做了什么：** 把插件复制到 `addons/godot-mcp/`，并直接在 `project.godot` 里把它打开。不需要你在 Godot 里点任何按钮。
 
@@ -358,7 +358,7 @@ godot-mcp/
 │   └── godot-mcp/            # Godot 编辑器插件
 │       ├── plugin.cfg         # 插件元数据
 │       └── plugin.gd          # stdin 读取器、TCP 服务器、102 个命令处理器
-├── test/                     # Vitest 套件（219 个测试：149 个可运行 + 70 个集成需要真实 Godot 项目）+ 旧版 .mjs 套件
+├── test/                     # Vitest 套件（224 个测试：154 个可运行 + 70 个集成需要真实 Godot 项目）+ 旧版 .mjs 套件
 │   ├── test_all.mjs          # 旧版独立套件（176 项工具检查）
 │   ├── test_editor.mjs       # Editor 桥 TCP 测试
 │   ├── test_runner.mjs       # 早期集成测试
@@ -422,7 +422,7 @@ godot-mcp/
 - **工程配置里的路径也当不可信输入**：`project.godot` 中的 `log_path` 只能指向工程根或 Godot 用户数据目录；`list_projects` 只扫描工程根与服务器工作目录（确有需要可用 `GODOT_MCP_SCAN_ROOT` 显式放宽）
 - **不做配置注入**：写入 `section` / `key` / `value` 时拒绝换行与结构字符，值永远无法在 `project.godot` 里凭空新增一个段（被注入的 `[autoload]` 会执行脚本）
 - **自动备份**：脚本和场景文件的写操作会创建 `.bak` 备份副本
-- **只读模式**：`--read-only`（或 `GODOT_MCP_READ_ONLY=true`）通过维护的白名单拒绝218 个写/副作用工具（write_、create_、delete_、move_、set_、edit_、editor_* 变更类、run/export/launch 等）——它们从 `tools/list` 中隐藏，直接调用时返回 `READ_ONLY` 错误
+- **只读模式**：`--read-only`（或 `GODOT_MCP_READ_ONLY=true`）通过维护的白名单拒绝 218 个写/副作用工具（write_、create_、delete_、move_、set_、edit_、editor_* 变更类、run/export/launch 等）——它们从 `tools/list` 中隐藏，直接调用时返回 `READ_ONLY` 错误
 - **TCP 仅限本机**：编辑器插件的 TCP 桥只绑定 `127.0.0.1`，绝不暴露到局域网
 - **可选令牌鉴权**：设置 `GODOT_MCP_TOKEN` 后，HTTP（`/mcp`、`/sse`）要求 Bearer 令牌，插件 TCP 桥要求 `auth` 握手；非 loopback 的 HTTP 绑定在没有令牌时拒绝启动
 - **编辑器改动可撤销**：所有会修改场景的编辑器命令（`editor_add_node`、`editor_remove_node`、`editor_set_node_properties`、`editor_rename_node`、`editor_move_node`、`editor_move_node_3d`、`editor_reparent_node`、`editor_duplicate_node`、`editor_delete_selected`、`editor_instantiate_scene` 等）都通过 Godot 原生 `EditorUndoRedoManager` 提交，一次 **Ctrl+Z**（或 `editor_undo`）即可撤回 AI 刚做的操作
@@ -513,7 +513,7 @@ npx @yanhuifair/godot-mcp -t all --port 3000 -p /path/to/your/godot/project
 
 ```bash
 curl http://127.0.0.1:3000/health
-# {"status":"ok","version":"1.12.0","projectRoot":"/path/to/project","endpoints":{...}}
+# {"status":"ok","version":"1.12.1","projectRoot":"/path/to/project","endpoints":{...}}
 ```
 
 ---
@@ -580,7 +580,7 @@ node dist/index.js -p /path/to/your/godot/project
 
 | 检查项 | 怎么做 | 预期结果 |
 |---|---|---|
-| 服务器版本 | `npx @yanhuifair/godot-mcp --version` | 一个版本号（如 `1.12.0`） |
+| 服务器版本 | `npx @yanhuifair/godot-mcp --version` | 一个版本号（如 `1.12.1`） |
 | 插件文件 | 看 `addons/godot-mcp/` 目录 | 有 `plugin.cfg`、`plugin.gd`、`runtime_bridge.gd` |
 | 插件已启用 | 打开 `project.godot` | `[editor_plugins]` 里有 `enabled = PackedStringArray("res://addons/godot-mcp/plugin.cfg")` |
 | 服务器能启动 | `npx @yanhuifair/godot-mcp -p .`（Ctrl+C 结束） | 打印工具数量，如 `386 tools` |
@@ -611,14 +611,14 @@ rm -rf addons/godot-mcp && npx -y @yanhuifair/godot-mcp@latest --enable-plugin -
 
 > Windows PowerShell 请用 `rm -r addons/godot-mcp`（不带 `-f`）。
 
-- **锁定某个版本** —— `npx @yanhuifair/godot-mcp@1.12.0 …`；**强制用最新** —— `npx @yanhuifair/godot-mcp@latest …`。
+- **锁定某个版本** —— `npx @yanhuifair/godot-mcp@1.12.1 …`；**强制用最新** —— `npx @yanhuifair/godot-mcp@latest …`。
 - **全局安装** —— `npm update -g @yanhuifair/godot-mcp`。
 - **从源码构建** —— `git pull && npm run build`。
 - **查看当前版本** —— `npx @yanhuifair/godot-mcp --version`。
 
 > **从 v1.9.0 升级？** 那个版本自带的编辑器插件里 `runtime_bridge.gd` 在 Godot 4.7 会解析失败（`_input` 函数与内置的 `Node._input` 冲突，且 `_resolve` 缺少返回类型）。如果编辑器报这些解析错误，删掉 `addons/godot-mcp` 再重跑 `--enable-plugin` 即可装上修复后的插件。
 
-完整变更历史见 [CHANGELOG](CHANGELOG.md)。**v1.12.0** 是一次安全版本：修掉了三个已用 PoC 证实的沙箱逃逸（`log_path` 任意文件读取、`write_project_config` 注入 `[autoload]`、`resolveProjectPath` 符号链接写逃逸），终结了 `edit_scene` 对未执行操作谎报成功，重写 `project.godot` 时不再打乱注释位置，并新增 20 项沙箱回归测试与文档漂移门禁。
+完整变更历史见 [CHANGELOG](CHANGELOG.md)。**v1.12.1** 是一次安全版本：修掉了三个已用 PoC 证实的沙箱逃逸（`log_path` 任意文件读取、`write_project_config` 注入 `[autoload]`、`resolveProjectPath` 符号链接写逃逸），终结了 `edit_scene` 对未执行操作谎报成功，重写 `project.godot` 时不再打乱注释位置，并新增 20 项沙箱回归测试与文档漂移门禁。
 
 ### 命令行参数
 
@@ -628,7 +628,7 @@ rm -rf addons/godot-mcp && npx -y @yanhuifair/godot-mcp@latest --enable-plugin -
 | `-g, --godot-path <path>` | Godot 可执行文件路径。不填则自动检测（顺序见下方）。 |
 | `--enable-plugin` | 把编辑器插件复制进 `addons/`**并**在 `project.godot` 中自动启用。需要配合 `-p`。**通常你要的就是这个。** |
 | `--install-addons` | 只复制插件文件，需要你自己去 Godot 的插件面板里勾选启用。 |
-| `--read-only` | 安全模式：拒绝218 个会写文件或产生副作用的工具。让 AI 探索一个陌生项目时非常好用。 |
+| `--read-only` | 安全模式：拒绝 218 个会写文件或产生副作用的工具。让 AI 探索一个陌生项目时非常好用。 |
 | `-t, --transport <mode>` | `stdio`（默认）· `sse` · `streamable-http` · `all`。详见[传输模式](#传输模式)。 |
 | `--port <number>` | `sse` / `streamable-http` 的 HTTP 端口，默认 `3000`。 |
 | `--host <string>` | HTTP 监听地址，默认 `127.0.0.1`。绑定其他地址**必须**设置 `GODOT_MCP_TOKEN`。 |
@@ -647,7 +647,7 @@ npx @yanhuifair/godot-mcp -p . -t streamable-http --port 8080
 | 变量 | 描述 |
 |---|---|
 | `GODOT_PATH` | Godot 二进制路径（可选，自动检测） |
-| `GODOT_MCP_READ_ONLY` | `true` — 启用只读模式（拒绝218 个写/副作用工具） |
+| `GODOT_MCP_READ_ONLY` | `true` — 启用只读模式（拒绝 218 个写/副作用工具） |
 | `GODOT_MCP_TOKEN` | 鉴权令牌。HTTP：绑定非 loopback 地址时必须设置；插件 TCP 桥：在 9876 端口启用 `auth` 握手 |
 | `GODOT_MCP_TEST_PROJECT` | 集成测试项目路径 |
 | `GODOT_PROJECT` | `sync-addons` 构建钩子的目标项目 |
@@ -2063,7 +2063,7 @@ npx @yanhuifair/godot-mcp --enable-plugin -p /path/to/your/godot/project
 npm install          # 安装依赖
 npm run build        # 构建 TypeScript 到 dist/
 npm run dev          # 开发模式（tsx 热重载）
-npm test             # 运行 vitest 套件（219 个测试：149 个可运行 + 70 个集成需要真实 Godot 项目）；node test/test_all.mjs 运行 176 项旧版检查
+npm test             # 运行 vitest 套件（224 个测试：154 个可运行 + 70 个集成需要真实 Godot 项目）；node test/test_all.mjs 运行 176 项旧版检查
 npm run test:watch   # 监听模式
 npm run check:godot  # 在真实的无头 Godot 中加载全部测试资源，校验
                      # ext_resource 路径、UID 与 SubResource 引用（需已安装 Godot）
@@ -2080,7 +2080,7 @@ npm run check:godot  # 在真实的无头 Godot 中加载全部测试资源，�
 | `--host` | HTTP 绑定地址（默认：127.0.0.1） |
 | `--install-addons` | 将编辑器插件复制到目标 Godot 项目 |
 | `--enable-plugin` | 安装并自动启用编辑器插件 |
-| `--read-only` | 拒绝218 个写/副作用工具（安全模式） |
+| `--read-only` | 拒绝 218 个写/副作用工具（安全模式） |
 | `--no-sse` | 禁用 SSE 端点 |
 | `--no-streamable-http` | 禁用 Streamable HTTP 端点 |
 | `-h, --help` | 显示帮助 |
@@ -2101,13 +2101,13 @@ npm run check:godot  # 在真实的无头 Godot 中加载全部测试资源，�
 
 ```bash
 npm run vsix
-# 输出: godot-mcp-1.12.0.vsix
+# 输出: godot-mcp-1.12.1.vsix
 ```
 
 在 VS Code 中安装：
 
 ```bash
-code --install-extension godot-mcp-1.12.0.vsix
+code --install-extension godot-mcp-1.12.1.vsix
 ```
 
 ---

@@ -72,7 +72,10 @@ function getConnection(): Promise<net.Socket> {
               if (res.error) p.reject(new Error(res.error.message || 'Runtime error'));
               else p.resolve(res.result);
             }
-          } catch {}
+          } catch {
+            // 与编辑器桥同理：静默丢弃畸形行会让调用方干等到超时，至少留个痕。
+            console.error(`[Godot MCP] Ignoring malformed runtime response: ${line.slice(0, 200)}`);
+          }
         }
       });
       client.on('close', () => {

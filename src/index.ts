@@ -2,7 +2,7 @@
 // Copyright (c) 2026 FairYan
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // ============================================================
-// Godot MCP Server - Entry Point (v1.12.0)
+// Godot MCP Server - Entry Point (v1.12.1)
 // ============================================================
 // 同时支持三种 MCP 通信协议：
 //   - Stdio（标准输入输出，默认）
@@ -20,6 +20,19 @@ import { runHttpTransport } from './transports/http-server.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+/**
+ * 版本号从 package.json 读，别写死第二份——否则又是一个会漂移的副本
+ * （本项目已经因为「同一事实存多处」踩过 tool count 漂移）。
+ */
+const VERSION: string = (() => {
+  try {
+    const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf-8'));
+    return typeof pkg.version === 'string' ? pkg.version : '0.0.0';
+  } catch {
+    return '0.0.0';
+  }
+})();
+
 // ---- 全局异常兜底：防止未捕获的 rejection/异常导致进程崩溃 ----
 process.on('unhandledRejection', (reason) => {
   console.error('[Godot MCP] Unhandled rejection:', reason);
@@ -36,6 +49,7 @@ interface CliConfig {
   projectPath?: string;
   godotPath?: string;
   help?: boolean;
+  version?: boolean;
   installAddons?: boolean;
   enablePlugin?: boolean;
   readOnly?: boolean;
@@ -71,6 +85,12 @@ function parseArgs(): CliConfig {
       case '--help':
       case '-h':
         result.help = true;
+        break;
+      // README 一直把 `--version` 写成「查看版本的命令」，但它之前根本没实现——
+      // 传进去会被当成未知参数忽略，然后照常启动 stdio 服务器并挂住等 stdin。
+      case '--version':
+      case '-v':
+        result.version = true;
         break;
       case '--install-addons':
         result.installAddons = true;
@@ -119,7 +139,7 @@ OPTIONS:
   --godot-path, -g <path>    Godot 可执行文件路径（默认：自动检测）
   --install-addons            将编辑器插件 (addons/) 安装到目标项目
   --enable-plugin             安装 addons 并自动在 project.godot 中启用插件
-  --read-only                 只读模式：拒绝218 个写/副作用工具（安全模式）
+  --read-only                 只读模式：拒绝 218 个写/副作用工具（安全模式）
 
 TRANSPORT OPTIONS:
   --transport, -t <mode>     传输协议（默认：stdio）
@@ -135,6 +155,7 @@ TRANSPORT OPTIONS:
   --no-streamable-http       禁用 Streamable HTTP 端点
 
   --help, -h                 显示此帮助信息
+  --version, -v              显示版本号并退出
 
 EXAMPLES:
   godot-mcp                                      # Stdio 模式（默认）
@@ -206,6 +227,13 @@ async function main(): Promise<void> {
 
   if (config.help) {
     printHelp();
+    process.exit(0);
+  }
+
+  // README 把 `--version` 写成查看版本的命令，这里必须真的处理它并退出：
+  // 否则参数被忽略 → 照常进 stdio 服务器 → 客户端以为命令卡死。
+  if (config.version) {
+    console.log(VERSION);
     process.exit(0);
   }
 
