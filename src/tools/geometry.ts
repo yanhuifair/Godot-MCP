@@ -6,6 +6,7 @@
 
 import { z } from 'zod';
 import { toolError, ErrorCode } from '../utils/errors.js';
+import { forEachNode, findNodeByPath } from '../utils/scene_walk.js';
 import { ToolResult } from '../utils/types.js';
 import { resolveProjectPath, readTextFile, writeTextFile } from '../utils/file_utils.js';
 import { parseScene, serializeScene } from '../parsers/scene_parser.js';
@@ -90,25 +91,9 @@ export function handleSetShapePoints(
     const { content } = readTextFile(absPath);
     const doc = parseScene(content);
 
-    // Find the node
-    function findNode(nodes: any[], pathParts: string[], idx: number): any | null {
-      if (idx >= pathParts.length) return null;
-      const target = pathParts[idx];
-      for (const node of nodes) {
-        if (node.name === target) {
-          if (idx === pathParts.length - 1) return node;
-          if (node.children) return findNode(node.children, pathParts, idx + 1);
-        }
-      }
-      return null;
-    }
-
+    // Find the node（按路径查找；同名兄弟节点的容错由 findNodeByPath 负责）
     const pathParts = args.node_path.split('/').filter(Boolean);
-    // Handle root path like "Main/Body/CollisionShape2D"
-    // First part might be root node, skip if needed
-    const startIdx = pathParts.length > 1 ? 1 : 0;
-
-    const node = findNode(doc.nodes, pathParts, 0);
+    const node = findNodeByPath(doc.nodes, args.node_path);
     if (!node) {
     return toolError(ErrorCode.FILE_NOT_FOUND, `Node "${args.node_path}" not found`);
     }
@@ -205,19 +190,15 @@ export function handleReadCollisionPolygon(
     const doc = parseScene(content);
 
     const found: { name: string; type: string; points: number[][] }[] = [];
-    function walk(nodes: any[]): void {
-      for (const node of nodes) {
-        if (node.type === 'CollisionPolygon2D') {
-          const prop = node.properties['polygon'] || '';
-          const pts = prop.includes('PackedVector2Array') ? parsePackedVector2Array(prop) : [];
-          if (!args.node_path || node.name === args.node_path || args.node_path.endsWith('/' + node.name)) {
-            found.push({ name: node.name, type: node.type, points: pts });
-          }
+    forEachNode(doc.nodes, (node) => {
+      if (node.type === 'CollisionPolygon2D') {
+        const prop = node.properties['polygon'] || '';
+        const pts = prop.includes('PackedVector2Array') ? parsePackedVector2Array(prop) : [];
+        if (!args.node_path || node.name === args.node_path || args.node_path.endsWith('/' + node.name)) {
+          found.push({ name: node.name, type: node.type, points: pts });
         }
-        if (node.children) walk(node.children);
       }
-    }
-    walk(doc.nodes);
+    });
 
     if (found.length === 0) {
       return { content: [{ type: 'text', text: `No CollisionPolygon2D nodes found${args.node_path ? ` matching "${args.node_path}"` : ''}.` }] };

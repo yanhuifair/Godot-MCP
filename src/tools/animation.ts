@@ -11,9 +11,9 @@
 
 import { z } from 'zod';
 import { toolError, ErrorCode } from '../utils/errors.js';
+import { forEachScene } from '../utils/scene_files.js';
+import { forEachNode } from '../utils/scene_walk.js';
 import { ToolResult } from '../utils/types.js';
-import fs from 'node:fs';
-import path from 'node:path';
 import { readTextFile, resolveProjectPath, findFilesByExtension, writeTextFile } from '../utils/file_utils.js';
 import { parseScene, serializeScene } from '../parsers/scene_parser.js';
 
@@ -90,14 +90,11 @@ export function handleListAnimations(
     let totalAnimations = 0;
     let totalPlayers = 0;
 
-    for (const sceneRelPath of sceneFiles) {
-      const absPath = resolveProjectPath(projectRoot, sceneRelPath);
-      const { content } = readTextFile(absPath);
-      const doc = parseScene(content);
+    forEachScene(projectRoot, { scenePath: args.scene_path }, (doc, sceneRelPath) => {
 
       // Find AnimationPlayer nodes
       const animPlayers = getAllAnimationPlayers(doc);
-      if (animPlayers.length === 0) continue;
+      if (animPlayers.length === 0) return; // 回调里 continue 不合法，等价写法是 return
 
       lines.push(`\n=== ${sceneRelPath} (${animPlayers.length} AnimationPlayer${animPlayers.length > 1 ? 's' : ''}) ===`);
       totalPlayers += animPlayers.length;
@@ -118,7 +115,7 @@ export function handleListAnimations(
           }
         }
       }
-    }
+    });
 
     if (totalPlayers === 0) {
       return { content: [{ type: 'text', text: 'No AnimationPlayer nodes found in project scenes.' }] };
@@ -537,13 +534,9 @@ export function handleReadAnimationTree(
 
     // Find AnimationTree nodes
     const trees: any[] = [];
-    function walk(nodes: any[]): void {
-      for (const node of nodes) {
-        if (node.type === 'AnimationTree') trees.push(node);
-        if (node.children) walk(node.children);
-      }
-    }
-    walk(doc.nodes);
+    forEachNode(doc.nodes, (node) => {
+      if (node.type === 'AnimationTree') trees.push(node);
+    });
 
     if (trees.length === 0 && animPlayers.length === 0) {
       return { content: [{ type: 'text', text: 'No AnimationTree or AnimationPlayer nodes found in this scene.' }] };
@@ -620,13 +613,9 @@ export function handleSetAnimationTreeParam(
     const doc = parseScene(content);
 
     const trees: any[] = [];
-    function walk(nodes: any[]): void {
-      for (const node of nodes) {
-        if (node.type === 'AnimationTree') trees.push(node);
-        if (node.children) walk(node.children);
-      }
-    }
-    walk(doc.nodes);
+    forEachNode(doc.nodes, (node) => {
+      if (node.type === 'AnimationTree') trees.push(node);
+    });
 
     const tree = args.tree_name
       ? trees.find(t => t.name === args.tree_name)
@@ -672,18 +661,11 @@ interface ParsedKey {
 function getAllAnimationPlayers(doc: any): any[] {
   const players: any[] = [];
 
-  function walk(nodes: any[]): void {
-    for (const node of nodes) {
-      if (node.type === 'AnimationPlayer') {
-        players.push(node);
-      }
-      if (node.children) {
-        walk(node.children);
-      }
+  forEachNode(doc.nodes, (node) => {
+    if (node.type === 'AnimationPlayer') {
+      players.push(node);
     }
-  }
-
-  walk(doc.nodes);
+  });
   return players;
 }
 

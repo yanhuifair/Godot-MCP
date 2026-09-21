@@ -144,7 +144,6 @@ interface DiffResult {
 }
 
 function computeDiff(linesA: string[], linesB: string[]): DiffResult {
-  const changes: DiffEntry[] = [];
   let adds = 0;
   let removes = 0;
   let mods = 0;

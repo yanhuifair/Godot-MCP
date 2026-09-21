@@ -8,6 +8,7 @@
 
 import { z } from 'zod';
 import { toolError, ErrorCode } from '../utils/errors.js';
+import { forEachScene } from '../utils/scene_files.js';
 import { ToolResult } from '../utils/types.js';
 import { resolveProjectPath, findFilesByExtension, readTextFile, writeTextFile } from '../utils/file_utils.js';
 import { parseScene, serializeScene } from '../parsers/scene_parser.js';
@@ -45,36 +46,6 @@ export const readParticlesSchema = {
 const LIGHT_TYPES_3D = ['OmniLight3D', 'SpotLight3D', 'DirectionalLight3D'];
 const LIGHT_TYPES_2D = ['PointLight2D', 'DirectionalLight2D'];
 
-const LIGHT_PARAM_LABELS: Record<string, string> = {
-  light_color: 'Light color',
-  light_energy: 'Light energy (brightness)',
-  light_indirect_energy: 'Indirect light energy',
-  light_negative: 'Negative light',
-  light_specular: 'Affects specular',
-  shadow_enabled: 'Casts shadows',
-  shadow_bias: 'Shadow bias',
-  shadow_normal_bias: 'Shadow normal bias',
-  shadow_opacity: 'Shadow opacity',
-  shadow_blur: 'Shadow blur',
-  spot_range: 'Spot range',
-  spot_attenuation: 'Spot attenuation',
-  spot_angle: 'Spot angle',
-  omni_range: 'Range',
-  omni_attenuation: 'Attenuation',
-  directional_shadow_mode: 'Shadow mode',
-  directional_shadow_split_1: 'Shadow split 1',
-  directional_shadow_split_2: 'Shadow split 2',
-  directional_shadow_split_3: 'Shadow split 3',
-  texture: 'Light texture (cookies)',
-  texture_scale: 'Texture scale',
-  editor_only: 'Editor only',
-  energy: 'Energy',
-  color: 'Color',
-  range_z_min: 'Min Z range',
-  range_z_max: 'Max Z range',
-  range_height: 'Range height',
-};
-
 const PARTICLE_TYPES = ['GPUParticles3D', 'CPUParticles3D', 'GPUParticles2D', 'CPUParticles2D'];
 
 // ---- Helpers ----
@@ -101,10 +72,7 @@ export function handleListCameras(
 
     const cameras: { scene: string; name: string; type: string; current: boolean }[] = [];
 
-    for (const relPath of sceneFiles) {
-      const absPath = resolveProjectPath(projectRoot, relPath);
-      const { content } = readTextFile(absPath);
-      const doc = parseScene(content);
+    forEachScene(projectRoot, { scenePath: args.scene_path }, (doc, relPath) => {
 
       for (const node of walkAllNodes(doc.nodes)) {
         if (node.type === 'Camera3D' || node.type === 'Camera2D') {
@@ -116,7 +84,7 @@ export function handleListCameras(
           });
         }
       }
-    }
+    });
 
     if (cameras.length === 0) {
       return { content: [{ type: 'text', text: 'No Camera nodes found.' }] };
@@ -218,10 +186,7 @@ export function handleListLights(
 
     const lights: { scene: string; name: string; type: string; energy: string }[] = [];
 
-    for (const relPath of sceneFiles) {
-      const absPath = resolveProjectPath(projectRoot, relPath);
-      const { content } = readTextFile(absPath);
-      const doc = parseScene(content);
+    forEachScene(projectRoot, { scenePath: args.scene_path }, (doc, relPath) => {
 
       for (const node of walkAllNodes(doc.nodes)) {
         if (targetTypes.includes(node.type)) {
@@ -233,7 +198,7 @@ export function handleListLights(
           });
         }
       }
-    }
+    });
 
     if (lights.length === 0) {
       return { content: [{ type: 'text', text: 'No light nodes found.' }] };
@@ -300,10 +265,7 @@ export function handleReadParticles(
 
     const particles: { scene: string; name: string; type: string; amount: string; lifetime: string }[] = [];
 
-    for (const relPath of sceneFiles) {
-      const absPath = resolveProjectPath(projectRoot, relPath);
-      const { content } = readTextFile(absPath);
-      const doc = parseScene(content);
+    forEachScene(projectRoot, { scenePath: args.scene_path }, (doc, relPath) => {
 
       for (const node of walkAllNodes(doc.nodes)) {
         if (targetTypes.includes(node.type)) {
@@ -316,7 +278,7 @@ export function handleReadParticles(
           });
         }
       }
-    }
+    });
 
     if (particles.length === 0) {
       return { content: [{ type: 'text', text: 'No particle nodes found.' }] };

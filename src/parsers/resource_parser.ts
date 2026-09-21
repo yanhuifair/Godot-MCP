@@ -14,7 +14,7 @@
 //
 // .res files are binary - not supported.
 
-import { ResourceDocument, ResourceHeader, ExtResource, SubResource } from '../utils/types.js';
+import { ResourceDocument } from '../utils/types.js';
 import { splitHeaderParts, parseKeyValuePairs, unquote, unquoteId, unquoteAttr } from './parser_helpers.js';
 
 const BINARY_RES_HEADER = 'GDROM'; // 4-byte magic for Godot binary resources

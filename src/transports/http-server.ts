@@ -17,7 +17,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { createMcpExpressApp } from '@modelcontextprotocol/sdk/server/express.js';
 import { randomUUID } from 'node:crypto';
 import { createMcpServer, initSharedResources, getProjectRoot } from '../server.js';
-import { initEditorBridge, shutdownEditorBridge } from '../tools/editor.js';
+import { initEditorBridge, shutdownEditorBridge } from '../tools/editor_bridge.js';
 import { cleanupProcesses } from '../utils/godot_cli.js';
 
 export interface HttpTransportOptions {
@@ -132,7 +132,7 @@ export async function runHttpTransport(options: HttpTransportOptions = {}): Prom
     const mayRevealPaths = isLoopback || requestHasValidToken(req);
     res.json({
       status: 'ok',
-      version: '1.12.1',
+      version: '1.12.2',
       ...(mayRevealPaths ? { projectRoot: getProjectRoot() } : {}),
       endpoints: {
         ...(enableSse ? { sse: `http://${host}:${port}/sse` } : {}),

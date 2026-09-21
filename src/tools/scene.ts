@@ -6,11 +6,10 @@
 
 import { z } from 'zod';
 import { toolError, ErrorCode } from '../utils/errors.js';
-import fs from 'node:fs';
-import pathMod from 'node:path';
 import { ToolResult, SceneOperation, SceneTemplateType, GodotDocument, NodeDefinition } from '../utils/types.js';
-import { readTextFile, writeTextFile, findFilesByExtension, findProjectRoot, resolveProjectPath, toResPath } from '../utils/file_utils.js';
+import { readTextFile, writeTextFile, findFilesByExtension, resolveProjectPath, toResPath } from '../utils/file_utils.js';
 import { parseScene, serializeScene, generateSceneTemplate, editScene, SceneEditReport } from '../parsers/scene_parser.js';
+import { collectNodes, findNodeByName } from '../utils/scene_walk.js';
 
 // ---- Tool Schemas ----
 
@@ -402,15 +401,7 @@ export function handleSceneDependencyGraph(projectRoot: string): ToolResult {
 }
 
 function getAllNodes(nodes: any[]): any[] {
-  const all: any[] = [];
-  function walk(list: any[]) {
-    for (const node of list) {
-      all.push(node);
-      if (node.children) walk(node.children);
-    }
-  }
-  walk(nodes);
-  return all;
+  return collectNodes(nodes);
 }
 
 // ---- Cross-Scene Node Finder ----
@@ -1065,16 +1056,7 @@ export function handleLoadSprite(
     const doc = parseScene(content);
 
     // 查找目标节点
-    const findNode = (nodes: any[], target: string): any | null => {
-      for (const n of nodes) {
-        if (n.name === target) return n;
-        const r = findNode(n.children || [], target);
-        if (r) return r;
-      }
-      return null;
-    };
-
-    const node = findNode(doc.nodes, args.node_path);
+    const node = findNodeByName(doc.nodes, args.node_path);
     if (!node) {
             return toolError(ErrorCode.FILE_NOT_FOUND, `Node "${args.node_path}" not found in ${args.scene_path}.`);
     }

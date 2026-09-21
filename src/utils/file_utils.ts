@@ -100,7 +100,10 @@ export function resolveProjectPath(projectRoot: string, relativePath: string): s
   try {
     realRoot = fs.existsSync(projectRoot) ? fs.realpathSync(projectRoot) : path.resolve(projectRoot);
   } catch (err) {
-    throw new Error(`Cannot resolve project root path "${projectRoot}": ${(err as Error).message}`);
+    throw new Error(
+      `Cannot resolve project root path "${projectRoot}": ${(err as Error).message}`,
+      { cause: err }
+    );
   }
 
   // Resolve target path (use path.resolve since file may not exist yet, e.g. for create operations)

@@ -19,7 +19,7 @@ const N = "\x1b[0m";
 
 let passed = 0;
 let failed = 0;
-let errors = [];
+const errors = [];
 
 function ok(name) {
   passed++;
@@ -189,7 +189,7 @@ async function testProjectTools() {
 
   // read_export_presets (可能不存在)
   try {
-    const { handleReadExportPresets } = await import("../dist/tools/project.js");
+    const { handleReadExportPresets } = await import("../dist/tools/export_presets.js");
     const r = handleReadExportPresets(PROJECT);
     ok(`read_export_presets - ${r.isError ? "无导出预设（预期）" : "读取成功"}`);
   } catch (e) {

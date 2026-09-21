@@ -9,9 +9,9 @@
 
 import { z } from 'zod';
 import { ToolResult } from '../utils/types.js';
-import { ErrorCode, wrapError, toolError } from '../utils/errors.js';
+import { ErrorCode, toolError } from '../utils/errors.js';
 import { getActiveRegistry } from '../utils/registry.js';
-import { probeEditor } from './editor.js';
+import { probeEditor } from './editor_bridge.js';
 import { sendGameCommand, isGameReachable } from './runtime_bridge.js';
 
 // ---- Schemas ----

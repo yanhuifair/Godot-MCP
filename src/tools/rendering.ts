@@ -6,6 +6,8 @@
 
 import { z } from 'zod';
 import { toolError, ErrorCode } from '../utils/errors.js';
+import { forEachScene } from '../utils/scene_files.js';
+import { collectNodes } from '../utils/scene_walk.js';
 import { ToolResult } from '../utils/types.js';
 import { readTextFile, resolveProjectPath, findFilesByExtension, writeTextFile, toResPath } from '../utils/file_utils.js';
 import { parseScene, serializeScene } from '../parsers/scene_parser.js';
@@ -41,15 +43,6 @@ export const readRaycastSchema = {
 
 // ---- Helpers ----
 
-function walkNodes(nodes: any[], types: string[]): any[] {
-  const result: any[] = [];
-  for (const node of nodes) {
-    if (types.includes(node.type)) result.push(node);
-    if (node.children) result.push(...walkNodes(node.children, types));
-  }
-  return result;
-}
-
 function findNodeByName(nodes: any[], name: string): any | null {
   for (const node of nodes) {
     if (node.name === name) return node;
@@ -72,7 +65,7 @@ export function handleReadMeshInstance(
     const { content } = readTextFile(absPath);
     const doc = parseScene(content);
 
-    const meshes = walkNodes(doc.nodes, ['MeshInstance3D', 'MeshInstance2D']);
+    const meshes = collectNodes(doc.nodes, ['MeshInstance3D', 'MeshInstance2D']);
     const target = args.node_name
       ? meshes.find(m => m.name === args.node_name)
       : meshes[0];
@@ -173,7 +166,7 @@ export function handleReadViewport(
     const { content } = readTextFile(absPath);
     const doc = parseScene(content);
 
-    const viewports = walkNodes(doc.nodes, ['Viewport', 'SubViewport']);
+    const viewports = collectNodes(doc.nodes, ['Viewport', 'SubViewport']);
     const target = args.node_name
       ? viewports.find(v => v.name === args.node_name)
       : viewports[0];
@@ -231,7 +224,7 @@ export function handleReadArea(
     const { content } = readTextFile(absPath);
     const doc = parseScene(content);
 
-    const areas = walkNodes(doc.nodes, ['Area2D', 'Area3D']);
+    const areas = collectNodes(doc.nodes, ['Area2D', 'Area3D']);
     const target = args.node_name
       ? areas.find(a => a.name === args.node_name)
       : areas[0];
@@ -293,19 +286,16 @@ export function handleReadRaycast(
 
     const rays: { scene: string; name: string; type: string; enabled: string; target: string }[] = [];
 
-    for (const relPath of sceneFiles) {
-      const absPath = resolveProjectPath(projectRoot, relPath);
-      const { content } = readTextFile(absPath);
-      const doc = parseScene(content);
+    forEachScene(projectRoot, { scenePath: args.scene_path }, (doc, relPath) => {
 
-      for (const node of walkNodes(doc.nodes, targetTypes)) {
+      for (const node of collectNodes(doc.nodes, targetTypes)) {
         rays.push({
           scene: relPath, name: node.name, type: node.type,
           enabled: node.properties['enabled'] || 'true',
           target: node.properties['target_position'] || node.properties['target_position'] || '?',
         });
       }
-    }
+    });
 
     if (rays.length === 0) {
       return { content: [{ type: 'text', text: 'No RayCast/ShapeCast nodes found.' }] };

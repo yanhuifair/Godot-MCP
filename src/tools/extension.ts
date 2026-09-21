@@ -8,7 +8,7 @@ import { z } from 'zod';
 import { toolError, ErrorCode } from '../utils/errors.js';
 import { ToolResult } from '../utils/types.js';
 import fs from 'node:fs';
-import { readTextFile, resolveProjectPath, findFilesByExtension, writeTextFile } from '../utils/file_utils.js';
+import { resolveProjectPath, findFilesByExtension, writeTextFile } from '../utils/file_utils.js';
 
 // ---- Tool Schemas ----
 

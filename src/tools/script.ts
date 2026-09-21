@@ -14,7 +14,6 @@ import {
   findFilesByExtension,
   resolveProjectPath,
 } from '../utils/file_utils.js';
-import { parseResource } from '../parsers/resource_parser.js';
 import { parseVisualShaderDoc, describeVisualShaderDoc } from './shader_graph.js';
 
 // ---- GDScript identifier validation ----
@@ -24,6 +23,8 @@ const GD_SCRIPT_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
 /** A single-line value with no control chars, statement separators, or comments. Optional fields pass `undefined`, which is valid (no value). */
 function isSingleLineSafe(s: string | undefined): boolean {
   if (s === undefined) return true;
+  // 有意匹配控制字符：GDScript 字符串/注释里出现它们说明输入被污染了
+  // eslint-disable-next-line no-control-regex
   return !/[\x00-\x1f\x7f;#]/.test(s);
 }
 /** Validate one GDScript parameter entry: `name[: type[= default]]`. */
@@ -480,7 +481,6 @@ export function handleValidateScript(
 
       // Check tab/space mixing
       if (line.length > 0) {
-        const leading = line.match(/^(\s*)/)?.[1].length || 0;
         const tabs = (line.match(/^\t*/)?.[0].length || 0) * 4;
         const spaces = (line.match(/^ */)?.[0].length || 0);
         if (tabs > 0 && spaces > 0 && spaces % 4 !== 0) {
@@ -585,7 +585,7 @@ export function handleReadScriptStructure(
 
     if (structure.vars.length > 0) {
       out.push(`Variables (${structure.vars.length}):`);
-      structure.vars.forEach(v => out.push(`  Line ${lines.findIndex((l, idx) => l.trim() === v) + 1}: ${v}`));
+      structure.vars.forEach(v => out.push(`  Line ${lines.findIndex((l) => l.trim() === v) + 1}: ${v}`));
       out.push('');
     }
 
@@ -890,7 +890,6 @@ export function handleValidateShader(
     }
 
     const { lines } = readFileLines(absPath);
-    const content = lines.join('\n');
     const issues: string[] = [];
     let shaderType = '';
     let braceDepth = 0;
@@ -972,7 +971,7 @@ export async function handleCompileShader(
 ): Promise<ToolResult> {
   try {
     // Try editor plugin first (triggers real shader compiler)
-    const { sendEditorCommand } = await import('./editor.js');
+    const { sendEditorCommand } = await import('./editor_bridge.js');
     const result = await sendEditorCommand('reimport_asset', { path: args.path });
     if (result && !result.error) {
       return { content: [{ type: 'text', text: `Shader compiled: ${args.path}\n\nGodot shader compiler triggered via editor plugin. Check the Godot Output panel for compilation results.` }] };

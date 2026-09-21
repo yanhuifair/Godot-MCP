@@ -24,6 +24,28 @@ export function cfgQuote(value: string): string {
 }
 
 /**
+ * 把用户给的值转成 .cfg 语法。
+ * 布尔/数字裸写；已经像 Godot 字面量的（引号串、`Object(...)`、`PackedStringArray(...)`）
+ * 逐字透传，方便调用方原样设置复杂选项值；其余按字符串字面量加引号。
+ *
+ * 「透传」必须排除裸换行：序列化器一行一个 key，值里带换行就等于可以凭空
+ * 插入新的 section/key。所以两条透传分支都只把换行转义掉，其余字符保持原样。
+ */
+export function cfgValue(value: string): string {
+  const t = value.trim();
+  if (t === 'true' || t === 'false') return t;
+  if (/^-?\d+(\.\d+)?$/.test(t)) return t;
+  if (t.startsWith('"') && t.endsWith('"') && t.length >= 2) {
+    const inner = t.slice(1, -1);
+    return `"${inner.replace(/\r/g, '\\r').replace(/\n/g, '\\n')}"`;
+  }
+  if (/^[A-Za-z_][A-Za-z0-9_]*\(.*\)$/s.test(t)) {
+    return t.replace(/\r/g, '\\r').replace(/\n/g, '\\n');
+  }
+  return cfgQuote(value);
+}
+
+/**
  * 校验 section / key 名。这些名字会被直接写成 `[name]` 或 `name = value`，
  * 含换行、`[`、`]` 或 `=` 就能篡改文件结构。
  */
@@ -131,7 +153,7 @@ export function parseConfig(content: string): ConfigDocument {
       if (key.startsWith('"') && key.endsWith('"') && key.length >= 2) {
         key = key.slice(1, -1);
       }
-      let value = trimmed.slice(eqIndex + 1).trim();
+      const value = trimmed.slice(eqIndex + 1).trim();
 
       // Check for multi-line value start
       if (value === '"' || (value.startsWith('"') && !value.endsWith('"')) ||

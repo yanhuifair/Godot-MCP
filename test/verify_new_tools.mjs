@@ -7,6 +7,7 @@ import path from 'node:path';
 const root = process.cwd();
 const project = await import(path.join(root, 'dist/tools/project.js'));
 const trans = await import(path.join(root, 'dist/tools/translation.js'));
+const presets = await import(path.join(root, 'dist/tools/export_presets.js'));
 
 function assert(cond, msg) {
   if (!cond) { console.error('❌ FAIL:', msg); process.exitCode = 1; }
@@ -18,7 +19,7 @@ const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'godot-mcp-verify-'));
 fs.writeFileSync(path.join(dir, 'project.godot'), '[application]\nconfig/name="V"\n');
 
 // ---------- export_presets.cfg ----------
-const h1 = project.handleCreateExportPreset(dir, { name: 'WinBuild', platform: 'Windows Desktop', runnable: true });
+const h1 = presets.handleCreateExportPreset(dir, { name: 'WinBuild', platform: 'Windows Desktop', runnable: true });
 assert(!h1.isError, 'create_export_preset: 无错误 -> ' + (h1.content?.[0]?.text || ''));
 const cfg1 = fs.readFileSync(path.join(dir, 'export_presets.cfg'), 'utf-8');
 assert(cfg1.includes('[preset.0]'), '导出预设文件含 [preset.0]');
@@ -30,29 +31,29 @@ assert(cfg1.includes('[runnable_presets]'), '含 runnable_presets 段');
 assert(/"Windows Desktop"="WinBuild"/.test(cfg1), 'runnable 映射 "Windows Desktop"=WinBuild（带引号）');
 
 // 读回验证：quoted key 必须被解析为带空格的逻辑名，而非 "WindowsDesktop"
-const rb = project.handleReadExportPresets(dir, {});
+const rb = presets.handleReadExportPresets(dir, {});
 assert(!rb.isError && /Windows Desktop/.test(rb.content[0].text), '读回 export_presets 保留 "Windows Desktop" 平台名');
 
 // 第二个预设（不同平台，避免 runnable 冲突）
-const h2 = project.handleCreateExportPreset(dir, { name: 'LinuxBuild', platform: 'Linux', runnable: true });
+const h2 = presets.handleCreateExportPreset(dir, { name: 'LinuxBuild', platform: 'Linux', runnable: true });
 assert(!h2.isError, 'create_export_preset #2 无错误');
 const cfg2 = fs.readFileSync(path.join(dir, 'export_presets.cfg'), 'utf-8');
 assert(cfg2.includes('[preset.1]'), '第二个预设为 [preset.1]');
 assert(/Linux="LinuxBuild"/.test(cfg2), 'runnable 映射 Linux=LinuxBuild');
 
 // 重复名应被拒
-const dup = project.handleCreateExportPreset(dir, { name: 'WinBuild', platform: 'macOS' });
+const dup = presets.handleCreateExportPreset(dir, { name: 'WinBuild', platform: 'macOS' });
 assert(dup.isError && dup.content[0].text.includes('ALREADY_EXISTS'), '重复名被拒绝(ALREADY_EXISTS)');
 
 // update：修改 export_path + 自定义 option
-const u1 = project.handleUpdateExportPreset(dir, { preset: 'WinBuild', export_path: 'build/win.exe', fields: { 'custom_features': 'a,b' } });
+const u1 = presets.handleUpdateExportPreset(dir, { preset: 'WinBuild', export_path: 'build/win.exe', fields: { 'custom_features': 'a,b' } });
 assert(!u1.isError, 'update_export_preset 无错误 -> ' + (u1.content?.[0]?.text || ''));
 const cfg3 = fs.readFileSync(path.join(dir, 'export_presets.cfg'), 'utf-8');
 assert(cfg3.includes('export_path="build/win.exe"'), 'update 写入 export_path');
 assert(cfg3.includes('custom_features="a,b"'), 'update 写入自定义字段');
 
 // remove：删除 preset.0，剩余必须重编号（load_config 在首个缺失索引处停止）
-const r1 = project.handleRemoveExportPreset(dir, { preset: 'WinBuild' });
+const r1 = presets.handleRemoveExportPreset(dir, { preset: 'WinBuild' });
 assert(!r1.isError, 'remove_export_preset 无错误');
 const cfg4 = fs.readFileSync(path.join(dir, 'export_presets.cfg'), 'utf-8');
 assert(!cfg4.includes('[preset.1]'), '移除后无 [preset.1]（已重编号）');

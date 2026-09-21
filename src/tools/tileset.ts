@@ -9,8 +9,8 @@
 
 import { z } from 'zod';
 import { toolError, ErrorCode } from '../utils/errors.js';
+import { forEachNode } from '../utils/scene_walk.js';
 import { ToolResult } from '../utils/types.js';
-import fs from 'node:fs';
 import { readTextFile, writeTextFile, resolveProjectPath, findFilesByExtension } from '../utils/file_utils.js';
 import { parseResource } from '../parsers/resource_parser.js';
 import { parseScene } from '../parsers/scene_parser.js';
@@ -146,15 +146,11 @@ export function handleReadTilemap(
 
     // Find TileMapLayer nodes
     const tilemapLayers: any[] = [];
-    function walk(nodes: any[]): void {
-      for (const node of nodes) {
-        if (node.type === 'TileMapLayer' || node.type === 'TileMap') {
-          tilemapLayers.push(node);
-        }
-        if (node.children) walk(node.children);
+    forEachNode(doc.nodes, (node) => {
+      if (node.type === 'TileMapLayer' || node.type === 'TileMap') {
+        tilemapLayers.push(node);
       }
-    }
-    walk(doc.nodes);
+    });
 
     if (tilemapLayers.length === 0) {
       return { content: [{ type: 'text', text: `No TileMapLayer nodes found in ${args.scene_path}` }] };

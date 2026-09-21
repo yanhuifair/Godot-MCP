@@ -1,7 +1,7 @@
 // Copyright (c) 2026 FairYan
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // ============================================================
-// Godot MCP Server - Server Factory & Handlers (v1.12.1)
+// Godot MCP Server - Server Factory & Handlers (v1.12.2)
 // ============================================================
 // 将 MCP Server 创建、工具注册、请求处理抽离为独立工厂函数，
 // 供 Stdio、SSE、Streamable HTTP 三种传输层共用。
@@ -63,11 +63,11 @@ export interface CreateServerOptions {
  * 创建一个已注册所有工具和处理器的新 MCP Server 实例。
  * 每个 transport 连接都需要独立的 Server 实例。
  */
-export function createMcpServer(options: CreateServerOptions = {}): Server {
+export function createMcpServer(_options: CreateServerOptions = {}): Server {
   const { registry } = initSharedResources();
 
   const server = new Server(
-    { name: 'godot-mcp', version: '1.12.1' },
+    { name: 'godot-mcp', version: '1.12.2' },
     { capabilities: { tools: {} } }
   );
 

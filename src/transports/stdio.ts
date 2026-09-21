@@ -10,7 +10,7 @@
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { createMcpServer, initSharedResources } from '../server.js';
 import { cleanupProcesses } from '../utils/godot_cli.js';
-import { initEditorBridge, shutdownEditorBridge } from '../tools/editor.js';
+import { initEditorBridge, shutdownEditorBridge } from '../tools/editor_bridge.js';
 
 export interface StdioTransportOptions {
   /** Godot 项目根目录路径 */

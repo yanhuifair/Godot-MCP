@@ -10,18 +10,13 @@
 
 import { z } from 'zod';
 import { toolError, ErrorCode } from '../utils/errors.js';
+import { collectNodes } from '../utils/scene_walk.js';
 import fs from 'node:fs';
 import { ToolResult } from '../utils/types.js';
 import { readTextFile, resolveProjectPath, findFilesByExtension, writeTextFile } from '../utils/file_utils.js';
 import { parseScene } from '../parsers/scene_parser.js';
 
 // ---- Shared scene-node walker ----
-
-function walk(nodes: any[], types: string[]): any[] {
-  const r: any[] = [];
-  for (const n of nodes) { if (types.includes(n.type)) r.push(n); if (n.children) r.push(...walk(n.children, types)); }
-  return r;
-}
 
 // ============================================================
 // 2D LIGHTS
@@ -45,7 +40,7 @@ export function handleReadLight2d(
     const lights: any[] = [];
     for (const s of scenes) {
       const doc = parseScene(readTextFile(resolveProjectPath(projectRoot, s)).content);
-      for (const n of walk(doc.nodes, args.light_type ? [args.light_type] : types)) {
+      for (const n of collectNodes(doc.nodes, args.light_type ? [args.light_type] : types)) {
         lights.push({ scene: s, name: n.name, type: n.type, energy: n.properties['energy'] || '1', color: n.properties['color'] || 'white', shadow: n.properties['shadow_enabled'] || 'false' });
       }
     }
@@ -60,7 +55,7 @@ export function handleSetLight2dParam(projectRoot: string, args: { scene_path: s
   try {
     const abs = resolveProjectPath(projectRoot, args.scene_path);
     const doc = parseScene(readTextFile(abs).content);
-    const light = walk(doc.nodes, ['PointLight2D', 'DirectionalLight2D']).find(n => n.name === args.light_name);
+    const light = collectNodes(doc.nodes, ['PointLight2D', 'DirectionalLight2D']).find(n => n.name === args.light_name);
     if (!light) return toolError(ErrorCode.FILE_NOT_FOUND, `Light ${args.light_name} not found`);
     light.properties[args.param] = args.value;
     // Note: full round-trip requires scene serialization — light write is best-effort
@@ -106,8 +101,8 @@ export function handleReadVehicleBody(projectRoot: string, args: { scene_path?: 
     const vehicles: any[] = [];
     for (const s of scenes) {
       const doc = parseScene(readTextFile(resolveProjectPath(projectRoot, s)).content);
-      for (const n of walk(doc.nodes, ['VehicleBody3D'])) {
-        const wheels = walk(n.children || [], ['VehicleWheel3D']);
+      for (const n of collectNodes(doc.nodes, ['VehicleBody3D'])) {
+        const wheels = collectNodes(n.children || [], ['VehicleWheel3D']);
         vehicles.push({ scene: s, name: n.name, mass: n.properties['mass'] || '40', wheels: wheels.length });
       }
     }
@@ -147,7 +142,7 @@ export function handleReadSpringArm(projectRoot: string, args: { scene_path?: st
     const arms: any[] = [];
     for (const s of scenes) {
       const doc = parseScene(readTextFile(resolveProjectPath(projectRoot, s)).content);
-      for (const n of walk(doc.nodes, ['SpringArm3D'])) {
+      for (const n of collectNodes(doc.nodes, ['SpringArm3D'])) {
         arms.push({ scene: s, name: n.name, length: n.properties['spring_length'] || '4', collision: n.properties['collision_mask'] || '1' });
       }
     }
@@ -170,7 +165,7 @@ export function handleReadDecal(projectRoot: string, args: { scene_path?: string
     const decals: any[] = [];
     for (const s of scenes) {
       const doc = parseScene(readTextFile(resolveProjectPath(projectRoot, s)).content);
-      for (const n of walk(doc.nodes, ['Decal'])) {
+      for (const n of collectNodes(doc.nodes, ['Decal'])) {
         decals.push({ scene: s, name: n.name, size: n.properties['size'] || '1', texture: n.properties['texture_albedo'] || 'none', alpha: n.properties['upper_fade'] || '0.3' });
       }
     }
@@ -193,7 +188,7 @@ export function handleReadOccluder(projectRoot: string, args: { scene_path?: str
     const occluders: any[] = [];
     for (const s of scenes) {
       const doc = parseScene(readTextFile(resolveProjectPath(projectRoot, s)).content);
-      for (const n of walk(doc.nodes, ['OccluderInstance3D', 'OcclusionPolygon2D'])) {
+      for (const n of collectNodes(doc.nodes, ['OccluderInstance3D', 'OcclusionPolygon2D'])) {
         occluders.push({ scene: s, name: n.name, type: n.type });
       }
     }
@@ -217,7 +212,7 @@ export function handleReadMarker(projectRoot: string, args: { scene_path?: strin
     const markers: any[] = [];
     for (const s of scenes) {
       const doc = parseScene(readTextFile(resolveProjectPath(projectRoot, s)).content);
-      for (const n of walk(doc.nodes, types)) {
+      for (const n of collectNodes(doc.nodes, types)) {
         markers.push({ scene: s, name: n.name, type: n.type, pos: n.properties['position'] || '0,0' });
       }
     }
@@ -318,7 +313,7 @@ export function handleReadSpriteFrames(projectRoot: string, args: { scene_path?:
     const sprites: any[] = [];
     for (const s of scenes) {
       const doc = parseScene(readTextFile(resolveProjectPath(projectRoot, s)).content);
-      for (const n of walk(doc.nodes, ['AnimatedSprite2D', 'AnimatedSprite3D'])) {
+      for (const n of collectNodes(doc.nodes, ['AnimatedSprite2D', 'AnimatedSprite3D'])) {
         const frames = n.properties['sprite_frames'] || 'none';
         sprites.push({ scene: s, name: n.name, type: n.type, frames, anim: n.properties['animation'] || 'default' });
       }
@@ -351,7 +346,7 @@ export function handleReadSoftBody(projectRoot: string, args: { scene_path?: str
     const bodies: any[] = [];
     for (const s of scenes) {
       const doc = parseScene(readTextFile(resolveProjectPath(projectRoot, s)).content);
-      for (const n of walk(doc.nodes, ['SoftBody3D'])) {
+      for (const n of collectNodes(doc.nodes, ['SoftBody3D'])) {
         bodies.push({ scene: s, name: n.name, mass: n.properties['mass'] || '1', stiffness: n.properties['stiffness'] || '1' });
       }
     }
@@ -375,7 +370,7 @@ export function handleReadGridMap(projectRoot: string, args: { scene_path?: stri
     const maps: any[] = [];
     for (const s of scenes) {
       const doc = parseScene(readTextFile(resolveProjectPath(projectRoot, s)).content);
-      for (const n of walk(doc.nodes, ['GridMap'])) {
+      for (const n of collectNodes(doc.nodes, ['GridMap'])) {
         maps.push({ scene: s, name: n.name, size: n.properties['cell_size'] || '1', mesh_library: n.properties['mesh_library'] || 'none' });
       }
     }
@@ -411,7 +406,7 @@ export function handleReadAudioListener(projectRoot: string, args: { scene_path?
     const listeners: any[] = [];
     for (const s of scenes) {
       const doc = parseScene(readTextFile(resolveProjectPath(projectRoot, s)).content);
-      for (const n of walk(doc.nodes, ['AudioListener2D', 'AudioListener3D'])) {
+      for (const n of collectNodes(doc.nodes, ['AudioListener2D', 'AudioListener3D'])) {
         listeners.push({ scene: s, name: n.name, type: n.type });
       }
     }

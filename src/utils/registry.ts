@@ -6,7 +6,7 @@
 // Centralized tool registration system. Each tool file
 // exports a `registerTools(registry)` function.
 
-import { z, ZodTypeAny } from 'zod';
+import { ZodTypeAny } from 'zod';
 import { ToolResult } from './types.js';
 
 export type ToolHandler = (projectRoot: string, args: any) => ToolResult | Promise<ToolResult>;

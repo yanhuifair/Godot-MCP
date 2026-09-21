@@ -8,15 +8,11 @@
 
 import { z } from 'zod';
 import { toolError, ErrorCode } from '../utils/errors.js';
+import { forEachScene } from '../utils/scene_files.js';
+import { collectNodes } from '../utils/scene_walk.js';
 import { ToolResult } from '../utils/types.js';
 import { readTextFile, resolveProjectPath, findFilesByExtension } from '../utils/file_utils.js';
 import { parseScene } from '../parsers/scene_parser.js';
-
-function walk(nodes: any[], types: string[]): any[] {
-  const r: any[] = [];
-  for (const n of nodes) { if (types.includes(n.type)) r.push(n); if (n.children) r.push(...walk(n.children, types)); }
-  return r;
-}
 
 // ---- Schemas ----
 
@@ -68,7 +64,7 @@ export function handleReadCharacterBody(
     const { content } = readTextFile(absPath);
     const doc = parseScene(content);
 
-    const bodies = walk(doc.nodes, ['CharacterBody2D', 'CharacterBody3D']);
+    const bodies = collectNodes(doc.nodes, ['CharacterBody2D', 'CharacterBody3D']);
     const target = args.name ? bodies.find(b => b.name === args.name) : bodies[0];
 
     if (!target) return { content: [{ type: 'text', text: 'No CharacterBody found.' }] };
@@ -107,7 +103,7 @@ export function handleReadCharacterBody(
 
     // Show child CollisionShape
     if (target.children) {
-      const shapes = walk(target.children, ['CollisionShape2D', 'CollisionShape3D']);
+      const shapes = collectNodes(target.children, ['CollisionShape2D', 'CollisionShape3D']);
       if (shapes.length > 0) {
         lines.push(`\n  Collision Shapes (${shapes.length}):`);
         shapes.forEach(s => lines.push(`    ${s.name} (${s.type})`));
@@ -132,19 +128,16 @@ export function handleReadAnimatedSprite(
 
     const sprites: { scene: string; name: string; type: string; anim: string; frame: string }[] = [];
 
-    for (const relPath of sceneFiles) {
-      const absPath = resolveProjectPath(projectRoot, relPath);
-      const { content } = readTextFile(absPath);
-      const doc = parseScene(content);
+    forEachScene(projectRoot, { scenePath: args.scene_path }, (doc, relPath) => {
 
-      for (const node of walk(doc.nodes, types)) {
+      for (const node of collectNodes(doc.nodes, types)) {
         sprites.push({
           scene: relPath, name: node.name, type: node.type,
           anim: node.properties['animation'] || '(none)',
           frame: node.properties['frame'] || '0',
         });
       }
-    }
+    });
 
     if (sprites.length === 0) return { content: [{ type: 'text', text: 'No AnimatedSprite nodes found.' }] };
 
@@ -154,11 +147,8 @@ export function handleReadAnimatedSprite(
       if (!match) return toolError(ErrorCode.FILE_NOT_FOUND, `AnimatedSprite "${args.name}" not found`);
 
       // Find the actual scene data
-      for (const relPath of sceneFiles) {
-        const absPath = resolveProjectPath(projectRoot, relPath);
-        const { content } = readTextFile(absPath);
-        const doc = parseScene(content);
-        const node = walk(doc.nodes, types).find(n => n.name === args.name);
+      forEachScene(projectRoot, { scenePath: args.scene_path }, (doc, relPath) => {
+        const node = collectNodes(doc.nodes, types).find(n => n.name === args.name);
         if (node) {
           const lines: string[] = [`${node.type}: ${node.name}`];
           lines.push(`Scene: ${relPath}`);
@@ -176,7 +166,7 @@ export function handleReadAnimatedSprite(
           }
           return { content: [{ type: 'text', text: lines.join('\n') }] };
         }
-      }
+      });
     }
 
     const byType: Record<string, typeof sprites> = {};
@@ -206,12 +196,9 @@ export function handleReadAudioPlayer(
 
     const players: { scene: string; name: string; type: string; stream: string; playing: string }[] = [];
 
-    for (const relPath of sceneFiles) {
-      const absPath = resolveProjectPath(projectRoot, relPath);
-      const { content } = readTextFile(absPath);
-      const doc = parseScene(content);
+    forEachScene(projectRoot, { scenePath: args.scene_path }, (doc, relPath) => {
 
-      for (const node of walk(doc.nodes, types)) {
+      for (const node of collectNodes(doc.nodes, types)) {
         let stream = node.properties['stream'] || '(none)';
         if (stream.length > 60) stream = stream.slice(0, 60) + '...';
         players.push({
@@ -219,7 +206,7 @@ export function handleReadAudioPlayer(
           stream, playing: node.properties['playing'] || 'false',
         });
       }
-    }
+    });
 
     if (players.length === 0) return { content: [{ type: 'text', text: 'No AudioStreamPlayer nodes found.' }] };
 
@@ -247,17 +234,14 @@ export function handleReadVideoPlayer(
 
     const players: { scene: string; name: string; stream: string; loop: string }[] = [];
 
-    for (const relPath of sceneFiles) {
-      const absPath = resolveProjectPath(projectRoot, relPath);
-      const { content } = readTextFile(absPath);
-      const doc = parseScene(content);
+    forEachScene(projectRoot, { scenePath: args.scene_path }, (doc, relPath) => {
 
-      for (const node of walk(doc.nodes, ['VideoStreamPlayer'])) {
+      for (const node of collectNodes(doc.nodes, ['VideoStreamPlayer'])) {
         let stream = node.properties['stream'] || '(none)';
         if (stream.length > 60) stream = stream.slice(0, 60) + '...';
         players.push({ scene: relPath, name: node.name, stream, loop: node.properties['loop'] || 'false' });
       }
-    }
+    });
 
     if (players.length === 0) return { content: [{ type: 'text', text: 'No VideoStreamPlayer nodes found.' }] };
 
@@ -281,15 +265,12 @@ export function handleReadParallax(
 
     const bgs: { scene: string; name: string; layers: number }[] = [];
 
-    for (const relPath of sceneFiles) {
-      const absPath = resolveProjectPath(projectRoot, relPath);
-      const { content } = readTextFile(absPath);
-      const doc = parseScene(content);
+    forEachScene(projectRoot, { scenePath: args.scene_path }, (doc, relPath) => {
 
-      for (const node of walk(doc.nodes, ['ParallaxBackground'])) {
+      for (const node of collectNodes(doc.nodes, ['ParallaxBackground'])) {
         let layers = 0;
         if (node.children) {
-          layers = walk(node.children, ['ParallaxLayer']).length;
+          layers = collectNodes(node.children, ['ParallaxLayer']).length;
         }
         bgs.push({ scene: relPath, name: node.name, layers });
 
@@ -302,7 +283,7 @@ export function handleReadParallax(
           }
           lines.push('');
 
-          const parallaxLayers = walk(node.children, ['ParallaxLayer']);
+          const parallaxLayers = collectNodes(node.children, ['ParallaxLayer']);
           parallaxLayers.forEach(l => {
             const scale = l.properties['motion_scale'] || '1, 1';
             const mirror = l.properties['motion_mirroring'] || '0, 0';
@@ -311,7 +292,7 @@ export function handleReadParallax(
           return { content: [{ type: 'text', text: lines.join('\n') }] };
         }
       }
-    }
+    });
 
     if (bgs.length === 0) return { content: [{ type: 'text', text: 'No ParallaxBackground nodes found.' }] };
 
@@ -335,17 +316,14 @@ export function handleReadRichText(
 
     const labels: { scene: string; name: string; bbcode: string; fit: string }[] = [];
 
-    for (const relPath of sceneFiles) {
-      const absPath = resolveProjectPath(projectRoot, relPath);
-      const { content } = readTextFile(absPath);
-      const doc = parseScene(content);
+    forEachScene(projectRoot, { scenePath: args.scene_path }, (doc, relPath) => {
 
-      for (const node of walk(doc.nodes, ['RichTextLabel'])) {
+      for (const node of collectNodes(doc.nodes, ['RichTextLabel'])) {
         let text = node.properties['text'] || node.properties['bbcode_text'] || '';
         if (text.length > 80) text = text.slice(0, 80) + '...';
         labels.push({ scene: relPath, name: node.name, bbcode: text, fit: node.properties['fit_content'] || 'false' });
       }
-    }
+    });
 
     if (labels.length === 0) return { content: [{ type: 'text', text: 'No RichTextLabel nodes found.' }] };
 
@@ -375,7 +353,7 @@ export function handleReadContainer(
     const { content } = readTextFile(absPath);
     const doc = parseScene(content);
 
-    const containers = walk(doc.nodes, CONTAINER_TYPES);
+    const containers = collectNodes(doc.nodes, CONTAINER_TYPES);
     const target = args.name ? containers.find(c => c.name === args.name) : containers[0];
 
     if (!target) return { content: [{ type: 'text', text: 'No Container nodes found.' }] };
@@ -426,7 +404,7 @@ export function handleReadTabContainer(
     const { content } = readTextFile(absPath);
     const doc = parseScene(content);
 
-    const tabs = walk(doc.nodes, ['TabContainer', 'TabBar']);
+    const tabs = collectNodes(doc.nodes, ['TabContainer', 'TabBar']);
     const target = args.name ? tabs.find(t => t.name === args.name) : tabs[0];
 
     if (!target) return { content: [{ type: 'text', text: 'No TabContainer/TabBar found.' }] };

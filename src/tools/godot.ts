@@ -18,7 +18,7 @@ import {
   captureScreenshot,
   detectRunningGodot,
 } from '../utils/godot_cli.js';
-import { sendEditorCommand } from './editor.js';
+import { sendEditorCommand } from './editor_bridge.js';
 import { resolveProjectPath, isPathWithin, warnSkippedPath } from '../utils/file_utils.js';
 import fs from 'node:fs';
 import pathMod from 'node:path';

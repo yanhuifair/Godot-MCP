@@ -310,7 +310,7 @@ export function getRecentOutput(clear?: boolean): string[] {
  * Clean up all spawned processes.
  */
 export function cleanupProcesses(): void {
-  for (const [pid, data] of spawnedProcesses) {
+  for (const data of spawnedProcesses.values()) {
     try {
       data.process.kill();
     } catch {
@@ -507,7 +507,7 @@ export async function detectRunningGodot(): Promise<{ running: boolean; editor: 
     }
 
     // Check if any project is playing (has --project flag without -e)
-    for (const [pid, data] of spawnedProcesses) {
+    for (const data of spawnedProcesses.values()) {
       const args = data.process.spawnargs || [];
       if (args.includes('--path') && !args.includes('-e') && !args.includes('--editor')) {
         result.playing = true;

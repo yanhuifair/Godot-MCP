@@ -31,6 +31,8 @@ jobs:
       - run: npm run build
       - name: Type check
         run: npx tsc --noEmit
+      - name: Lint (errors only — `any` warnings are a tracked cleanup item)
+        run: npm run lint:errors
       - name: Vitest (unit + structural + sandbox)
         run: npx vitest run
       - name: Legacy tool suite

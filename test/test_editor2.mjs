@@ -34,7 +34,6 @@ function hdr(n) {
 }
 
 let sock = null,
-  buf = "",
   cid = 0;
 const pend = {};
 

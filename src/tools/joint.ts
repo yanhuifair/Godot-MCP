@@ -6,6 +6,8 @@
 
 import { z } from 'zod';
 import { toolError, ErrorCode } from '../utils/errors.js';
+import { forEachScene } from '../utils/scene_files.js';
+import { forEachNode, findNodeByName } from '../utils/scene_walk.js';
 import { ToolResult } from '../utils/types.js';
 import { resolveProjectPath, readTextFile, writeTextFile, findFilesByExtension } from '../utils/file_utils.js';
 import { parseScene, serializeScene } from '../parsers/scene_parser.js';
@@ -120,18 +122,7 @@ export function handleSetJointParam(
     const { content } = readTextFile(absPath);
     const doc = parseScene(content);
 
-    function findNode(nodes: any[], name: string): any | null {
-      for (const node of nodes) {
-        if (node.name === name && ALL_JOINT_TYPES.includes(node.type)) return node;
-        if (node.children) {
-          const found = findNode(node.children, name);
-          if (found) return found;
-        }
-      }
-      return null;
-    }
-
-    const joint = findNode(doc.nodes, args.joint_name);
+    const joint = findNodeByName(doc.nodes, args.joint_name, ALL_JOINT_TYPES);
     if (!joint) {
     return toolError(ErrorCode.FILE_NOT_FOUND, `Joint "${args.joint_name}" not found in ${args.scene_path}`);
     }
@@ -162,24 +153,17 @@ export function handleListJoints(
 
     const joints: { scene: string; name: string; type: string; connections: string }[] = [];
 
-    for (const relPath of sceneFiles) {
-      const absPath = resolveProjectPath(projectRoot, relPath);
-      const { content } = readTextFile(absPath);
-      const doc = parseScene(content);
+    forEachScene(projectRoot, { scenePath: args.scene_path }, (doc, relPath) => {
 
-      function walk(nodes: any[]): void {
-        for (const node of nodes) {
-          if (targetTypes.includes(node.type)) {
-            const a = node.properties['node_a'] || '';
-            const b = node.properties['node_b'] || '';
-            const conn = [a, b].filter(Boolean).join(' ↔ ') || 'no connections';
-            joints.push({ scene: relPath, name: node.name, type: node.type, connections: conn });
-          }
-          if (node.children) walk(node.children);
+      forEachNode(doc.nodes, (node) => {
+        if (targetTypes.includes(node.type)) {
+          const a = node.properties['node_a'] || '';
+          const b = node.properties['node_b'] || '';
+          const conn = [a, b].filter(Boolean).join(' ↔ ') || 'no connections';
+          joints.push({ scene: relPath, name: node.name, type: node.type, connections: conn });
         }
-      }
-      walk(doc.nodes);
-    }
+      });
+    });
 
     if (joints.length === 0) {
       return { content: [{ type: 'text', text: 'No joint nodes found.' }] };
@@ -224,15 +208,11 @@ export function handleReadJoint(
     const doc = parseScene(content);
 
     const joints: any[] = [];
-    function walk(nodes: any[]): void {
-      for (const node of nodes) {
-        if (ALL_JOINT_TYPES.includes(node.type) && (!args.joint_name || node.name === args.joint_name)) {
-          joints.push(node);
-        }
-        if (node.children) walk(node.children);
+    forEachNode(doc.nodes, (node) => {
+      if (ALL_JOINT_TYPES.includes(node.type) && (!args.joint_name || node.name === args.joint_name)) {
+        joints.push(node);
       }
-    }
-    walk(doc.nodes);
+    });
 
     if (joints.length === 0) {
       return { content: [{ type: 'text', text: `No joint nodes found${args.joint_name ? ` matching "${args.joint_name}"` : ''}.` }] };

@@ -8,17 +8,13 @@
 
 import { z } from 'zod';
 import { toolError, ErrorCode } from '../utils/errors.js';
+import { forEachScene } from '../utils/scene_files.js';
 import { ToolResult } from '../utils/types.js';
 import fs from 'node:fs';
 import { readTextFile, resolveProjectPath, findFilesByExtension, writeTextFile } from '../utils/file_utils.js';
 import { parseScene } from '../parsers/scene_parser.js';
+import { collectNodes, countNodes } from '../utils/scene_walk.js';
 import { parseResource } from '../parsers/resource_parser.js';
-
-function walk(nodes: any[], types: string[]): any[] {
-  const r: any[] = [];
-  for (const n of nodes) { if (types.includes(n.type)) r.push(n); if (n.children) r.push(...walk(n.children, types)); }
-  return r;
-}
 
 // ---- Schemas ----
 
@@ -56,10 +52,7 @@ export function handleListAllSignals(
 
     const allConns: { scene: string; signal: string; from: string; to: string; method: string }[] = [];
 
-    for (const relPath of sceneFiles) {
-      const absPath = resolveProjectPath(projectRoot, relPath);
-      const { content } = readTextFile(absPath);
-      const doc = parseScene(content);
+    forEachScene(projectRoot, { scenePath: args.scene_path }, (doc, relPath) => {
 
       for (const conn of doc.connections) {
         if (args.signal_name && conn.signal !== args.signal_name) continue;
@@ -68,7 +61,7 @@ export function handleListAllSignals(
           from: conn.from, to: conn.to, method: conn.method,
         });
       }
-    }
+    });
 
     if (allConns.length === 0) {
       const filter = args.signal_name ? ` "${args.signal_name}"` : '';
@@ -234,18 +227,15 @@ export function handleListPopups(
 
     const popups: { scene: string; name: string; type: string; visible: string }[] = [];
 
-    for (const relPath of sceneFiles) {
-      const absPath = resolveProjectPath(projectRoot, relPath);
-      const { content } = readTextFile(absPath);
-      const doc = parseScene(content);
+    forEachScene(projectRoot, { scenePath: args.scene_path }, (doc, relPath) => {
 
-      for (const node of walk(doc.nodes, types)) {
+      for (const node of collectNodes(doc.nodes, types)) {
         popups.push({
           scene: relPath, name: node.name, type: node.type,
           visible: node.properties['visible'] || 'false',
         });
       }
-    }
+    });
 
     if (popups.length === 0) return { content: [{ type: 'text', text: 'No Popup/Window/Dialog nodes found.' }] };
 
@@ -283,12 +273,9 @@ export function handleGenerateCohesionReport(projectRoot: string): ToolResult {
         const { content } = readTextFile(absPath);
         const doc = parseScene(content);
 
-        totalNodes += doc.nodes.flatMap(n => {
-          const all: any[] = [];
-          const w = (nodes: any[]) => { for (const n of nodes) { all.push(n); if (n.children) w(n.children); } };
-          w(doc.nodes);
-          return all;
-        }).length;
+        // 以前这里是 flatMap(n => { ... w(doc.nodes) ... })：回调忽略了自己的参数，
+        // 却对整棵树数一遍 —— 场景有多个根节点时会把节点数按根数翻倍。
+        totalNodes += countNodes(doc.nodes as any);
 
         totalConnections += doc.connections.length;
         totalExtRefs += doc.extResources.length;
@@ -298,28 +285,17 @@ export function handleGenerateCohesionReport(projectRoot: string): ToolResult {
           signalCounts[c.signal] = (signalCounts[c.signal] || 0) + 1;
         }
 
-        // Count node types
-        walk(doc.nodes, Object.keys(nodeTypeCounts).length === 0 ?
-          [] : Object.keys(nodeTypeCounts)).forEach(n => {
-            nodeTypeCounts[n.type] = (nodeTypeCounts[n.type] || 0) + 1;
-          });
+        // Count node types。
+        // 以前这里传的是 `Object.keys(nodeTypeCounts).length === 0 ? [] : …`，
+        // 而空数组在「按 type 过滤」的语义下一个都匹配不到 —— 等于永远不计数。
+        for (const n of collectNodes(doc.nodes)) {
+          nodeTypeCounts[n.type] = (nodeTypeCounts[n.type] || 0) + 1;
+        }
       } catch { /* skip */ }
     }
 
-    // Re-count node types properly
-    for (const relPath of sceneFiles) {
-      try {
-        const absPath = resolveProjectPath(projectRoot, relPath);
-        const { content } = readTextFile(absPath);
-        const doc = parseScene(content);
-        const allNodes: any[] = [];
-        const w = (nodes: any[]) => { for (const n of nodes) { allNodes.push(n); if (n.children) w(n.children); } };
-        w(doc.nodes);
-        allNodes.forEach(n => {
-          nodeTypeCounts[n.type] = (nodeTypeCounts[n.type] || 0) + 1;
-        });
-      } catch { /* skip */ }
-    }
+    // 注：原先这里还有第二趟，把所有场景重新解析一遍只为了"正确统计节点类型"
+    // ——那是在绕第一趟的 bug。修好后它就是纯粹的重复 I/O，已删。
 
     const lines: string[] = [];
     lines.push('=== Project Cohesion Report ===');

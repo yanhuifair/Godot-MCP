@@ -123,7 +123,7 @@ export async function handleRuntimeResume(): Promise<ToolResult> {
 
 export async function handleRuntimeStep(args: { frames?: number }): Promise<ToolResult> {
   try {
-    const r = await sendGameCommand('step', { frames: args.frames ?? 1 });
+    await sendGameCommand('step', { frames: args.frames ?? 1 });
     const n = args.frames ?? 1;
     return { content: [{ type: 'text', text: `Stepped ${n} frame(s) deterministically; game re-frozen. Use runtime_resume to continue.` }] };
   } catch (err: any) { return wrapError(ErrorCode.RUNTIME_NOT_REACHABLE, err); }

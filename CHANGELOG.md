@@ -1,4 +1,59 @@
 # Changelog
+## v1.12.2 (2026-09-21)
+
+Internal cleanup release: dev tooling plus a de-duplication pass. No tool was added or removed and no
+tool signature changed — the only behavioural changes are the bug fixes listed at the end.
+
+### Added — ESLint
+- `eslint.config.js` (flat config, ESLint 10 + typescript-eslint 8), with `npm run lint`,
+  `npm run lint:fix` and `npm run lint:errors`. CI gained a lint step.
+- The rules are chosen for real defects rather than style: `no-empty` (no silent `catch {}` — this
+  codebase has been bitten by it twice), `no-unused-vars`, `no-fallthrough`, `no-unreachable`,
+  `no-dupe-keys`, `no-constant-condition`, `prefer-const`.
+- `@typescript-eslint/no-explicit-any` is a **warning**, not an error: there are ~470 existing `any`
+  uses and turning those into errors would bury the findings that matter. It is a tracked cleanup
+  item, not a passing grade.
+- Turning the rules on found and fixed 38 real issues in `src/`: dead imports, unused locals, a
+  write-only variable, `catch {}` around socket teardown, and a swallowed `cause` on a thrown error.
+  Two notable ones: `src/tools/inspector.ts` carried a 29-line `LIGHT_PARAM_LABELS` table that nothing
+  referenced, and `src/tools/editor.ts` declared a timer after registering the callbacks that clear it.
+
+### Changed — vitest 2 → 5
+- Upgraded to `vitest@5` (with the matching `vite@8` peer). This clears the remaining dev-chain
+  advisories: `npm audit` now reports **0 vulnerabilities** for the whole tree (production was
+  already clean). The suite runs slightly faster as well (2.4s → 1.8s).
+
+### Changed — de-duplication
+- **New `src/utils/scene_walk.ts`** replaces 18 hand-rolled scene-tree traversals. The node-type
+  filter version existed 5 times (3 byte-identical) and the "visitor" version 12 times; the three
+  `findNode` variants are now `findNodeByName` / `findNodeByPath`. The new traversal also carries a
+  cycle guard — a malformed tree used to be able to blow the stack and take the whole server down.
+- **New `src/utils/scene_files.ts`** with `forEachScene` / `forEachResource`, replacing 21 copies of
+  "list `.tscn` → `resolveProjectPath` → `readTextFile` → `parseScene`". Every tool now goes through
+  one place, so a new tool cannot forget the path sandbox, and error handling is decided once.
+- **`src/tools/export_presets.ts`** split out of `project.ts` (1257 → 793 lines): parsing,
+  serialisation, platform constants and the three export-preset writers are self-contained.
+- **`src/tools/editor_bridge.ts`** split out of `editor.ts` (1471 → 1119 lines): the TCP/spawn
+  transport, health probe and teardown. The ~110 `editor_*` tools only ever needed
+  `sendEditorCommand()`, so they no longer sit next to socket handling.
+- `cfgValue()` moved to `config_parser.ts` (it is used by both project config and export presets)
+  and now shares `cfgQuote()` for the string case.
+
+### Fixed — two latent bugs found while refactoring
+- **`generate_cohesion_report` counted wrong on multi-root scenes.** `doc.nodes.flatMap(n => …)`
+  ignored its callback argument and counted the *entire* tree once per root, so a scene with two
+  roots reported double. Godot scenes normally have a single root, which is why nobody noticed.
+- **The same function parsed every scene file twice.** Node-type counting was written against an
+  empty-array filter that could never match anything, so a second full pass had been added to
+  "re-count node types properly". The first pass is fixed and the second pass is gone — one less
+  read+parse of every scene in the project.
+- **`set_shape_points` could miss a node.** Its local `findNode` returned as soon as it found a
+  name match whose subtree did not contain the rest of the path, so a same-named sibling later in
+  the list was never tried. `findNodeByPath` checks each candidate properly.
+
+### Docs
+- `README` / `README-zh`: added `npm run lint` to the Development commands.
+
 ## v1.12.1 (2026-09-21)
 
 ### Fixed — a documented command that did not exist

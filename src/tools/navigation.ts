@@ -8,9 +8,10 @@
 
 import { z } from 'zod';
 import { toolError, ErrorCode } from '../utils/errors.js';
+import { forEachScene } from '../utils/scene_files.js';
+import { forEachNode } from '../utils/scene_walk.js';
 import { ToolResult } from '../utils/types.js';
 import { readTextFile, resolveProjectPath, findFilesByExtension, writeTextFile } from '../utils/file_utils.js';
-import { parseResource } from '../parsers/resource_parser.js';
 import { parseScene, serializeScene } from '../parsers/scene_parser.js';
 
 // ---- Tool Schemas ----
@@ -46,32 +47,25 @@ export function handleListNavRegions(
     const regions: { scene: string; name: string; type: string; baked: boolean }[] = [];
     const navMeshRefs: { scene: string; name: string; meshPath: string }[] = [];
 
-    for (const relPath of sceneFiles) {
-      const absPath = resolveProjectPath(projectRoot, relPath);
-      const { content } = readTextFile(absPath);
-      const doc = parseScene(content);
+    forEachScene(projectRoot, { scenePath: args.scene_path }, (doc, relPath) => {
 
-      function walk(nodes: any[]): void {
-        for (const node of nodes) {
-          if (node.type === 'NavigationRegion3D' || node.type === 'NavigationRegion2D') {
-            const baked = node.properties['bake_navigation_mesh'] === 'true' ||
-                          node.properties['navigation_mesh'] !== undefined;
-            regions.push({ scene: relPath, name: node.name, type: node.type, baked });
+      forEachNode(doc.nodes, (node) => {
+        if (node.type === 'NavigationRegion3D' || node.type === 'NavigationRegion2D') {
+          const baked = node.properties['bake_navigation_mesh'] === 'true' ||
+                        node.properties['navigation_mesh'] !== undefined;
+          regions.push({ scene: relPath, name: node.name, type: node.type, baked });
 
-            // Check for NavigationMesh reference
-            if (node.properties['navigation_mesh']) {
-              navMeshRefs.push({
-                scene: relPath,
-                name: node.name,
-                meshPath: node.properties['navigation_mesh'],
-              });
-            }
+          // Check for NavigationMesh reference
+          if (node.properties['navigation_mesh']) {
+            navMeshRefs.push({
+              scene: relPath,
+              name: node.name,
+              meshPath: node.properties['navigation_mesh'],
+            });
           }
-          if (node.children) walk(node.children);
         }
-      }
-      walk(doc.nodes);
-    }
+      });
+    });
 
     if (regions.length === 0) {
       return { content: [{ type: 'text', text: 'No NavigationRegion nodes found.' }] };
@@ -107,15 +101,11 @@ export function handleReadNavRegion(
     const doc = parseScene(content);
 
     const regions: any[] = [];
-    function walk(nodes: any[]): void {
-      for (const node of nodes) {
-        if (node.type === 'NavigationRegion3D' || node.type === 'NavigationRegion2D') {
-          regions.push(node);
-        }
-        if (node.children) walk(node.children);
+    forEachNode(doc.nodes, (node) => {
+      if (node.type === 'NavigationRegion3D' || node.type === 'NavigationRegion2D') {
+        regions.push(node);
       }
-    }
-    walk(doc.nodes);
+    });
 
     const region = args.region_name
       ? regions.find(r => r.name === args.region_name)
@@ -231,15 +221,11 @@ export function handleReadNavAgent(
     const doc = parseScene(content);
 
     const agents: any[] = [];
-    function walk(nodes: any[]): void {
-      for (const node of nodes) {
-        if (NAV_AGENT_TYPES.includes(node.type)) {
-          if (!args.agent_name || node.name === args.agent_name) agents.push(node);
-        }
-        if (node.children) walk(node.children);
+    forEachNode(doc.nodes, (node) => {
+      if (NAV_AGENT_TYPES.includes(node.type)) {
+        if (!args.agent_name || node.name === args.agent_name) agents.push(node);
       }
-    }
-    walk(doc.nodes);
+    });
 
     if (agents.length === 0) {
       return { content: [{ type: 'text', text: `No NavigationAgent nodes found${args.agent_name ? ` matching "${args.agent_name}"` : ''}.` }] };
@@ -321,15 +307,11 @@ export function handleReadNavObstacle(
     const doc = parseScene(content);
 
     const obstacles: any[] = [];
-    function walk(nodes: any[]): void {
-      for (const node of nodes) {
-        if (NAV_OBSTACLE_TYPES.includes(node.type)) {
-          if (!args.obstacle_name || node.name === args.obstacle_name) obstacles.push(node);
-        }
-        if (node.children) walk(node.children);
+    forEachNode(doc.nodes, (node) => {
+      if (NAV_OBSTACLE_TYPES.includes(node.type)) {
+        if (!args.obstacle_name || node.name === args.obstacle_name) obstacles.push(node);
       }
-    }
-    walk(doc.nodes);
+    });
 
     if (obstacles.length === 0) {
       return { content: [{ type: 'text', text: `No NavigationObstacle nodes found${args.obstacle_name ? ` matching "${args.obstacle_name}"` : ''}.` }] };

@@ -750,7 +750,7 @@ function deepCloneNode(node: NodeDefinition): NodeDefinition {
 /**
  * Serialize scene document back to text with proper flat node ordering.
  */
-function serializeSceneToText(doc: GodotDocument, flatNodes: FlatNodeEntry[]): string {
+function serializeSceneToText(doc: GodotDocument, _flatNodes: FlatNodeEntry[]): string {
   // Reuse serializeScene logic with proper parent tracking
   // For the edit_scene serialization, we need accurate parent paths
   return serializeScene(doc);

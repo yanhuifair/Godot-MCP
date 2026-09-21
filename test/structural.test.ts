@@ -444,7 +444,7 @@ describe('register.ts 分类计数注释', () => {
 
     const positions = [];
     for (let i = 0; i < lines.length; i++) {
-      const m = lines[i].match(/^  \/\/ (.+?) \((\d+)\)$/);
+      const m = lines[i].match(/^ {2}\/\/ (.+?) \((\d+)\)$/);
       if (m) positions.push({ line: i, name: m[1], claim: parseInt(m[2], 10) });
     }
 

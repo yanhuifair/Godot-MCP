@@ -6,6 +6,8 @@
 
 import { z } from 'zod';
 import { toolError, ErrorCode } from '../utils/errors.js';
+import { forEachScene } from '../utils/scene_files.js';
+import { collectNodes } from '../utils/scene_walk.js';
 import { ToolResult } from '../utils/types.js';
 import { readTextFile, resolveProjectPath, findFilesByExtension, writeTextFile } from '../utils/file_utils.js';
 import { parseResource } from '../parsers/resource_parser.js';
@@ -68,15 +70,6 @@ export const createNoiseTextureSchema = {
 };
 
 // ---- Helpers ----
-
-function walkNodes(nodes: any[], types: string[]): any[] {
-  const result: any[] = [];
-  for (const node of nodes) {
-    if (types.includes(node.type)) result.push(node);
-    if (node.children) result.push(...walkNodes(node.children, types));
-  }
-  return result;
-}
 
 // ---- Curve Tools ----
 
@@ -256,17 +249,14 @@ export function handleListPaths(
 
     const paths: { scene: string; name: string; type: string; pointCount: string }[] = [];
 
-    for (const relPath of sceneFiles) {
-      const absPath = resolveProjectPath(projectRoot, relPath);
-      const { content } = readTextFile(absPath);
-      const doc = parseScene(content);
+    forEachScene(projectRoot, { scenePath: args.scene_path }, (doc, relPath) => {
 
-      for (const node of walkNodes(doc.nodes, ['Path2D', 'Path3D'])) {
+      for (const node of collectNodes(doc.nodes, ['Path2D', 'Path3D'])) {
         const curve = node.properties['curve'] || '';
         const pts = curve.match(/points/) ? 'has curve' : 'no curve';
         paths.push({ scene: relPath, name: node.name, type: node.type, pointCount: pts });
       }
-    }
+    });
 
     if (paths.length === 0) {
       return { content: [{ type: 'text', text: 'No Path2D/Path3D nodes found.' }] };
@@ -290,7 +280,7 @@ export function handleReadPath(
     const { content } = readTextFile(absPath);
     const doc = parseScene(content);
 
-    const paths = walkNodes(doc.nodes, ['Path2D', 'Path3D']);
+    const paths = collectNodes(doc.nodes, ['Path2D', 'Path3D']);
     const target = args.name ? paths.find(p => p.name === args.name) : paths[0];
 
     if (!target) {
@@ -326,16 +316,13 @@ export function handleListSkeletons(
 
     const skeletons: { scene: string; name: string; boneCount: string }[] = [];
 
-    for (const relPath of sceneFiles) {
-      const absPath = resolveProjectPath(projectRoot, relPath);
-      const { content } = readTextFile(absPath);
-      const doc = parseScene(content);
+    forEachScene(projectRoot, { scenePath: args.scene_path }, (doc, relPath) => {
 
-      for (const node of walkNodes(doc.nodes, ['Skeleton3D', 'Skeleton2D'])) {
+      for (const node of collectNodes(doc.nodes, ['Skeleton3D', 'Skeleton2D'])) {
         const bones = countBones(node);
         skeletons.push({ scene: relPath, name: node.name, boneCount: String(bones) });
       }
-    }
+    });
 
     if (skeletons.length === 0) {
       return { content: [{ type: 'text', text: 'No Skeleton nodes found.' }] };
@@ -359,7 +346,7 @@ export function handleReadSkeleton(
     const { content } = readTextFile(absPath);
     const doc = parseScene(content);
 
-    const skeletons = walkNodes(doc.nodes, ['Skeleton3D', 'Skeleton2D']);
+    const skeletons = collectNodes(doc.nodes, ['Skeleton3D', 'Skeleton2D']);
     const target = args.name ? skeletons.find(s => s.name === args.name) : skeletons[0];
 
     if (!target) {
@@ -402,19 +389,16 @@ export function handleReadReflectionProbe(
 
     const probes: { scene: string; name: string; type: string; size: string; update: string }[] = [];
 
-    for (const relPath of sceneFiles) {
-      const absPath = resolveProjectPath(projectRoot, relPath);
-      const { content } = readTextFile(absPath);
-      const doc = parseScene(content);
+    forEachScene(projectRoot, { scenePath: args.scene_path }, (doc, relPath) => {
 
-      for (const node of walkNodes(doc.nodes, ['ReflectionProbe', 'VoxelGI', 'LightmapGI'])) {
+      for (const node of collectNodes(doc.nodes, ['ReflectionProbe', 'VoxelGI', 'LightmapGI'])) {
         probes.push({
           scene: relPath, name: node.name, type: node.type,
           size: node.properties['size'] || node.properties['extents'] || '?',
           update: node.properties['update_mode'] || 'auto',
         });
       }
-    }
+    });
 
     if (probes.length === 0) {
       return { content: [{ type: 'text', text: 'No ReflectionProbe/VoxelGI/LightmapGI nodes found.' }] };
@@ -442,18 +426,15 @@ export function handleReadMultiMesh(
 
     const multis: { scene: string; name: string; type: string; count: string }[] = [];
 
-    for (const relPath of sceneFiles) {
-      const absPath = resolveProjectPath(projectRoot, relPath);
-      const { content } = readTextFile(absPath);
-      const doc = parseScene(content);
+    forEachScene(projectRoot, { scenePath: args.scene_path }, (doc, relPath) => {
 
-      for (const node of walkNodes(doc.nodes, ['MultiMeshInstance3D', 'MultiMeshInstance2D'])) {
+      for (const node of collectNodes(doc.nodes, ['MultiMeshInstance3D', 'MultiMeshInstance2D'])) {
         multis.push({
           scene: relPath, name: node.name, type: node.type,
           count: node.properties['multimesh'] ? 'has mesh' : 'no mesh',
         });
       }
-    }
+    });
 
     if (multis.length === 0) {
       return { content: [{ type: 'text', text: 'No MultiMeshInstance nodes found.' }] };
@@ -602,7 +583,7 @@ export function handleSetSkeletonBonePose(
     const { content } = readTextFile(absPath);
     const doc = parseScene(content);
 
-    const skeletons = walkNodes(doc.nodes, ['Skeleton3D', 'Skeleton2D']);
+    const skeletons = collectNodes(doc.nodes, ['Skeleton3D', 'Skeleton2D']);
     const skel = args.skeleton ? skeletons.find(s => s.name === args.skeleton) : skeletons[0];
     if (!skel) {
       return toolError(ErrorCode.FILE_NOT_FOUND, `No Skeleton node found in ${args.scene_path}`);
@@ -650,7 +631,7 @@ export function handleWritePathCurve(
     const { content } = readTextFile(absPath);
     const doc = parseScene(content);
 
-    const paths = walkNodes(doc.nodes, ['Path2D', 'Path3D']);
+    const paths = collectNodes(doc.nodes, ['Path2D', 'Path3D']);
     const target = args.path ? paths.find(p => p.name === args.path) : paths[0];
     if (!target) {
       return toolError(ErrorCode.FILE_NOT_FOUND, `No Path node found in ${args.scene_path}`);

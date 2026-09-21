@@ -141,7 +141,6 @@ describe('Script Tools (integration)', () => {
 
   it('write_script writes content with backup', async () => {
     const { handleWriteScript } = await import('../src/tools/script.js');
-    const originalSize = readFileSync(join(testDir, 'player.gd'), 'utf-8').length;
 
     const result = handleWriteScript(testDir, { path: 'player.gd', content: 'extends Node\n', create_backup: true });
     expect(result.content[0].text).toContain('Script written');
@@ -203,7 +202,7 @@ describe('Server initialization', () => {
 
 describe('Scene Connection Editor', () => {
   it('add_connection appears in editScene operations', async () => {
-    const { parseScene, editScene } = await import('../src/parsers/scene_parser.js');
+    const { editScene } = await import('../src/parsers/scene_parser.js');
     const content = readFileSync(join(testDir, 'main.tscn'), 'utf-8');
     const modified = editScene(content, [{
       action: 'add_connection',
@@ -218,7 +217,7 @@ describe('Scene Connection Editor', () => {
   });
 
   it('remove_connection removes existing connection', async () => {
-    const { parseScene, editScene } = await import('../src/parsers/scene_parser.js');
+    const { editScene } = await import('../src/parsers/scene_parser.js');
     // First add, then remove
     const content = readFileSync(join(testDir, 'main.tscn'), 'utf-8');
     const withConnection = editScene(content, [{

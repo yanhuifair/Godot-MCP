@@ -14,13 +14,12 @@
 import net from 'node:net';
 
 const GAME_PORT = 9877;
-const RESPONSE_MARKER = '\n'; // one JSON object per line
 const GAME_RESPONSE_TIMEOUT = 15000;
 const GAME_HEALTH_CACHE_MS = 5000;
 
 let _client: net.Socket | null = null;
 let _buf = '';
-let _pending: Map<number, { resolve: (v: any) => void; reject: (e: Error) => void }> = new Map();
+const _pending: Map<number, { resolve: (v: any) => void; reject: (e: Error) => void }> = new Map();
 let _connecting: Promise<net.Socket> | null = null;
 let _lastHealth = 0;
 let _lastHealthy = false;
@@ -33,7 +32,7 @@ function getConnection(): Promise<net.Socket> {
   if (_connecting) return _connecting;
 
   _connecting = new Promise((resolve, reject) => {
-    if (_client) { try { _client.destroy(); } catch {} _client = null; }
+    if (_client) { try { _client.destroy(); } catch { /* 套接字可能已经死了，忽略 */ } _client = null; }
     for (const [, p] of _pending) p.reject(new Error('Connection lost'));
     _pending.clear();
     _buf = '';

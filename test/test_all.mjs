@@ -108,7 +108,7 @@ t("list_groups", "../dist/tools/project.js", ({ handleListGroups }) => {
   const r = handleListGroups(P);
   r.isError ? fail("list_groups", r.content[0].text) : pass("list_groups");
 });
-t("read_export_presets", "../dist/tools/project.js", ({ handleReadExportPresets }) => {
+t("read_export_presets", "../dist/tools/export_presets.js", ({ handleReadExportPresets }) => {
   handleReadExportPresets(P);
   pass("read_export_presets");
 });
@@ -875,7 +875,7 @@ t("set_shape_points", "../dist/tools/geometry.js", ({ handleSetShapePoints }) =>
 
 // ============== EXTENSION ==============
 hdr("Extension/Other (5 tools)");
-t("read_gdextension", "../dist/tools/extension.js", ({ handleReadGdextension }) => {
+t("read_gdextension", "../dist/tools/extension.js", () => {
   // .gdextension file removed - skip test
   pass("read_gdextension (skipped)");
 });

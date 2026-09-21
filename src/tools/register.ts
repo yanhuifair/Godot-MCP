@@ -6,27 +6,30 @@
 // Every tool in one place. Add new tools here.
 // Each category is a self-contained block.
 
-import { z } from 'zod';
 import { ToolRegistry, setActiveRegistry } from '../utils/registry.js';
 
 // Project tools
 import {
+  handleReadExportPresets,
+  handleCreateExportPreset, handleUpdateExportPreset, handleRemoveExportPreset,
+  readExportPresetsSchema,
+  createExportPresetSchema, updateExportPresetSchema, removeExportPresetSchema,
+} from './export_presets.js';
+import {
   handleListProjectFiles, handleReadProjectConfig, handleSearchInProject,
   handleReadInputMap, handleDeleteFile, handleMoveFile, handleWriteProjectConfig,
-  handleReadExportPresets, handleGenerateProjectReport, handleListAutoloads,
+handleGenerateProjectReport, handleListAutoloads,
   handleAddAutoload, handleRemoveAutoload, handleFindUnusedAssets,
   handleValidateProject, handleListGroups, handleDuplicateScene,
   handleDuplicateResource, handleCreateDirectory,
   handleWriteInputAction, handleRemoveInputAction, handleAddInputBinding,
-  handleCreateExportPreset, handleUpdateExportPreset, handleRemoveExportPreset,
   listProjectFilesSchema, readProjectConfigSchema, searchInProjectSchema,
   readInputMapSchema, deleteFileSchema, moveFileSchema, writeProjectConfigSchema,
-  readExportPresetsSchema, generateProjectReportSchema, listAutoloadsSchema,
+generateProjectReportSchema, listAutoloadsSchema,
   addAutoloadSchema, removeAutoloadSchema, findUnusedAssetsSchema,
   validateProjectSchema, listGroupsSchema, duplicateSceneSchema,
   duplicateResourceSchema, createDirectorySchema,
   writeInputActionSchema, removeInputActionSchema, addInputBindingSchema,
-  createExportPresetSchema, updateExportPresetSchema, removeExportPresetSchema,
 } from './project.js';
 
 // Scene tools

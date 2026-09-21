@@ -4,7 +4,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { parseConfig, serializeConfig } from '../src/parsers/config_parser.js';
-import { parseScene, serializeScene, generateSceneTemplate } from '../src/parsers/scene_parser.js';
+import { parseScene, generateSceneTemplate } from '../src/parsers/scene_parser.js';
 import { parseResource, isBinaryResource } from '../src/parsers/resource_parser.js';
 import { parseImportConfig, serializeImportConfig } from '../src/utils/import_parser.js';
 import { findProjectRoot } from '../src/utils/file_utils.js';
