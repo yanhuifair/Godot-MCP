@@ -1,4 +1,7 @@
 # Changelog
+## v1.12.8 (2026-10-03)
+- Removed the outdated `test/test_editor.mjs`. It predated the method-name change and called the editor bridge with a stale `editor_` prefix (45 call sites), so three of its own assertions always failed against a live editor. Its coverage was fully absorbed into `test_editor2.mjs` in v1.12.7, which is the authoritative editor-bridge suite (66/0 against a live editor).
+
 ## v1.12.7 (2026-10-03)
 - `test_editor2.mjs` (the authoritative editor-bridge suite): backfilled 18 editor methods that only the outdated `test_editor.mjs` exercised (`get_info`, `get_rect`, `get_project_directory`, `read_current_scene`, `save`, `get_method_list`, `get_class_list`, `list_node_signals`, `create_folder`, `get_dependencies`, `get_input_map`, `get_autoloads`, `get_class_properties`, `get_class_signals`, `get_recent_scenes`, `get_errors`, `get_camera`, `set_camera`, `toggle_snap`). Editor-bridge coverage is now 66/0 against a live editor, and v2 fully supersedes v1.
 

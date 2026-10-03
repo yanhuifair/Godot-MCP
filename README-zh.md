@@ -513,7 +513,7 @@ npx @yanhuifair/godot-mcp -t all --port 3000 -p /path/to/your/godot/project
 
 ```bash
 curl http://127.0.0.1:3000/health
-# {"status":"ok","version":"1.12.7","projectRoot":"/path/to/project","endpoints":{...}}
+# {"status":"ok","version":"1.12.8","projectRoot":"/path/to/project","endpoints":{...}}
 ```
 
 ---
@@ -618,7 +618,7 @@ rm -rf addons/godot-mcp && npx -y @yanhuifair/godot-mcp@latest --enable-plugin -
 
 > **从 v1.9.0 升级？** 那个版本自带的编辑器插件里 `runtime_bridge.gd` 在 Godot 4.7 会解析失败（`_input` 函数与内置的 `Node._input` 冲突，且 `_resolve` 缺少返回类型）。如果编辑器报这些解析错误，删掉 `addons/godot-mcp` 再重跑 `--enable-plugin` 即可装上修复后的插件。
 
-完整变更历史见 [CHANGELOG](CHANGELOG.md)。**v1.12.7** 让插件在工程打开时自动检测版本并更新：编辑器插件现在会自动发现落后的 addon，并从运行中的 server 拉取匹配版本，从此不会再卡在坏掉的旧 addon 上。**v1.12.3** 是一次安全版本：修掉了三个已用 PoC 证实的沙箱逃逸（`log_path` 任意文件读取、`write_project_config` 注入 `[autoload]`、`resolveProjectPath` 符号链接写逃逸），终结了 `edit_scene` 对未执行操作谎报成功，重写 `project.godot` 时不再打乱注释位置，并新增 20 项沙箱回归测试与文档漂移门禁。
+完整变更历史见 [CHANGELOG](CHANGELOG.md)。**v1.12.8** 让插件在工程打开时自动检测版本并更新：编辑器插件现在会自动发现落后的 addon，并从运行中的 server 拉取匹配版本，从此不会再卡在坏掉的旧 addon 上。**v1.12.3** 是一次安全版本：修掉了三个已用 PoC 证实的沙箱逃逸（`log_path` 任意文件读取、`write_project_config` 注入 `[autoload]`、`resolveProjectPath` 符号链接写逃逸），终结了 `edit_scene` 对未执行操作谎报成功，重写 `project.godot` 时不再打乱注释位置，并新增 20 项沙箱回归测试与文档漂移门禁。
 
 ### 命令行参数
 
