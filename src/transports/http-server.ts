@@ -132,7 +132,7 @@ export async function runHttpTransport(options: HttpTransportOptions = {}): Prom
     const mayRevealPaths = isLoopback || requestHasValidToken(req);
     res.json({
       status: 'ok',
-      version: '1.12.8',
+      version: '1.12.9',
       ...(mayRevealPaths ? { projectRoot: getProjectRoot() } : {}),
       endpoints: {
         ...(enableSse ? { sse: `http://${host}:${port}/sse` } : {}),
@@ -238,12 +238,23 @@ function setupSseEndpoint(app: Express): void {
     const server = createMcpServer();
     const transport = new SSEServerTransport('/sse', res as unknown as ServerResponse);
 
-    await server.connect(transport);
-    await transport.start();
+    // 注意：server.connect(transport) 内部会自动调用 transport.start()，
+    // 这里绝不能再多调一次 start()——SDK 会抛 "already started"，
+    // 而 async handler 里未捕获的异常会让整个 server 进程崩溃（连带
+    // streamable-http / stdio 一起挂）。同理用 try/catch 兜底。
+    try {
+      await server.connect(transport);
+    } catch (err: any) {
+      console.error('[Godot MCP] SSE connection failed:', err.message);
+      if (!res.headersSent) res.status(500).end();
+      return;
+    }
 
     // 存储 transport 引用以便 POST 请求能找到对应的会话
+    // 注意：不能再 res.setHeader('Mcp-Session-Id')——connect() 里
+    // transport.start() 已经把响应头发出去（SDK 靠 endpoint 事件把
+    // sessionId 告诉客户端），此时 setHeader 会抛 ERR_HTTP_HEADERS_SENT。
     const sessionId = transport.sessionId;
-    res.setHeader('Mcp-Session-Id', sessionId);
     sseTransports.set(sessionId, { server, transport });
 
     transport.onclose = () => {

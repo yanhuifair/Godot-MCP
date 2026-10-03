@@ -1,4 +1,7 @@
 # Changelog
+## v1.12.9 (2026-10-03)
+- **Fix: SSE transport crashed the whole server on the first connection.** `GET /sse` called `transport.start()` right after `server.connect(transport)`, but the SDK's `connect()` already starts the transport — the duplicate `start()` threw `SSEServerTransport already started!`. Because the exception was unhandled inside an async Express handler, it took down the whole process, which also killed the stdio and streamable-HTTP transports in `--transport all`. Removed the duplicate `start()`, wrapped the handler in try/catch, and dropped a `res.setHeader('Mcp-Session-Id')` that ran after the response headers had already been sent (`ERR_HTTP_HEADERS_SENT`). Verified end-to-end: GET /sse → session id → POST /sse → initialize response over the stream, server stays up.
+
 ## v1.12.8 (2026-10-03)
 - Removed the outdated `test/test_editor.mjs`. It predated the method-name change and called the editor bridge with a stale `editor_` prefix (45 call sites), so three of its own assertions always failed against a live editor. Its coverage was fully absorbed into `test_editor2.mjs` in v1.12.7, which is the authoritative editor-bridge suite (66/0 against a live editor).
 
