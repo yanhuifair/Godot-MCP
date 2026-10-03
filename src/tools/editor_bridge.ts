@@ -358,12 +358,12 @@ function handlePluginRequest(msg: any): void {
   try {
     const res = syncAddonToProject(_projectRoot);
     if (res.updated) {
-      console.log(`[Godot MCP] Addon updated to v${res.version} (${res.reason}) — reloading editor plugin`);
+      console.error(`[Godot MCP] Addon updated to v${res.version} (${res.reason}) — reloading editor plugin`);
       // 文件已写入磁盘，让运行中的插件实例重新加载以生效
       sendEditorCommand('reload_addon', { from: msg?.params?.plugin_version ?? '', to: res.version })
         .catch((e) => console.error('[Godot MCP] reload_addon command failed:', (e as Error).message));
     } else {
-      console.log(`[Godot MCP] Addon already up to date (v${res.version})`);
+      console.error(`[Godot MCP] Addon already up to date (v${res.version})`);
     }
   } catch (e) {
     console.error('[Godot MCP] Addon sync failed:', (e as Error).message);
@@ -379,7 +379,7 @@ export function initEditorBridge(projectRoot: string): void {
   try {
     const res = syncAddonToProject(projectRoot);
     if (res.updated) {
-      console.log(`[Godot MCP] Addon synced to v${res.version} on startup (${res.reason})`);
+      console.error(`[Godot MCP] Addon synced to v${res.version} on startup (${res.reason})`);
     }
   } catch (e) {
     console.error('[Godot MCP] Startup addon sync failed:', (e as Error).message);

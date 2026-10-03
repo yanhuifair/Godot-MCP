@@ -132,7 +132,7 @@ export async function runHttpTransport(options: HttpTransportOptions = {}): Prom
     const mayRevealPaths = isLoopback || requestHasValidToken(req);
     res.json({
       status: 'ok',
-      version: '1.12.4',
+      version: '1.12.5',
       ...(mayRevealPaths ? { projectRoot: getProjectRoot() } : {}),
       endpoints: {
         ...(enableSse ? { sse: `http://${host}:${port}/sse` } : {}),

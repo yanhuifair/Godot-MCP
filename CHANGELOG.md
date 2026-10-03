@@ -1,4 +1,7 @@
 # Changelog
+## v1.12.5 (2026-10-03)
+- **Fix: MCP stdio connection closed (-32000) on startup.** The addon self-update feature added in v1.12.4 logged status messages with `console.log`, which writes to **stdout**. In stdio transport, stdout is the exclusive JSON-RPC protocol channel, so those log lines corrupted the stream and MCP clients (VS Code / Claude Desktop / Cursor) closed the connection immediately. All self-update status logs now go to `console.error` (stderr), keeping stdout clean. No behavior change — only where the logs are written.
+
 ## v1.12.4 (2026-10-02)
 
 Added — addon self-update on project open

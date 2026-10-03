@@ -513,7 +513,7 @@ Starts: Stdio + SSE (`/sse`) + Streamable HTTP (`/mcp`) + Health Check (`/health
 
 ```bash
 curl http://127.0.0.1:3000/health
-# {"status":"ok","version":"1.12.4","projectRoot":"/path/to/project","endpoints":{...}}
+# {"status":"ok","version":"1.12.5","projectRoot":"/path/to/project","endpoints":{...}}
 ```
 
 > `/health` is deliberately **not** token-protected so probe tools can use it, but it only echoes
@@ -623,7 +623,7 @@ rm -rf addons/godot-mcp && npx -y @yanhuifair/godot-mcp@latest --enable-plugin -
 
 > **Upgrading from v1.9.0?** That release shipped an editor plugin whose `runtime_bridge.gd` failed to parse in Godot 4.7 (a `_input` function colliding with the built-in `Node._input`, plus an untyped `_resolve`). If your editor logs those parse errors, delete `addons/godot-mcp` and re-run `--enable-plugin` to install the fixed plugin.
 
-See [CHANGELOG](CHANGELOG.md) for the complete history. **v1.12.4** adds addon self-update on project open: the editor plugin now detects a stale addon automatically and pulls the matching copy from the running server, so you can no longer get stuck on a broken older addon. **v1.12.3** is a security release: it closes three sandbox escapes proven by PoC (arbitrary file read via `log_path`, `[autoload]` injection through `write_project_config`, and a symlink write escape in `resolveProjectPath`), stops `edit_scene` reporting success for operations it never applied, keeps comments in place when rewriting `project.godot`, and adds 20 sandbox regression tests plus doc-drift gates to CI.
+See [CHANGELOG](CHANGELOG.md) for the complete history. **v1.12.5** adds addon self-update on project open: the editor plugin now detects a stale addon automatically and pulls the matching copy from the running server, so you can no longer get stuck on a broken older addon. **v1.12.3** is a security release: it closes three sandbox escapes proven by PoC (arbitrary file read via `log_path`, `[autoload]` injection through `write_project_config`, and a symlink write escape in `resolveProjectPath`), stops `edit_scene` reporting success for operations it never applied, keeps comments in place when rewriting `project.godot`, and adds 20 sandbox regression tests plus doc-drift gates to CI.
 
 ### Command-Line Options
 
