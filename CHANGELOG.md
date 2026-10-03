@@ -1,4 +1,7 @@
 # Changelog
+## v1.12.7 (2026-10-03)
+- `test_editor2.mjs` (the authoritative editor-bridge suite): backfilled 18 editor methods that only the outdated `test_editor.mjs` exercised (`get_info`, `get_rect`, `get_project_directory`, `read_current_scene`, `save`, `get_method_list`, `get_class_list`, `list_node_signals`, `create_folder`, `get_dependencies`, `get_input_map`, `get_autoloads`, `get_class_properties`, `get_class_signals`, `get_recent_scenes`, `get_errors`, `get_camera`, `set_camera`, `toggle_snap`). Editor-bridge coverage is now 66/0 against a live editor, and v2 fully supersedes v1.
+
 ## v1.12.6 (2026-10-03)
 - **Fix: `test_runner.mjs` false failures + fixture pollution.** Two `async` handlers (`get_godot_version`, `is_editor_running`) were called without `await`, so the harness read `.content[0]` off a Promise and reported `Cannot read properties of undefined` — the handlers themselves were fine. `add_audio_bus` wrote `TestBus` directly into the tracked `default_bus_layout.tres` fixture and never removed it, so every run after the first failed; it now operates on a throwaway copy. `test_runner` is now 70/0 and idempotent across repeated runs, with the fixture staying clean.
 

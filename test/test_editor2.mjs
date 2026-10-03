@@ -429,6 +429,45 @@ sock.connect(9876, "127.0.0.1", async () => {
       fail("get_plugin_list", e.message);
     }
 
+    // === v1 补漏 ===
+    // 这些 method 在旧版 test_editor.mjs 测过、v2 最初漏了；补上以保证
+    // v2 覆盖范围 ≥ v1。参数沿用 v1 的真实调用（v1 的方法名带过时的
+    // editor_ 前缀，是脚本 bug 而非产品 bug）。全部 try/catch 包裹。
+    hdr("v1 补漏 (18)");
+    const backfill = [
+      ["get_info", {}],
+      ["get_rect", {}],
+      ["get_project_directory", {}],
+      ["read_current_scene", {}],
+      ["save", {}],
+      ["get_method_list", { class_name: "Node" }],
+      ["get_class_list", { filter: "Node" }],
+      ["list_node_signals", { node_path: "Main" }],
+      ["create_folder", { path: "res://_test_folder" }],
+      ["get_dependencies", { path: "res://scenes/main.tscn" }],
+      ["get_input_map", {}],
+      ["get_autoloads", {}],
+      ["get_class_properties", { class_name: "Node2D" }],
+      ["get_class_signals", { class_name: "Node" }],
+      ["get_recent_scenes", {}],
+      ["get_errors", {}],
+      ["get_camera", {}],
+      ["set_camera", { position: [0, 5, 10], rotation: [0, 0, 0] }],
+      ["toggle_snap", {}],
+    ];
+    for (const [m, p] of backfill) {
+      try {
+        await rpc(m, p);
+        pass(m);
+      } catch (e) {
+        fail(m, e.message);
+      }
+    }
+    // 还原 create_folder 造成的副作用
+    try {
+      await rpc("delete_asset", { path: "res://_test_folder" });
+    } catch { /* 清理失败不影响判定 */ }
+
     // === Cleanup ===
     hdr("清理");
     try {
