@@ -760,12 +760,19 @@ async function testAudioTools() {
   }
 
   // add_audio_bus - 指定 layout_path
+  // 关键：不能直接改 tracked 的 default_bus_layout.tres（会永久污染 fixture，
+  // 第二次运行必因 TestBus 已存在而失败）。改为复制到临时副本上操作，跑完删副本。
   try {
     const { handleAddAudioBus } = await import("../dist/tools/audio.js");
-    const r = handleAddAudioBus(PROJECT, { bus_name: "TestBus", parent: "Master", volume_db: -12.0, layout_path: "resources/default_bus_layout.tres" });
-    // 这个可能会修改 default_bus_layout.tres
+    const { readTextFile, writeTextFile, resolveProjectPath, deleteFile } = await import("../dist/utils/file_utils.js");
+    const tmpLayout = "resources/_test_bus_tmp.tres";
+    // 用 readTextFile+writeTextFile 做沙箱内的复制（file_utils 没有 copyFile）
+    const srcContent = readTextFile(resolveProjectPath(PROJECT, "resources/default_bus_layout.tres")).content;
+    writeTextFile(resolveProjectPath(PROJECT, tmpLayout), srcContent);
+    const r = handleAddAudioBus(PROJECT, { bus_name: "TestBus", parent: "Master", volume_db: -12.0, layout_path: tmpLayout });
     if (!r.isError) ok("add_audio_bus - 添加总线成功");
     else fail("add_audio_bus", r.content[0].text);
+    deleteFile(PROJECT, tmpLayout);
   } catch (e) {
     fail("add_audio_bus", e.message);
   }
@@ -855,7 +862,7 @@ async function testGodotEngineTools() {
   // get_godot_version
   try {
     const { handleGetGodotVersion } = await import("../dist/tools/godot.js");
-    const r = handleGetGodotVersion();
+    const r = await handleGetGodotVersion();
     const text = r.content[0].text;
     console.log(`  ${Y}ℹ${N} get_godot_version: ${text.substring(0, 100)}`);
     if (!r.isError) ok("get_godot_version - 检测成功");
@@ -867,7 +874,7 @@ async function testGodotEngineTools() {
   // is_editor_running
   try {
     const { handleIsEditorRunning } = await import("../dist/tools/godot.js");
-    const r = handleIsEditorRunning(PROJECT);
+    const r = await handleIsEditorRunning(PROJECT);
     console.log(`  ${Y}ℹ${N} is_editor_running: ${r.content[0].text.substring(0, 100)}`);
     ok(`is_editor_running - ${r.isError ? "未运行（预期）" : "运行中"}`);
   } catch (e) {

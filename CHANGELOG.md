@@ -1,4 +1,7 @@
 # Changelog
+## v1.12.6 (2026-10-03)
+- **Fix: `test_runner.mjs` false failures + fixture pollution.** Two `async` handlers (`get_godot_version`, `is_editor_running`) were called without `await`, so the harness read `.content[0]` off a Promise and reported `Cannot read properties of undefined` — the handlers themselves were fine. `add_audio_bus` wrote `TestBus` directly into the tracked `default_bus_layout.tres` fixture and never removed it, so every run after the first failed; it now operates on a throwaway copy. `test_runner` is now 70/0 and idempotent across repeated runs, with the fixture staying clean.
+
 ## v1.12.5 (2026-10-03)
 - **Fix: MCP stdio connection closed (-32000) on startup.** The addon self-update feature added in v1.12.4 logged status messages with `console.log`, which writes to **stdout**. In stdio transport, stdout is the exclusive JSON-RPC protocol channel, so those log lines corrupted the stream and MCP clients (VS Code / Claude Desktop / Cursor) closed the connection immediately. All self-update status logs now go to `console.error` (stderr), keeping stdout clean. No behavior change — only where the logs are written.
 
