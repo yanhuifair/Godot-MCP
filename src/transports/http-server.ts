@@ -89,11 +89,15 @@ export async function runHttpTransport(options: HttpTransportOptions = {}): Prom
   // 若设置了 GODOT_MCP_TOKEN，则 /mcp 与 /sse 的每个请求都必须携带令牌：
   //   Authorization: Bearer <token>   或   ?token=<token>
   // 未设置该环境变量时服务器保持开放（与改动前行为一致，向后兼容）。
-  const mcpToken = process.env.GODOT_MCP_TOKEN;
+  // 鉴权令牌必须始终存在：未显式配置时自动生成一个一次性令牌并打印到日志，
+  // 避免 /mcp 与 /sse 在默认配置下（未设置 GODOT_MCP_TOKEN）完全不鉴权。
+  const mcpToken = process.env.GODOT_MCP_TOKEN ?? randomUUID();
+  if (!process.env.GODOT_MCP_TOKEN) {
+    console.error(`[Godot MCP] GODOT_MCP_TOKEN not set; generated one-time token: ${mcpToken}`);
+  }
 
-  /** 请求是否携带了正确的令牌（无令牌配置时一律视为不通过，由调用方决定语义）。 */
+  /** 请求是否携带了正确的令牌。 */
   const requestHasValidToken = (req: Request): boolean => {
-    if (!mcpToken) return false;
     const header = req.headers['authorization'];
     const fromHeader = typeof header === 'string' && header.startsWith('Bearer ')
       ? header.slice(7)
@@ -103,16 +107,12 @@ export async function runHttpTransport(options: HttpTransportOptions = {}): Prom
     return !!provided && safeTokenEqual(provided, mcpToken);
   };
 
-  if (mcpToken) {
-    console.error('[Godot MCP] HTTP auth ENABLED (GODOT_MCP_TOKEN is set)');
-    const authMiddleware = (req: Request, res: Response, next: NextFunction) => {
-      if (requestHasValidToken(req)) return next();
-      res.status(401).json({ error: 'Unauthorized: invalid or missing token' });
-    };
-    app.use(['/mcp', '/sse'], authMiddleware);
-  } else {
-    console.error('[Godot MCP] HTTP auth DISABLED (set GODOT_MCP_TOKEN to enable)');
-  }
+  console.error('[Godot MCP] HTTP auth ENABLED');
+  const authMiddleware = (req: Request, res: Response, next: NextFunction) => {
+    if (requestHasValidToken(req)) return next();
+    res.status(401).json({ error: 'Unauthorized: invalid or missing token' });
+  };
+  app.use(['/mcp', '/sse'], authMiddleware);
 
   // ---- Streamable HTTP 端点 (/mcp) ----
   if (enableStreamableHttp) {
