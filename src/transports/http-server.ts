@@ -19,6 +19,7 @@ import { randomUUID } from 'node:crypto';
 import { createMcpServer, initSharedResources, getProjectRoot } from '../server.js';
 import { initEditorBridge, shutdownEditorBridge } from '../tools/editor_bridge.js';
 import { cleanupProcesses } from '../utils/godot_cli.js';
+import { resolveHttpToken } from '../utils/http_token.js';
 
 export interface HttpTransportOptions {
   /** HTTP 监听端口，默认 3000 */
@@ -85,15 +86,26 @@ export async function runHttpTransport(options: HttpTransportOptions = {}): Prom
   // 创建 Express 应用（自带 DNS rebinding 防护）
   const app = createMcpExpressApp({ host });
 
-  // ---- 可选鉴权（GODOT_MCP_TOKEN） ----
-  // 若设置了 GODOT_MCP_TOKEN，则 /mcp 与 /sse 的每个请求都必须携带令牌：
+  // ---- 鉴权令牌（始终存在） ----
+  // /mcp 与 /sse 的每个请求都必须携带令牌：
   //   Authorization: Bearer <token>   或   ?token=<token>
-  // 未设置该环境变量时服务器保持开放（与改动前行为一致，向后兼容）。
-  // 鉴权令牌必须始终存在：未显式配置时自动生成一个一次性令牌并打印到日志，
-  // 避免 /mcp 与 /sse 在默认配置下（未设置 GODOT_MCP_TOKEN）完全不鉴权。
-  const mcpToken = process.env.GODOT_MCP_TOKEN ?? randomUUID();
-  if (!process.env.GODOT_MCP_TOKEN) {
-    console.error(`[Godot MCP] GODOT_MCP_TOKEN not set; generated one-time token: ${mcpToken}`);
+  // 来源优先级：GODOT_MCP_TOKEN > 工程 .godot/mcp_http_token >
+  //             ~/.godot-mcp/http_token > 新生成并落盘。
+  // 持久化的目的：以前每次启动都换一个一次性令牌，已配好的 HTTP 客户端下
+  // 次启动就 401，等于逼用户每次去日志里捞令牌。
+  const tokenInfo = resolveHttpToken(projectRoot);
+  const mcpToken = tokenInfo.token;
+  if (tokenInfo.source === 'env') {
+    console.error('[Godot MCP] HTTP auth token: from GODOT_MCP_TOKEN');
+  } else {
+    const where = tokenInfo.path ?? '(in-memory, not persisted)';
+    const verb = tokenInfo.created ? 'created' : 'reusing';
+    console.error(`[Godot MCP] HTTP auth token ${verb}: ${where}`);
+    console.error(`[Godot MCP]   token: ${mcpToken}`);
+    console.error('[Godot MCP]   (reused on every start; set GODOT_MCP_TOKEN to override)');
+    if (tokenInfo.warning) {
+      console.error(`[Godot MCP]   warning: ${tokenInfo.warning}`);
+    }
   }
 
   /** 请求是否携带了正确的令牌。 */
@@ -132,7 +144,7 @@ export async function runHttpTransport(options: HttpTransportOptions = {}): Prom
     const mayRevealPaths = isLoopback || requestHasValidToken(req);
     res.json({
       status: 'ok',
-      version: '1.12.10',
+      version: '1.12.11',
       ...(mayRevealPaths ? { projectRoot: getProjectRoot() } : {}),
       endpoints: {
         ...(enableSse ? { sse: `http://${host}:${port}/sse` } : {}),
