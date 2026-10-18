@@ -424,7 +424,7 @@ godot-mcp/
 - **自动备份**：脚本和场景文件的写操作会创建 `.bak` 备份副本
 - **只读模式**：`--read-only`（或 `GODOT_MCP_READ_ONLY=true`）通过维护的白名单拒绝 218 个写/副作用工具（write_、create_、delete_、move_、set_、edit_、editor_* 变更类、run/export/launch 等）——它们从 `tools/list` 中隐藏，直接调用时返回 `READ_ONLY` 错误
 - **TCP 仅限本机**：编辑器插件的 TCP 桥只绑定 `127.0.0.1`，绝不暴露到局域网
-- **可选令牌鉴权**：设置 `GODOT_MCP_TOKEN` 后，HTTP（`/mcp`、`/sse`）要求 Bearer 令牌，插件 TCP 桥要求 `auth` 握手；非 loopback 的 HTTP 绑定在没有令牌时拒绝启动
+- **HTTP 令牌鉴权始终开启**：`/mcp`、`/sse` 一律要求 Bearer 令牌。设置 `GODOT_MCP_TOKEN` 可指定令牌；未设置时服务器会在启动时生成一个一次性随机令牌并打印到 stderr（`GODOT_MCP_TOKEN not set; generated one-time token: …`）。绑定非 loopback 地址必须设置该变量。插件 TCP 桥在设置 `GODOT_MCP_TOKEN`（或项目设置 `godot_mcp/auth_token`）时启用 `auth` 握手
 - **编辑器改动可撤销**：所有会修改场景的编辑器命令（`editor_add_node`、`editor_remove_node`、`editor_set_node_properties`、`editor_rename_node`、`editor_move_node`、`editor_move_node_3d`、`editor_reparent_node`、`editor_duplicate_node`、`editor_delete_selected`、`editor_instantiate_scene` 等）都通过 Godot 原生 `EditorUndoRedoManager` 提交，一次 **Ctrl+Z**（或 `editor_undo`）即可撤回 AI 刚做的操作
 - **结构化错误**：工具失败统一返回 `{ content, isError: true }` 结构；关键路径携带类型化错误码（`READ_ONLY`、`EDITOR_NOT_REACHABLE`、`EDITOR_COMMAND_FAILED`、`NOT_FOUND` 等）。引擎侧失败绝不会被当作成功返回——编辑器拒绝了命令，工具就会带着引擎自己的报错信息抛出 `EDITOR_COMMAND_FAILED`
 
@@ -648,7 +648,7 @@ npx @yanhuifair/godot-mcp -p . -t streamable-http --port 8080
 |---|---|
 | `GODOT_PATH` | Godot 二进制路径（可选，自动检测） |
 | `GODOT_MCP_READ_ONLY` | `true` — 启用只读模式（拒绝 218 个写/副作用工具） |
-| `GODOT_MCP_TOKEN` | 鉴权令牌。HTTP：绑定非 loopback 地址时必须设置；插件 TCP 桥：在 9876 端口启用 `auth` 握手 |
+| `GODOT_MCP_TOKEN` | 鉴权令牌。HTTP：`/mcp` 与 `/sse` 始终要求令牌——未设置时启动时会生成一次性随机令牌并打印到 stderr（想跨重启固定令牌就设置它）；插件 TCP 桥：在 9876 端口启用 `auth` 握手 |
 | `GODOT_MCP_TEST_PROJECT` | 集成测试项目路径 |
 | `GODOT_PROJECT` | `sync-addons` 构建钩子的目标项目 |
 | `MCP_STDIO` | `true` — 让编辑器插件以 stdio 模式运行（MCP 启动 Godot 时自动设置） |

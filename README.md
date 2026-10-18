@@ -424,7 +424,7 @@ To accommodate AI clients that may use either `snake_case` or `camelCase` parame
 - **Automatic backups**: Write operations on script and scene files create `.bak` backup copies
 - **Read-only mode**: `--read-only` (or `GODOT_MCP_READ_ONLY=true`) rejects the 218 write/side-effect tools (write_, create_, delete_, move_, set_, edit_, editor_* mutations, run/export/launch, …) via a maintained whitelist — they are hidden from `tools/list` and blocked with a `READ_ONLY` error if called directly
 - **TCP only on loopback**: The editor plugin's TCP bridge binds `127.0.0.1` only, never the LAN
-- **Optional token auth**: Set `GODOT_MCP_TOKEN` to require a bearer token on HTTP (`/mcp`, `/sse`) and an `auth` handshake on the plugin TCP bridge; non-loopback HTTP binds are refused without it
+- **HTTP token auth is always on**: `/mcp` and `/sse` require a bearer token. Set `GODOT_MCP_TOKEN` to choose it; when it is unset the server generates a one-time random token at startup and prints it to stderr (`GODOT_MCP_TOKEN not set; generated one-time token: …`). Non-loopback HTTP binds are refused without it. The plugin TCP bridge enables its `auth` handshake when `GODOT_MCP_TOKEN` (or the project setting `godot_mcp/auth_token`) is set
 - **Undoable editor mutations**: Every scene-changing editor command (`editor_add_node`, `editor_remove_node`, `editor_set_node_properties`, `editor_rename_node`, `editor_move_node`, `editor_move_node_3d`, `editor_reparent_node`, `editor_duplicate_node`, `editor_delete_selected`, `editor_instantiate_scene`, …) is committed through Godot's native `EditorUndoRedoManager`, so a single **Ctrl+Z** (or `editor_undo`) reverts what the AI just did
 - **Structured errors**: Tool failures return structured `{ content, isError: true }` responses; privileged paths carry typed error codes (`READ_ONLY`, `EDITOR_NOT_REACHABLE`, `EDITOR_COMMAND_FAILED`, `NOT_FOUND`, …). Engine-side failures are never reported as success — if the editor rejects a command, the tool surfaces `EDITOR_COMMAND_FAILED` with the engine's own message
 
@@ -518,8 +518,9 @@ curl http://127.0.0.1:3000/health
 
 > `/health` is deliberately **not** token-protected so probe tools can use it, but it only echoes
 > `projectRoot` when the request comes from loopback or carries a valid `GODOT_MCP_TOKEN` — a
-> LAN/remote deployment must not leak local paths. Everything else (`/mcp`, `/sse`) is always
-> token-gated when `GODOT_MCP_TOKEN` is set.
+> LAN/remote deployment must not leak local paths. Everything else (`/mcp`, `/sse`) is **always**
+> token-gated: `GODOT_MCP_TOKEN` when set, otherwise a one-time token generated at startup and
+> printed to stderr.
 
 ---
 
@@ -653,7 +654,7 @@ npx @yanhuifair/godot-mcp -p . -t streamable-http --port 8080
 |---|---|
 | `GODOT_PATH` | Path to Godot binary (optional, auto-detected) |
 | `GODOT_MCP_READ_ONLY` | `true` — enable read-only mode (rejects 218 write/side-effect tools) |
-| `GODOT_MCP_TOKEN` | Auth token. HTTP: required when binding a non-loopback host. Plugin TCP bridge: enables the `auth` handshake on port 9876 |
+| `GODOT_MCP_TOKEN` | Auth token. HTTP: `/mcp` and `/sse` always require one — if unset, a random one-time token is generated and printed to stderr at startup (set this to keep the token stable across restarts). Plugin TCP bridge: enables the `auth` handshake on port 9876 |
 | `GODOT_MCP_TEST_PROJECT` | Path to test project for integration tests |
 | `GODOT_PROJECT` | Target project for the `sync-addons` build hook |
 | `MCP_STDIO` | `true` — run the editor plugin in stdio mode (set automatically when MCP spawns Godot) |
