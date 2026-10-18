@@ -12,7 +12,7 @@ import { ToolResult } from '../utils/types.js';
 import { ErrorCode, toolError } from '../utils/errors.js';
 import { getActiveRegistry } from '../utils/registry.js';
 import { probeEditor } from './editor_bridge.js';
-import { sendGameCommand, isGameReachable } from './runtime_bridge.js';
+import { probeGameRuntime } from './runtime_bridge.js';
 
 // ---- Schemas ----
 
@@ -23,7 +23,7 @@ export const searchToolsSchema = {
 };
 
 export const getStatusSchema = {
-  probe_runtime: z.boolean().optional().default(true).describe('Also probe the live-game runtime bridge (port 9877).'),
+  probe_runtime: z.boolean().optional().default(true).describe('Also perform a real ping against the live-game runtime bridge on 127.0.0.1:9877 (never a cached flag). Set false to skip the probe entirely.'),
 };
 
 // ---- Handlers ----
@@ -87,19 +87,30 @@ export async function handleGetStatus(args: { probe_runtime?: boolean }): Promis
   out.push(`Editor bridge : ${editor}${editorVersion ? ' (Godot ' + editorVersion + ')' : ''}`);
   out.push(`  → start the editor with the MCP plugin, or run the game from the editor to auto-connect on 127.0.0.1:9876`);
 
-  // Runtime bridge (live game)
-  let runtime = 'not running / not enabled';
+  // Runtime bridge (live game) — 实测，不读缓存。
+  // 这里以前先问 isGameReachable()（一个只在连接成功时刷新、5 秒过期的标志），
+  // 结果 5 秒内没发过 runtime_* 命令就把真实 ping 挡在门外，游戏明明在跑也报
+  // "not running / not enabled"。健康检查必须每次真连真 ping。
   if (args.probe_runtime !== false) {
-    if (isGameReachable()) {
-      try {
-        const r = await sendGameCommand('ping', {});
-        runtime = r && r.ok ? 'connected (game running)' : 'reachable';
-      } catch {
-        runtime = 'not running / not enabled';
-      }
+    const probe = await probeGameRuntime();
+    let runtime: string;
+    let runtimeHealthy = false;
+    if (!probe.reachable) {
+      runtime = 'not running / not enabled';
+    } else if (probe.responding) {
+      runtime = probe.info && probe.info.ok === false
+        ? `reachable (ping replied ${JSON.stringify(probe.info)})`
+        : 'connected (game running)';
+      runtimeHealthy = true;
+    } else {
+      // 端口开着却没有 ping 回应：既可能是 autoload 卡死，也可能是 9877 被
+      // 别的程序占着。如实分开报，别一口断定"游戏没跑"。
+      runtime = `reachable (127.0.0.1:9877 accepts connections but ping failed: ${probe.error})`;
     }
     out.push(`Runtime bridge: ${runtime}`);
-    out.push(`  → add addons/godot-mcp/runtime_bridge.gd as an autoload (name godot_mcp_runtime) to control the running game`);
+    if (!runtimeHealthy) {
+      out.push(`  → add addons/godot-mcp/runtime_bridge.gd as an autoload (name godot_mcp_runtime) to control the running game`);
+    }
   }
 
   out.push(`Tools total   : ${total}`);
