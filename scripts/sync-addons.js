@@ -46,26 +46,30 @@ function hashFile(p) {
 
 // --- 辅助：按内容比较源与目标，返回第一处差异的说明（相同则返回 null）---
 function diffReason(srcDir, dstDir) {
-  if (!fs.existsSync(dstDir)) return "target does not exist";
+  if (!fs.existsSync(dstDir)) return { reason: "target does not exist", stale: [] };
 
   const srcFiles = listFiles(srcDir);
   const dstFiles = listFiles(dstDir);
 
   const missing = srcFiles.filter((f) => !dstFiles.includes(f));
-  if (missing.length) return `target is missing ${missing.length} file(s): ${missing.slice(0, 3).join(", ")}`;
+  if (missing.length) return { reason: `target is missing ${missing.length} file(s): ${missing.slice(0, 3).join(", ")}`, stale: [] };
 
   // Godot 会在目标工程里自己生成 .uid / .import 等元文件，它们本来就不该
   // 存在于源目录，不能当成“过期文件”，否则每次构建都会误判为需要同步。
   const isEngineArtifact = (f) => /\.(uid|import)$/.test(f);
   const extra = dstFiles.filter((f) => !srcFiles.includes(f) && !isEngineArtifact(f));
-  if (extra.length) return `target has ${extra.length} stale file(s): ${extra.slice(0, 3).join(", ")}`;
+  // 返回 { reason, stale }：调用方要能把过期文件删掉，否则"有差异"永远成立，
+  // 每次构建/每次打开工程都重复复制一遍（addon_sync.ts 是同一个逻辑）。
+  if (extra.length) {
+    return { reason: `target has ${extra.length} stale file(s): ${extra.slice(0, 3).join(", ")}`, stale: extra };
+  }
 
   const changed = srcFiles.filter(
     (f) => hashFile(path.join(srcDir, f)) !== hashFile(path.join(dstDir, f))
   );
-  if (changed.length) return `${changed.length} file(s) changed: ${changed.slice(0, 3).join(", ")}`;
+  if (changed.length) return { reason: `${changed.length} file(s) changed: ${changed.slice(0, 3).join(", ")}`, stale: [] };
 
-  return null;
+  return { reason: null, stale: [] };
 }
 
 // 目标路径：命令行参数 > 环境变量 GODOT_PROJECT > 自动检测
@@ -101,7 +105,7 @@ const srcPluginCfg = path.join(sourceAddons, "plugin.cfg");
 const dstPluginCfg = path.join(targetAddons, "plugin.cfg");
 
 // 内容完全一致则跳过复制
-const reason = diffReason(sourceAddons, targetAddons);
+const { reason, stale } = diffReason(sourceAddons, targetAddons);
 if (!reason) {
   console.log(`[sync-addons] Already up to date (v${readPluginVersion(srcPluginCfg)}) — skipping sync`);
   process.exit(0);
@@ -110,6 +114,17 @@ console.log(`[sync-addons] Out of date — ${reason}`);
 
 // 复制目录
 fs.cpSync(sourceAddons, targetAddons, { recursive: true, force: true });
+
+// 新版里已不存在的文件要删掉：否则"有差异"永远成立，每次构建都白复制一遍
+// （与 src/utils/addon_sync.ts 的孪生逻辑保持一致）。
+for (const f of stale) {
+  try {
+    fs.rmSync(path.join(targetAddons, f), { force: true });
+    console.log(`[sync-addons]   removed stale file: ${f}`);
+  } catch {
+    // 删不掉就算了，下次构建再试
+  }
+}
 
 // 确保 plugin.cfg 已复制（cpSync 已处理，此处保留为显式保障）
 if (fs.existsSync(srcPluginCfg)) {

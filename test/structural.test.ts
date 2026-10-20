@@ -411,6 +411,49 @@ describe('WRITE_TOOLS 名单完整性', () => {
     }
     expect(missing).toEqual([]);
   });
+
+  // 上面的检查只对"名字看起来像写操作"的工具生效。`editor_open_asset`、
+  // `editor_open_dock`、`editor_focus`、`monitor_output` 这类名字读起来像只读、
+  // 实际会改编辑器状态/清输出缓冲的工具就漏过来了（v1.12.12 修）。
+  // 改成反向门禁：每个 editor_* 工具都必须被**显式归类**——要么在 WRITE_TOOLS，
+  // 要么在下述只读快照里。新增 editor 工具而未归类 ⇒ 测试失败，逼人做判断。
+  it('每个 editor_* 工具都必须显式归类为「写」或「只读」', async () => {
+    const { WRITE_TOOLS } = await import('../src/utils/registry.js');
+    const { registerAllTools } = await import('../src/tools/register.js');
+    const { ToolRegistry } = await import('../src/utils/registry.js');
+
+    const registry = new ToolRegistry();
+    registerAllTools(registry);
+    const editorTools = registry.list().map((t) => t.name).filter((n) => n.startsWith('editor_'));
+
+    // 只读 editor 工具的快照（改 UI/查询，不写工程、不改编辑器持久状态）
+    const readOnlyEditorTools = new Set([
+      'editor_get_3d_snap', 'editor_get_autoloads', 'editor_get_breakpoints',
+      'editor_get_camera', 'editor_get_class_doc', 'editor_get_class_list',
+      'editor_get_class_properties', 'editor_get_class_signals', 'editor_get_debug_variables',
+      'editor_get_dependencies', 'editor_get_editor_setting', 'editor_get_errors',
+      'editor_get_filesystem_selection', 'editor_get_info', 'editor_get_input_map',
+      'editor_get_method_list', 'editor_get_node_properties', 'editor_get_open_scene',
+      'editor_get_open_scenes', 'editor_get_paths', 'editor_get_performance',
+      'editor_get_playing_scene', 'editor_get_plugin_list', 'editor_get_project_directory',
+      'editor_get_project_setting', 'editor_get_recent_scenes', 'editor_get_rect',
+      'editor_get_running_scene_tree', 'editor_get_scene_changes', 'editor_get_selection',
+      'editor_get_stack_trace', 'editor_get_unsaved_scenes', 'editor_health_check',
+      'editor_is_playing', 'editor_list_filesystem', 'editor_list_node_signals',
+      'editor_read_current_scene', 'editor_search_help', 'editor_show_in_filesystem',
+      'editor_show_toast',
+    ]);
+
+    const unclassified = editorTools.filter(
+      (n) => !WRITE_TOOLS.has(n) && !readOnlyEditorTools.has(n)
+    );
+    // 失败信息要能直接照着改：新工具要么进 WRITE_TOOLS，要么进上面的快照。
+    expect(unclassified).toEqual([]);
+
+    // 快照本身也不能有僵尸条目（工具删了却还留着名字，会让门禁失去意义）
+    const stale = [...readOnlyEditorTools].filter((n) => !editorTools.includes(n));
+    expect(stale).toEqual([]);
+  });
 });
 
 // ---- 版本一致性与分类计数 ----

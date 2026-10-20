@@ -422,7 +422,7 @@ godot-mcp/
 - **工程配置里的路径也当不可信输入**：`project.godot` 中的 `log_path` 只能指向工程根或 Godot 用户数据目录；`list_projects` 只扫描工程根与服务器工作目录（确有需要可用 `GODOT_MCP_SCAN_ROOT` 显式放宽）
 - **不做配置注入**：写入 `section` / `key` / `value` 时拒绝换行与结构字符，值永远无法在 `project.godot` 里凭空新增一个段（被注入的 `[autoload]` 会执行脚本）
 - **自动备份**：脚本和场景文件的写操作会创建 `.bak` 备份副本
-- **只读模式**：`--read-only`（或 `GODOT_MCP_READ_ONLY=true`）通过维护的白名单拒绝 218 个写/副作用工具（write_、create_、delete_、move_、set_、edit_、editor_* 变更类、run/export/launch 等）——它们从 `tools/list` 中隐藏，直接调用时返回 `READ_ONLY` 错误
+- **只读模式**：`--read-only`（或 `GODOT_MCP_READ_ONLY=true`）通过维护的白名单拒绝 223 个写/副作用工具（write_、create_、delete_、move_、set_、edit_、editor_* 变更类、run/export/launch 等）——它们从 `tools/list` 中隐藏，直接调用时返回 `READ_ONLY` 错误
 - **TCP 仅限本机**：编辑器插件的 TCP 桥只绑定 `127.0.0.1`，绝不暴露到局域网
 - **HTTP 令牌鉴权始终开启**：`/mcp`、`/sse` 一律要求 Bearer 令牌。设置 `GODOT_MCP_TOKEN` 可指定令牌；未设置时服务器会替你保存一个——首次启动生成并写入 `<工程>/.godot/mcp_http_token`（权限 `0600`，而 `.godot/` 本来就在 Godot 的 `.gitignore` 里），之后每次启动都复用同一个，已配好的 HTTP 客户端不会因为重启变 401。没有工程根目录时退到 `~/.godot-mcp/http_token`。令牌会在启动时打印到 stderr。绑定非 loopback 地址仍必须显式设置 `GODOT_MCP_TOKEN`。插件 TCP 桥在设置 `GODOT_MCP_TOKEN`（或项目设置 `godot_mcp/auth_token`）时启用 `auth` 握手
 - **编辑器改动可撤销**：所有会修改场景的编辑器命令（`editor_add_node`、`editor_remove_node`、`editor_set_node_properties`、`editor_rename_node`、`editor_move_node`、`editor_move_node_3d`、`editor_reparent_node`、`editor_duplicate_node`、`editor_delete_selected`、`editor_instantiate_scene` 等）都通过 Godot 原生 `EditorUndoRedoManager` 提交，一次 **Ctrl+Z**（或 `editor_undo`）即可撤回 AI 刚做的操作
@@ -513,7 +513,7 @@ npx @yanhuifair/godot-mcp -t all --port 3000 -p /path/to/your/godot/project
 
 ```bash
 curl http://127.0.0.1:3000/health
-# {"status":"ok","version":"1.12.11","projectRoot":"/path/to/project","endpoints":{...}}
+# {"status":"ok","version":"1.12.12","projectRoot":"/path/to/project","endpoints":{...}}
 ```
 
 ---
@@ -618,7 +618,7 @@ rm -rf addons/godot-mcp && npx -y @yanhuifair/godot-mcp@latest --enable-plugin -
 
 > **从 v1.9.0 升级？** 那个版本自带的编辑器插件里 `runtime_bridge.gd` 在 Godot 4.7 会解析失败（`_input` 函数与内置的 `Node._input` 冲突，且 `_resolve` 缺少返回类型）。如果编辑器报这些解析错误，删掉 `addons/godot-mcp` 再重跑 `--enable-plugin` 即可装上修复后的插件。
 
-完整变更历史见 [CHANGELOG](CHANGELOG.md)。**v1.12.11** 让 HTTP 鉴权令牌可持久化：首次启动生成后写入 `<工程>/.godot/mcp_http_token`（权限 `0600`），之后每次启动复用同一个，已配好的客户端不会因为重启变成 401。**v1.12.10** 让 `get_status` 对运行中的游戏说实话：现在真的会连 127.0.0.1:9877 并发一次 `ping`，而不是读一个 5 秒过期的缓存，游戏在跑就不会再被报成未运行。**v1.12.9** 让插件在工程打开时自动检测版本并更新：编辑器插件现在会自动发现落后的 addon，并从运行中的 server 拉取匹配版本，从此不会再卡在坏掉的旧 addon 上。**v1.12.3** 是一次安全版本：修掉了三个已用 PoC 证实的沙箱逃逸（`log_path` 任意文件读取、`write_project_config` 注入 `[autoload]`、`resolveProjectPath` 符号链接写逃逸），终结了 `edit_scene` 对未执行操作谎报成功，重写 `project.godot` 时不再打乱注释位置，并新增 20 项沙箱回归测试与文档漂移门禁。
+完整变更历史见 [CHANGELOG](CHANGELOG.md)。**v1.12.12** 是一次"说真话"的修正：`attach_script` 现在会登记它引用的 `ext_resource`（以前产出的场景 Godot 根本解析不了却还报成功）；`editor_pause_project` 不再去暂停编辑器自己的树（那会让桥自杀），改为如实报错并指向 `runtime_freeze`；编辑器桥终于认 README 里写的项目设置 `godot_mcp/auth_token` 与 `godot_mcp/editor_port`；只读模式再拦下 5 个有副作用的工具（共 223）；另有几个"全失败也报成功"的工具改为如实报错。**v1.12.11** 让 HTTP 鉴权令牌可持久化：首次启动生成后写入 `<工程>/.godot/mcp_http_token`（权限 `0600`），之后每次启动复用同一个，已配好的客户端不会因为重启变成 401。**v1.12.10** 让 `get_status` 对运行中的游戏说实话：现在真的会连 127.0.0.1:9877 并发一次 `ping`，而不是读一个 5 秒过期的缓存，游戏在跑就不会再被报成未运行。**v1.12.9** 让插件在工程打开时自动检测版本并更新：编辑器插件现在会自动发现落后的 addon，并从运行中的 server 拉取匹配版本，从此不会再卡在坏掉的旧 addon 上。**v1.12.3** 是一次安全版本：修掉了三个已用 PoC 证实的沙箱逃逸（`log_path` 任意文件读取、`write_project_config` 注入 `[autoload]`、`resolveProjectPath` 符号链接写逃逸），终结了 `edit_scene` 对未执行操作谎报成功，重写 `project.godot` 时不再打乱注释位置，并新增 20 项沙箱回归测试与文档漂移门禁。
 
 ### 命令行参数
 
@@ -647,7 +647,7 @@ npx @yanhuifair/godot-mcp -p . -t streamable-http --port 8080
 | 变量 | 描述 |
 |---|---|
 | `GODOT_PATH` | Godot 二进制路径（可选，自动检测） |
-| `GODOT_MCP_READ_ONLY` | `true` — 启用只读模式（拒绝 218 个写/副作用工具） |
+| `GODOT_MCP_READ_ONLY` | `true` — 启用只读模式（拒绝 223 个写/副作用工具） |
 | `GODOT_MCP_TOKEN` | 鉴权令牌。HTTP：`/mcp` 与 `/sse` 始终要求令牌——未设置时会生成一次并持久化到 `<工程>/.godot/mcp_http_token`（无工程时退到 `~/.godot-mcp/http_token`），之后每次启动复用；设置它即覆盖该令牌，绑定非 loopback 地址也必须设置。插件 TCP 桥：在 9876 端口启用 `auth` 握手 |
 | `GODOT_MCP_TEST_PROJECT` | 集成测试项目路径 |
 | `GODOT_PROJECT` | `sync-addons` 构建钩子的目标项目 |
@@ -2081,7 +2081,7 @@ npm run check:godot  # 在真实的无头 Godot 中加载全部测试资源，�
 | `--host` | HTTP 绑定地址（默认：127.0.0.1） |
 | `--install-addons` | 将编辑器插件复制到目标 Godot 项目 |
 | `--enable-plugin` | 安装并自动启用编辑器插件 |
-| `--read-only` | 拒绝 218 个写/副作用工具（安全模式） |
+| `--read-only` | 拒绝 223 个写/副作用工具（安全模式） |
 | `--no-sse` | 禁用 SSE 端点 |
 | `--no-streamable-http` | 禁用 Streamable HTTP 端点 |
 | `-h, --help` | 显示帮助 |

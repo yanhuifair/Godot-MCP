@@ -20,6 +20,7 @@ import { createMcpServer, initSharedResources, getProjectRoot } from '../server.
 import { initEditorBridge, shutdownEditorBridge } from '../tools/editor_bridge.js';
 import { cleanupProcesses } from '../utils/godot_cli.js';
 import { resolveHttpToken } from '../utils/http_token.js';
+import { VERSION } from '../utils/version.js';
 
 export interface HttpTransportOptions {
   /** HTTP 监听端口，默认 3000 */
@@ -101,8 +102,13 @@ export async function runHttpTransport(options: HttpTransportOptions = {}): Prom
     const where = tokenInfo.path ?? '(in-memory, not persisted)';
     const verb = tokenInfo.created ? 'created' : 'reusing';
     console.error(`[Godot MCP] HTTP auth token ${verb}: ${where}`);
-    console.error(`[Godot MCP]   token: ${mcpToken}`);
-    console.error('[Godot MCP]   (reused on every start; set GODOT_MCP_TOKEN to override)');
+    // 令牌值只在**首次生成**时打印一次。之后每次启动都往日志里写一遍秘密
+    // 没有收益（客户端早就配好了），反而让 stderr/日志文件变成泄密源。
+    // 想再看就 cat 上面那个文件。
+    if (tokenInfo.created) {
+      console.error(`[Godot MCP]   token: ${mcpToken}`);
+      console.error('[Godot MCP]   (reused on every start; set GODOT_MCP_TOKEN to override)');
+    }
     if (tokenInfo.warning) {
       console.error(`[Godot MCP]   warning: ${tokenInfo.warning}`);
     }
@@ -129,6 +135,7 @@ export async function runHttpTransport(options: HttpTransportOptions = {}): Prom
   // ---- Streamable HTTP 端点 (/mcp) ----
   if (enableStreamableHttp) {
     setupStreamableHttpEndpoint(app);
+    startSessionSweeper();
   }
 
   // ---- SSE 端点 (/sse) ----
@@ -141,10 +148,15 @@ export async function runHttpTransport(options: HttpTransportOptions = {}): Prom
   // 非 loopback 部署时它对本网段可见，回显 projectRoot 绝对路径等于告诉别人
   // 这台机器上的目录结构。因此只有「本机请求」或「带了正确令牌」才回显路径。
   app.get('/health', (req: Request, res: Response) => {
-    const mayRevealPaths = isLoopback || requestHasValidToken(req);
+    // 判断"是不是本机在问"要看**对端地址**，而不是我们绑在哪个接口上：
+    // 绑 0.0.0.0 时 isLoopback 为 false，但请求可能就来自 127.0.0.1；反之
+    // 绑在 loopback 上时同理。用 remoteAddress 才不会把路径泄露给局域网。
+    const remote = req.socket.remoteAddress ?? '';
+    const fromLoopback = /^(127\.\d+\.\d+\.\d+|::1|::ffff:127\.\d+\.\d+\.\d+|0:0:0:0:0:0:0:1)$/i.test(remote);
+    const mayRevealPaths = fromLoopback || requestHasValidToken(req);
     res.json({
       status: 'ok',
-      version: '1.12.11',
+      version: VERSION,
       ...(mayRevealPaths ? { projectRoot: getProjectRoot() } : {}),
       endpoints: {
         ...(enableSse ? { sse: `http://${host}:${port}/sse` } : {}),
@@ -183,7 +195,14 @@ export async function runHttpTransport(options: HttpTransportOptions = {}): Prom
     console.error('[Godot MCP] Shutting down HTTP server...');
     shutdownEditorBridge();
     cleanupProcesses(); // kill any spawned Godot editor/game/export processes
-    server.close();
+    // 等监听真正关闭再退：`--transport all` 下 stdio 还在同一进程里，直接
+    // process.exit 会把正在写的响应/日志截断。close() 无回调参时要自己等。
+    await new Promise<void>((resolve) => {
+      const timer = setTimeout(resolve, 2000); // 兜底：别因为挂着的长连接永远不退出
+      server.close(() => { clearTimeout(timer); resolve(); });
+      timer.unref?.();
+    });
+    if (sweeper) clearInterval(sweeper);
     process.exit(0);
   };
   process.on('SIGINT', shutdown);
@@ -194,6 +213,29 @@ export async function runHttpTransport(options: HttpTransportOptions = {}): Prom
 
 // Streamable HTTP 会话管理（sessionId -> transport）
 const mcpTransports = new Map<string, StreamableHTTPServerTransport>();
+// 对应的 Server 实例 + 最近活动时间。SDK 只在我们（或客户端）显式终止会话时
+// 回调 onsessionclosed；客户端直接断网不告而别时它不会触发，于是每个僵尸会话
+// 都白占一个 Server（含工具注册表）。这里做空闲回收兜底。
+const sessions = new Map<string, { server: unknown; lastSeen: number }>();
+const SESSION_IDLE_TTL_MS = 60 * 60 * 1000; // 1 小时无任何请求即视为僵尸
+const SESSION_SWEEP_MS = 15 * 60 * 1000;
+
+let sweeper: NodeJS.Timeout | null = null;
+function startSessionSweeper(): void {
+  if (sweeper) return;
+  sweeper = setInterval(() => {
+    const now = Date.now();
+    for (const [sid, s] of sessions) {
+      if (now - s.lastSeen < SESSION_IDLE_TTL_MS) continue;
+      console.error(`[Godot MCP] Reaping idle Streamable HTTP session: ${sid}`);
+      try { (s.server as any)?.close?.(); } catch { /* best-effort disposal */ }
+      mcpTransports.delete(sid);
+      sessions.delete(sid);
+    }
+  }, SESSION_SWEEP_MS);
+  // 定时器不能拖住进程退出
+  sweeper.unref();
+}
 
 function setupStreamableHttpEndpoint(app: Express): void {
   // 有状态模式：每个会话（Mcp-Session-Id）使用独立的 Server + Transport 实例，
@@ -209,19 +251,34 @@ function setupStreamableHttpEndpoint(app: Express): void {
         return;
       }
       // 新会话：为该连接创建专用的 transport 与 server
+      const entry: { server: unknown; lastSeen: number } = { server: null, lastSeen: Date.now() };
       transport = new StreamableHTTPServerTransport({
         sessionIdGenerator: () => randomUUID(),
         onsessioninitialized: (sid) => {
           mcpTransports.set(sid, transport!);
+          sessions.set(sid, entry);
         },
         onsessionclosed: (sid) => {
           mcpTransports.delete(sid);
+          sessions.delete(sid);
           console.error(`[Godot MCP] Streamable HTTP session closed: ${sid}`);
         },
       });
       const server = createMcpServer();
-      // 必须等 server 与 transport 连接完成后再处理首条请求（通常是 initialize）
-      await server.connect(transport);
+      entry.server = server;
+      // 必须等 server 与 transport 连接完成后再处理首条请求（通常是 initialize）。
+      // connect() 也可能抛（协议/版本不匹配等），必须包在 try 里——async
+      // Express handler 里漏掉的异常会升级成 uncaughtException。
+      try {
+        await server.connect(transport);
+      } catch (err: any) {
+        console.error('[Godot MCP] Streamable HTTP connect failed:', err.message);
+        if (!res.headersSent) res.status(500).json({ error: 'Internal server error' });
+        return;
+      }
+    } else if (sessionId) {
+      const s = sessions.get(sessionId);
+      if (s) s.lastSeen = Date.now();
     }
 
     try {
@@ -269,10 +326,18 @@ function setupSseEndpoint(app: Express): void {
     const sessionId = transport.sessionId;
     sseTransports.set(sessionId, { server, transport });
 
+    // ⚠️ 这里绝不能再调 server.close()：SDK 的 Protocol.close() →
+    // SSEServerTransport.close() → onclose() 是无条件回调（没有 _closed 守卫），
+    // 而客户端断开时 res 'close' → onclose() 已经触发过一次。于是
+    // onclose → server.close() → transport.close() → onclose → … 无限递归，
+    // 直接爆栈（RangeError: Maximum call stack size exceeded）。
+    // 断开本身就是 close 的**结果**，这里只需清理注册表。
+    let closed = false;
     transport.onclose = () => {
+      if (closed) return;
+      closed = true;
       console.error(`[Godot MCP] SSE connection closed: ${sessionId}`);
       sseTransports.delete(sessionId);
-      try { (server as any).close?.(); } catch { /* best-effort disposal */ }
     };
   });
 

@@ -256,6 +256,14 @@ export function handleFixMissingUids(projectRoot: string): ToolResult {
     if (fixedFiles.length === 0 && failedFiles.length === 0) {
       lines.push('All scanned files already have UIDs.');
     }
+    // 一个都没修成、却又确实有失败 ⇒ 不能报 "UID Fix Complete"。
+    // 客户端会据此认为 UID 已经补齐，接着去改场景，结果全是悬空引用。
+    if (fixedFiles.length === 0 && failedFiles.length > 0) {
+      return toolError(
+        ErrorCode.INTERNAL_ERROR,
+        `UID fix failed for all ${failedFiles.length} file(s): ${failedFiles.slice(0, 5).join(', ')}`
+      );
+    }
 
     return { content: [{ type: 'text', text: lines.join('\n') }] };
   } catch (err: any) {

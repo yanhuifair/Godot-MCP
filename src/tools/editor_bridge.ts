@@ -14,17 +14,59 @@
 // ============================================================
 
 import net from 'node:net';
+import fs from 'node:fs';
+import path from 'node:path';
 import { spawn, ChildProcess } from 'node:child_process';
 import { editorCommandError } from '../utils/errors.js';
 import { findGodotBinary } from '../utils/godot_cli.js';
 import { syncAddonToProject } from '../utils/addon_sync.js';
+import { parseConfig } from '../parsers/config_parser.js';
 
-const EDITOR_PORT = 9876;
+const DEFAULT_EDITOR_PORT = 9876;
 const TCP_CONNECT_TIMEOUT = 800;   // quick probe for an existing editor on 127.0.0.1
 const TCP_RESPONSE_TIMEOUT = 30000; // per-request response wait (heavy ops: bake, reimport, run_gdscript)
 const SPAWN_TIMEOUT = 15000;
 const MAX_RESTART_ATTEMPTS = 3;
 const RESPONSE_MARKER = '__MCP__:';
+
+/**
+ * 编辑器桥的连接参数。以前端口写死 9876、令牌只读 GODOT_MCP_TOKEN，而插件侧
+ * 读的是**项目设置** `godot_mcp/auth_token` 与 `godot_mcp/editor_port`（README
+ * 就是这么写的）。于是用户照文档在 project.godot 里配了令牌 → server 不发 auth
+ * 握手 → 插件把每条命令都回 "Unauthorized"，而 server 侧的表现只是"命令失败"，
+ * 排查方向完全跑偏。两边必须读同一份配置。
+ */
+let _editorPort: number = DEFAULT_EDITOR_PORT;
+let _authToken: string = process.env.GODOT_MCP_TOKEN ?? '';
+
+/** parseConfig 存的是等号右边的原文（可能带引号），这里剥掉。 */
+function unquote(raw: string | undefined): string {
+  if (typeof raw !== 'string') return '';
+  const t = raw.trim();
+  return t.startsWith('"') && t.endsWith('"') && t.length >= 2 ? t.slice(1, -1) : t;
+}
+
+/** 从 project.godot 的 [godot_mcp] 段读桥接参数；读不到就用默认值。 */
+function loadBridgeSettingsFromProject(projectRoot: string | null): void {
+  _editorPort = DEFAULT_EDITOR_PORT;
+  _authToken = process.env.GODOT_MCP_TOKEN ?? '';
+  if (!projectRoot) return;
+  try {
+    const cfgPath = path.join(projectRoot, 'project.godot');
+    if (!fs.existsSync(cfgPath)) return;
+    const doc = parseConfig(fs.readFileSync(cfgPath, 'utf-8'));
+    const s = doc.sections['godot_mcp'] ?? {};
+    // 环境变量优先：它是"这次运行"的显式意图，不该被工程里的值盖掉。
+    if (!process.env.GODOT_MCP_TOKEN) {
+      const t = unquote(s['auth_token']);
+      if (t) _authToken = t;
+    }
+    const p = parseInt(unquote(s['editor_port']), 10);
+    if (Number.isInteger(p) && p > 0 && p < 65536) _editorPort = p;
+  } catch {
+    // 配置读不了就按默认来 —— 读配置失败不该让整个桥起不来
+  }
+}
 
 let _editorProcess: ChildProcess | null = null;
 const _pendingRequests: Map<number, { resolve: (value: any) => void; reject: (err: Error) => void }> = new Map();
@@ -82,7 +124,7 @@ function getTcpConnection(): Promise<net.Socket> {
     };
     client.once('error', onConnectError);
 
-    client.connect(EDITOR_PORT, '127.0.0.1', () => {
+    client.connect(_editorPort, '127.0.0.1', () => {
       clearTimeout(timer);
       client.removeListener('error', onConnectError);
       _tcpClient = client;
@@ -91,7 +133,7 @@ function getTcpConnection(): Promise<net.Socket> {
 
       // 插件若配置了 auth_token（GODOT_MCP_TOKEN），TCP 连接必须先完成 auth 握手。
       // 该响应不会匹配任何 pending 请求，会被 data 处理器忽略。
-      const token = process.env.GODOT_MCP_TOKEN;
+      const token = _authToken;
       if (token) {
         client.write(JSON.stringify({ jsonrpc: '2.0', id: 'auth', method: 'auth', params: { token } }) + '\n');
       }
@@ -357,7 +399,9 @@ function handlePluginRequest(msg: any): void {
   if (!_projectRoot) return;
   try {
     const res = syncAddonToProject(_projectRoot);
-    if (res.updated) {
+    if (res.skipped) {
+      console.error(`[Godot MCP] Addon sync skipped (${res.skipped})`);
+    } else if (res.updated) {
       console.error(`[Godot MCP] Addon updated to v${res.version} (${res.reason}) — reloading editor plugin`);
       // 文件已写入磁盘，让运行中的插件实例重新加载以生效
       sendEditorCommand('reload_addon', { from: msg?.params?.plugin_version ?? '', to: res.version })
@@ -374,11 +418,16 @@ function handlePluginRequest(msg: any): void {
 export function initEditorBridge(projectRoot: string): void {
   _projectRoot = projectRoot;
   _restartAttempts = 0;
+  // 端口/令牌可能来自工程设置（godot_mcp/editor_port、godot_mcp/auth_token），
+  // 必须在建任何连接之前读——否则连到默认端口却拿着错误的令牌，全部命令被拒。
+  loadBridgeSettingsFromProject(projectRoot);
   // 启动即把 bundled addon 同步到工程：即使插件当前因旧版本无法加载，
   // 磁盘上的 addon 也会被修正，下次打开工程即生效（self-update 的安全网）。
   try {
     const res = syncAddonToProject(projectRoot);
-    if (res.updated) {
+    if (res.skipped) {
+      console.error(`[Godot MCP] Startup addon sync skipped (${res.skipped})`);
+    } else if (res.updated) {
       console.error(`[Godot MCP] Addon synced to v${res.version} on startup (${res.reason})`);
     }
   } catch (e) {

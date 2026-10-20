@@ -115,7 +115,10 @@ export async function handleGetStatus(args: { probe_runtime?: boolean }): Promis
 
   out.push(`Tools total   : ${total}`);
   out.push('', 'Subsystems available via this server:');
-  out.push('  • 235 file-path tools (edit .tscn/.tres/.gd/.import without the editor)');
+  // 别硬编码工具数：以前这里写死 235，加一个工具就变谎话。直接从注册表算——
+  // "file-path tools" = 不需要编辑器桥/运行时桥的那些（即非 editor_/runtime_）。
+  const bridgeTools = registry ? registry.list().filter((t) => /^(editor_|runtime_)/.test(t.name)).length : 0;
+  out.push(`  • ${total - bridgeTools} file-path tools (edit .tscn/.tres/.gd/.import without the editor)`);
   out.push('  • editor bridge (live scene/node/script/debugger control on :9876)');
   out.push('  • ClassDB introspection (editor_get_class_list / _method_list / _property_list / _signal_list)');
   out.push('  • live-game runtime bridge (runtime_* tools, requires autoload)');

@@ -66,6 +66,10 @@ export const WRITE_TOOLS: ReadonlySet<string> = new Set([
   'editor_connect_signal', 'editor_disconnect_signal', 'editor_simulate_key',
   'editor_enable_plugin', 'editor_disable_plugin', 'editor_create_folder', 'editor_delete_asset',
   'editor_rename_asset', 'editor_move_asset', 'editor_duplicate_asset', 'editor_set_camera',
+  // 下面 5 个不带“写”语义前缀，但都会改编辑器状态或清输出缓冲，漏了就等于
+  // 只读模式形同虚设（--read-only 下仍可改工程状态）。
+  'editor_open_asset', 'editor_open_script_at_line', 'editor_open_dock', 'editor_focus',
+  'monitor_output',
   'editor_add_autoload', 'editor_remove_autoload', 'editor_add_input_action',
   'editor_remove_input_action', 'editor_reimport_asset', 'editor_bake_lightmaps',
   'editor_bake_navigation', 'editor_take_screenshot',
@@ -153,7 +157,7 @@ export class ToolRegistry {
   /**
    * 设置后续 register() 调用的分组名。
    * 分类以前只以 register.ts 里的注释形式存在，导致每个工具的 category 都是
-   * undefined —— search_tools 无法按类聚合，README 宣称的"29 个分类"也无从校验。
+   * undefined —— search_tools 无法按类聚合，README 宣称的"30 个分类"也无从校验。
    */
   setCategory(name: string): void {
     this.currentCategory = name;

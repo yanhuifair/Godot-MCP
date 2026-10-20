@@ -650,10 +650,9 @@ export function handleFindUnusedAssets(projectRoot: string): ToolResult {
 
     // Find files NOT referenced
     const allFiles = findFilesByExtension(projectRoot, ['.tscn', '.gd', '.cs', '.tres', '.gdshader', '.gdshaderinc'], '', true);
-    const unused = allFiles.filter(f => {
-      if (f === 'project.godot' || f === 'export_presets.cfg') return false;
-      return !referenced.has(f);
-    });
+    // 这两个判断以前是死代码：findFilesByExtension 只收 .tscn/.gd/.cs/.tres/.gdshader*，
+    // project.godot 与 export_presets.cfg 永远不会出现在 allFiles 里。
+    const unused = allFiles.filter(f => !referenced.has(f));
 
     if (unused.length === 0) {
       return { content: [{ type: 'text', text: 'All project files are referenced. No unused assets found.' }] };

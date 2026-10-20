@@ -802,13 +802,35 @@ export function handleAttachScript(
   try {
     const absPath = resolveProjectPath(projectRoot, args.scene_path);
     const { content } = readTextFile(absPath);
-    const ops: SceneOperation[] = [{ action: 'modify_node', node_path: args.node_path, properties: { script: `ExtResource("${args.script_path}")` } }];
-    const report: SceneEditReport = { applied: 0, skipped: [] };
-    const modified = editScene(content, ops, report);
-    const failed = allOpsFailed(args.scene_path, report);
-    if (failed) return failed;
+    // 不能只写 `script = ExtResource("<id>")` 而不登记 ext_resource：Godot 读到
+    // 未声明的 ExtResource 会让整个场景变成 "Unexpected end of file"，但这个
+    // 工具以前照样回 "Script ... attached" —— 一个会把场景写坏还报成功的工具。
+    // 正确做法同 load_sprite：先注册（或复用）ext_resource，再引用它的 id。
+    const doc = parseScene(content);
+
+    const node = findNodeByName(doc.nodes, args.node_path);
+    if (!node) {
+      return toolError(ErrorCode.FILE_NOT_FOUND, `Node "${args.node_path}" not found in ${args.scene_path}.`);
+    }
+
+    const scriptPath = toResPath(args.script_path);
+    let ext = doc.extResources.find((e) => e.path === scriptPath);
+    if (!ext) {
+      ext = {
+        id: uniqueResourceId(doc, 'script'),
+        type: 'Script',
+        path: scriptPath,
+      };
+      doc.extResources.push(ext);
+    }
+
+    if (!node.properties) node.properties = {};
+    node.properties.script = `ExtResource("${ext.id}")`;
+
+    recomputeLoadSteps(doc);
+    const modified = serializeScene(doc);
     writeTextFile(absPath, modified, true);
-    return { content: [{ type: 'text', text: `Script "${args.script_path}" attached to "${args.node_path}" in ${args.scene_path}` }] };
+    return { content: [{ type: 'text', text: `Script "${args.script_path}" attached to "${args.node_path}" in ${args.scene_path} (ExtResource "${ext.id}")` }] };
   } catch (err: any) {
     return toolError(ErrorCode.INTERNAL_ERROR, `Error attaching script: ${err.message}`);
   }

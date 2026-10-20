@@ -422,7 +422,7 @@ To accommodate AI clients that may use either `snake_case` or `camelCase` parame
 - **Sandboxed reads from project config**: Values inside `project.godot` are treated as untrusted input. A `log_path` may only point inside the project root or the Godot user-data directory, and `list_projects` only scans the project root and the server's working directory (widen deliberately with `GODOT_MCP_SCAN_ROOT`)
 - **No config injection**: `section` / `key` / `value` writes reject line breaks and structural characters, so a value can never add a new section to `project.godot` (an injected `[autoload]` would execute a script)
 - **Automatic backups**: Write operations on script and scene files create `.bak` backup copies
-- **Read-only mode**: `--read-only` (or `GODOT_MCP_READ_ONLY=true`) rejects the 218 write/side-effect tools (write_, create_, delete_, move_, set_, edit_, editor_* mutations, run/export/launch, …) via a maintained whitelist — they are hidden from `tools/list` and blocked with a `READ_ONLY` error if called directly
+- **Read-only mode**: `--read-only` (or `GODOT_MCP_READ_ONLY=true`) rejects the 223 write/side-effect tools (write_, create_, delete_, move_, set_, edit_, editor_* mutations, run/export/launch, …) via a maintained whitelist — they are hidden from `tools/list` and blocked with a `READ_ONLY` error if called directly
 - **TCP only on loopback**: The editor plugin's TCP bridge binds `127.0.0.1` only, never the LAN
 - **HTTP token auth is always on**: `/mcp` and `/sse` require a bearer token. Set `GODOT_MCP_TOKEN` to choose it; when it is unset the server keeps one for you — on first start it generates a token and writes it to `<project>/.godot/mcp_http_token` (mode `0600`, and `.godot/` is already in Godot's `.gitignore`), then reuses that same token on every later start, so a configured HTTP client keeps working across restarts. With no project root it falls back to `~/.godot-mcp/http_token`. The token is printed to stderr at startup. Non-loopback HTTP binds still require `GODOT_MCP_TOKEN` to be set explicitly. The plugin TCP bridge enables its `auth` handshake when `GODOT_MCP_TOKEN` (or the project setting `godot_mcp/auth_token`) is set
 - **Undoable editor mutations**: Every scene-changing editor command (`editor_add_node`, `editor_remove_node`, `editor_set_node_properties`, `editor_rename_node`, `editor_move_node`, `editor_move_node_3d`, `editor_reparent_node`, `editor_duplicate_node`, `editor_delete_selected`, `editor_instantiate_scene`, …) is committed through Godot's native `EditorUndoRedoManager`, so a single **Ctrl+Z** (or `editor_undo`) reverts what the AI just did
@@ -513,7 +513,7 @@ Starts: Stdio + SSE (`/sse`) + Streamable HTTP (`/mcp`) + Health Check (`/health
 
 ```bash
 curl http://127.0.0.1:3000/health
-# {"status":"ok","version":"1.12.11","projectRoot":"/path/to/project","endpoints":{...}}
+# {"status":"ok","version":"1.12.12","projectRoot":"/path/to/project","endpoints":{...}}
 ```
 
 > `/health` is deliberately **not** token-protected so probe tools can use it, but it only echoes
@@ -624,7 +624,7 @@ rm -rf addons/godot-mcp && npx -y @yanhuifair/godot-mcp@latest --enable-plugin -
 
 > **Upgrading from v1.9.0?** That release shipped an editor plugin whose `runtime_bridge.gd` failed to parse in Godot 4.7 (a `_input` function colliding with the built-in `Node._input`, plus an untyped `_resolve`). If your editor logs those parse errors, delete `addons/godot-mcp` and re-run `--enable-plugin` to install the fixed plugin.
 
-See [CHANGELOG](CHANGELOG.md) for the complete history. **v1.12.11** makes the HTTP auth token persistent: it is generated once, written to `<project>/.godot/mcp_http_token` (`0600`), and reused on every later start, so an already-configured HTTP client no longer gets `401` after a restart. **v1.12.10** makes `get_status` tell the truth about the live-game bridge: it now performs a real TCP connect plus `ping` on 127.0.0.1:9877 instead of reading a 5-second cache, so a running game is no longer reported as down. **v1.12.9** adds addon self-update on project open: the editor plugin now detects a stale addon automatically and pulls the matching copy from the running server, so you can no longer get stuck on a broken older addon. **v1.12.3** is a security release: it closes three sandbox escapes proven by PoC (arbitrary file read via `log_path`, `[autoload]` injection through `write_project_config`, and a symlink write escape in `resolveProjectPath`), stops `edit_scene` reporting success for operations it never applied, keeps comments in place when rewriting `project.godot`, and adds 20 sandbox regression tests plus doc-drift gates to CI.
+See [CHANGELOG](CHANGELOG.md) for the complete history. **v1.12.12** is a correctness and honesty pass: `attach_script` now registers the `ext_resource` it references (it used to write scenes Godot cannot parse while reporting success), `editor_pause_project` refuses to pause the editor's own tree (which killed the bridge) and points at `runtime_freeze` instead, the editor bridge finally honours the documented `godot_mcp/auth_token` / `godot_mcp/editor_port` project settings, read-only mode blocks five more effectful tools (223 total), and several tools that used to report success on total failure now report failure. **v1.12.11** makes the HTTP auth token persistent: it is generated once, written to `<project>/.godot/mcp_http_token` (`0600`), and reused on every later start, so an already-configured HTTP client no longer gets `401` after a restart. **v1.12.10** makes `get_status` tell the truth about the live-game bridge: it now performs a real TCP connect plus `ping` on 127.0.0.1:9877 instead of reading a 5-second cache, so a running game is no longer reported as down. **v1.12.9** adds addon self-update on project open: the editor plugin now detects a stale addon automatically and pulls the matching copy from the running server, so you can no longer get stuck on a broken older addon. **v1.12.3** is a security release: it closes three sandbox escapes proven by PoC (arbitrary file read via `log_path`, `[autoload]` injection through `write_project_config`, and a symlink write escape in `resolveProjectPath`), stops `edit_scene` reporting success for operations it never applied, keeps comments in place when rewriting `project.godot`, and adds 20 sandbox regression tests plus doc-drift gates to CI.
 
 ### Command-Line Options
 
@@ -653,7 +653,7 @@ npx @yanhuifair/godot-mcp -p . -t streamable-http --port 8080
 | Variable | Description |
 |---|---|
 | `GODOT_PATH` | Path to Godot binary (optional, auto-detected) |
-| `GODOT_MCP_READ_ONLY` | `true` — enable read-only mode (rejects 218 write/side-effect tools) |
+| `GODOT_MCP_READ_ONLY` | `true` — enable read-only mode (rejects 223 write/side-effect tools) |
 | `GODOT_MCP_TOKEN` | Auth token. HTTP: `/mcp` and `/sse` always require one — when unset, a token is generated once and persisted to `<project>/.godot/mcp_http_token` (fallback `~/.godot-mcp/http_token`) and reused on later starts; set this to override it and for any non-loopback bind. Plugin TCP bridge: enables the `auth` handshake on port 9876 |
 | `GODOT_MCP_TEST_PROJECT` | Path to test project for integration tests |
 | `GODOT_PROJECT` | Target project for the `sync-addons` build hook |
@@ -2087,7 +2087,7 @@ npm run check:godot  # Load every fixture in a real headless Godot and verify
 | `--host` | HTTP bind address (default: 127.0.0.1) |
 | `--install-addons` | Copy editor plugin to target Godot project |
 | `--enable-plugin` | Install and auto-enable the editor plugin |
-| `--read-only` | Reject 218 write/side-effect tools (security mode) |
+| `--read-only` | Reject 223 write/side-effect tools (security mode) |
 | `--no-sse` | Disable SSE endpoint |
 | `--no-streamable-http` | Disable Streamable HTTP endpoint |
 | `-h, --help` | Show help |

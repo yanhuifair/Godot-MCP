@@ -70,6 +70,32 @@ describe('runtime_bridge.gd does not shadow Godot virtual methods', () => {
   });
 });
 
+describe('health_check reports the real command count', () => {
+  // plugin.gd 的 health_check 里 commands 是个写死的数字，以前写 117 而分发表
+  // 只有 115 个键 —— 编辑器桥的"有多少命令"一直是假的。这里从源码数出真实分支数。
+  function countDispatchKeys(src: string): number {
+    const dispatch = src.slice(
+      src.indexOf('func _execute_command'),
+      src.indexOf('func ', src.indexOf('func _execute_command') + 10)
+    );
+    const keys = new Set<string>();
+    for (const line of dispatch.split('\n')) {
+      const m = line.match(/^\s*"([a-z_0-9]+)"(?:\s*,\s*"([a-z_0-9]+)")*\s*:\s*return/);
+      if (!m) continue;
+      for (const k of m.slice(1)) if (k) keys.add(k);
+    }
+    return keys.size;
+  }
+
+  it('matches the number of command branches in _execute_command', () => {
+    const src = fs.readFileSync(PLUGIN, 'utf8');
+    const actual = countDispatchKeys(src);
+    expect(actual).toBeGreaterThan(100); // 解析失败（0/个别数）应该炸掉这条
+    const declared = Number(/commands":\s*(\d+)/.exec(src)?.[1]);
+    expect(declared, 'plugin.gd health_check 的 commands 与实际分支数不符').toBe(actual);
+  });
+});
+
 describe('TCP peer state is polled before it is trusted', () => {
   // StreamPeerTCP.get_status() only updates on poll(). Reading it without
   // polling means a disconnected client is never detected.

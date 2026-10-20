@@ -2,7 +2,7 @@
 // Copyright (c) 2026 FairYan
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // ============================================================
-// Godot MCP Server - Entry Point (v1.12.11)
+// Godot MCP Server - Entry Point (v1.12.12)
 // ============================================================
 // 同时支持三种 MCP 通信协议：
 //   - Stdio（标准输入输出，默认）
@@ -17,21 +17,9 @@ import { findGodotBinary } from './utils/godot_cli.js';
 import { findProjectRoot } from './utils/file_utils.js';
 import { runStdioTransport } from './transports/stdio.js';
 import { runHttpTransport } from './transports/http-server.js';
+import { VERSION } from './utils/version.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-/**
- * 版本号从 package.json 读，别写死第二份——否则又是一个会漂移的副本
- * （本项目已经因为「同一事实存多处」踩过 tool count 漂移）。
- */
-const VERSION: string = (() => {
-  try {
-    const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf-8'));
-    return typeof pkg.version === 'string' ? pkg.version : '0.0.0';
-  } catch {
-    return '0.0.0';
-  }
-})();
 
 // ---- 全局异常兜底：防止未捕获的 rejection/异常导致进程崩溃 ----
 process.on('unhandledRejection', (reason) => {
@@ -40,6 +28,25 @@ process.on('unhandledRejection', (reason) => {
 process.on('uncaughtException', (err) => {
   console.error('[Godot MCP] Uncaught exception:', err);
 });
+
+/**
+ * 校验 --port：必须是 0–65535 的整数。
+ * 不校验的话 `--port abc` → parseInt → NaN → 一路传到 app.listen()，
+ * 最后以 "Fatal error: RangeError [ERR_SOCKET_BAD_PORT]" 收场，用户只看到
+ * 一句莫名其妙的崩溃，而不是"端口不是数字"。
+ */
+function parsePort(raw: string | undefined): number {
+  if (raw === undefined || !/^\d+$/.test(raw.trim())) {
+    console.error(`Error: --port expects a port number, got "${raw ?? ''}". Use --help for usage.`);
+    process.exit(1);
+  }
+  const port = parseInt(raw.trim(), 10);
+  if (port < 0 || port > 65535) {
+    console.error(`Error: --port must be between 0 and 65535, got ${port}.`);
+    process.exit(1);
+  }
+  return port;
+}
 
 // ---- Transport 类型 ----
 
@@ -106,7 +113,10 @@ function parseArgs(): CliConfig {
         result.transport = args[++i] as TransportMode;
         break;
       case '--port':
-        result.port = parseInt(args[++i], 10);
+        // 不校验的话 `--port abc` → parseInt → NaN → 一路传到 app.listen()，
+        // 最后抛 ERR_SOCKET_BAD_PORT 并以 "Fatal error: RangeError" 收场。
+        // 用户只看到一句莫名其妙的崩溃，而不是"端口不是数字"。
+        result.port = parsePort(args[++i]);
         break;
       case '--host':
         result.host = args[++i];
@@ -129,7 +139,7 @@ function printHelp(): void {
   console.log(`
 Godot MCP Server - Model Context Protocol server for Godot Engine
 ──────────────────────────────────────────────────────────────────────
-同时支持三种 MCP 通信协议：Stdio、SSE、Streamable HTTP
+同时支持四种通信方式：Stdio、SSE、Streamable HTTP，以及编辑器插件 TCP 桥 (:9876)
 
 USAGE:
   godot-mcp [options]
@@ -139,7 +149,7 @@ OPTIONS:
   --godot-path, -g <path>    Godot 可执行文件路径（默认：自动检测）
   --install-addons            将编辑器插件 (addons/) 安装到目标项目
   --enable-plugin             安装 addons 并自动在 project.godot 中启用插件
-  --read-only                 只读模式：拒绝 218 个写/副作用工具（安全模式）
+  --read-only                 只读模式：拒绝 223 个写/副作用工具（安全模式）
 
 TRANSPORT OPTIONS:
   --transport, -t <mode>     传输协议（默认：stdio）
@@ -176,11 +186,14 @@ CLIENT CONFIGURATION EXAMPLES:
     }
   }
 
-  # HTTP 客户端 (SSE):
+  # HTTP 客户端 (SSE) — HTTP 端点一律需要令牌：
+  #   令牌在启动时打印到 stderr（首次生成后写入 <工程>/.godot/mcp_http_token 并复用），
+  #   也可以自己 export GODOT_MCP_TOKEN 固定住。
   {
     "mcpServers": {
       "godot-mcp": {
-        "url": "http://127.0.0.1:3000/sse"
+        "url": "http://127.0.0.1:3000/sse",
+        "headers": { "Authorization": "Bearer <token>" }
       }
     }
   }
@@ -190,7 +203,8 @@ CLIENT CONFIGURATION EXAMPLES:
     "mcpServers": {
       "godot-mcp": {
         "url": "http://127.0.0.1:3000/mcp",
-        "transportType": "streamable-http"
+        "transportType": "streamable-http",
+        "headers": { "Authorization": "Bearer <token>" }
       }
     }
   }
@@ -218,6 +232,71 @@ function installAddonsToProject(projectPath: string): void {
 
   console.log(`✅ Editor plugin installed: addons/godot-mcp → ${targetAddons}`);
   console.log('   In Godot: Project → Project Settings → Plugins → Enable "Godot MCP"');
+}
+
+const PLUGIN_CFG_RES = '"res://addons/godot-mcp/plugin.cfg"';
+
+/**
+ * 在 project.godot 的 [editor_plugins] 段里补上本插件。
+ *
+ * 只在**段内**做外科手术式改写，不走 parseConfig/serializeConfig 全量回写：
+ * 序列化器会按自己的风格重写整个文件（Godot 写 `key=value`，我们写 `key = value`），
+ * 一次 `--enable-plugin` 就把用户的 project.godot 每行都改一遍，diff 噪音太大。
+ *
+ * 以前这里是手搓字符串拼接，且兜底分支拼的是 `editor_plugins]`（少了左方括号），
+ * 会写出一个畸形段头、把配置文件搞坏 —— 现在统一走这个函数。
+ *
+ * 返回 true 表示文件确实被改了。
+ */
+function enablePluginInProjectFile(projectFile: string): boolean {
+  const original = fs.readFileSync(projectFile, 'utf-8');
+  const lines = original.split('\n');
+
+  const sectionIdx = lines.findIndex((l) => /^\s*\[editor_plugins\]\s*$/.test(l));
+  const enabledLine = (plugins: string[]): string =>
+    `enabled=PackedStringArray(${plugins.join(', ')})`;
+
+  if (sectionIdx === -1) {
+    // 没有该段：直接在末尾追加（注意段头必须是 `[editor_plugins]`）
+    const tail = original.endsWith('\n') || original === '' ? '' : '\n';
+    fs.writeFileSync(
+      projectFile,
+      `${original}${tail}\n[editor_plugins]\n${enabledLine([PLUGIN_CFG_RES])}\n`
+    );
+    return true;
+  }
+
+  // 找到该段的结束位置（下一个段头或文件末尾）
+  let endIdx = lines.length;
+  for (let i = sectionIdx + 1; i < lines.length; i++) {
+    if (/^\s*\[.+\]\s*$/.test(lines[i])) { endIdx = i; break; }
+  }
+
+  // 段内已有的 enabled 行
+  const enabledIdx = lines.findIndex(
+    (l, i) => i > sectionIdx && i < endIdx && /^\s*enabled\s*=/.test(l)
+  );
+
+  if (enabledIdx === -1) {
+    lines.splice(sectionIdx + 1, 0, enabledLine([PLUGIN_CFG_RES]));
+    fs.writeFileSync(projectFile, lines.join('\n'));
+    return true;
+  }
+
+  const line = lines[enabledIdx];
+  const m = line.match(/PackedStringArray\(([^)]*)\)/);
+  const plugins = m
+    ? m[1].split(',').map((s) => s.trim()).filter(Boolean)
+    : [];
+  if (plugins.includes(PLUGIN_CFG_RES)) return false; // 已经启用，别动文件
+
+  plugins.push(PLUGIN_CFG_RES);
+  // 保留原来的缩进与 key 写法，只换掉值
+  const indent = (line.match(/^\s*/) ?? [''])[0];
+  const key = (line.match(/^\s*(enabled)\s*=/) ?? [])[1] ?? 'enabled';
+  lines[enabledIdx] = `${indent}${key}=PackedStringArray(${plugins.join(', ')})`;
+  fs.writeFileSync(projectFile, lines.join('\n'));
+  return true;
 }
 
 // ---- 主入口 ----
@@ -267,37 +346,10 @@ async function main(): Promise<void> {
 
     // Auto-enable plugin in project.godot
     const projectFile = path.join(root, 'project.godot');
-    let content = fs.readFileSync(projectFile, 'utf-8');
-    if (!content.includes('[editor_plugins]')) {
-      content += '\n\n[editor_plugins]\n';
-    }
-    if (!content.includes('enabled=PackedStringArray("res://addons/godot-mcp/plugin.cfg"')) {
-      // Find [editor_plugins] section and update
-      const sections = content.split('\n[');
-      let found = false;
-      for (let i = 0; i < sections.length; i++) {
-        if (sections[i].startsWith('editor_plugins]') || sections[i].startsWith('editor_plugins\n')) {
-          if (!sections[i].includes('godot-mcp')) {
-            sections[i] = sections[i].replace(/enabled\s*=\s*PackedStringArray\(([^)]*)\)/, (_, plugins) => {
-              const arr = plugins.split(',').map((s: string) => s.trim()).filter(Boolean);
-              arr.push('"res://addons/godot-mcp/plugin.cfg"');
-              return `enabled=PackedStringArray(${arr.join(', ')})`;
-            });
-            // If no enabled line, add one
-            if (!sections[i].includes('enabled=')) {
-              sections[i] += '\nenabled=PackedStringArray("res://addons/godot-mcp/plugin.cfg")';
-            }
-          }
-          found = true;
-        }
-      }
-      content = sections.join('\n[');
-      if (!found) {
-        content += 'editor_plugins]\nenabled=PackedStringArray("res://addons/godot-mcp/plugin.cfg")';
-      }
-    }
-    fs.writeFileSync(projectFile, content);
-    console.log('✅ Editor plugin enabled in project.godot');
+    const changed = enablePluginInProjectFile(projectFile);
+    console.log(changed
+      ? '✅ Editor plugin enabled in project.godot'
+      : '✅ Editor plugin was already enabled in project.godot');
     console.log('   Restart Godot for the plugin to take effect.');
     process.exit(0);
   }

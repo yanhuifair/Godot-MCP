@@ -5,7 +5,7 @@ extends EditorPlugin
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 # ============================================================
-# Godot MCP Editor Plugin v1.12.11
+# Godot MCP Editor Plugin v1.12.12
 # ============================================================
 # ⚠️  Godot 4.x only. Godot 3 is NOT supported.
 # Dual-mode communication with the MCP server:
@@ -20,7 +20,7 @@ const DEFAULT_PORT = 9876
 const MAX_OUTPUT_LINES = 500
 const BUFFER_SIZE = 65536
 const RESPONSE_MARKER = "__MCP__:"
-const PLUGIN_VERSION = "1.12.11"
+const PLUGIN_VERSION = "1.12.12"
 
 # TCP 接收缓冲上限：超过且无完整行时丢弃，防止恶意客户端灌数据撑爆内存
 const TCP_BUFFER_LIMIT = 1024 * 1024
@@ -64,6 +64,10 @@ func _enter_tree() -> void:
 		_start_tcp_server()
 
 	set_process(true)
+	# 桥必须一直跑：它靠 _process 轮询 TCP / stdin。若有人暂停了编辑器自己的
+	# SceneTree（或别的插件这么干了），默认 process_mode 会让轮询跟着停，整个桥
+	# 静默失效。ALWAYS = 不受暂停影响。
+	set_process_mode(Node.PROCESS_MODE_ALWAYS)
 
 	if _stdio_mode:
 		print("[Godot MCP] Plugin v" + PLUGIN_VERSION + " loaded — stdio mode")
@@ -187,6 +191,20 @@ func _process_tcp() -> void:
 			_peer.poll()
 			print("[Godot MCP] TCP client connected (auth: ", "on" if _auth_token != "" else "off", ")")
 			_request_addon_update()
+	elif _tcp_server.is_connection_available():
+		# 已经有客户端在连了。以前新连接只是被留在 listen backlog 里没人应答，
+		# 第二个 MCP 客户端的每个命令都要干等 30s 超时（还会让 server 误判 TCP
+		# 不可用而退化到 spawn 模式）。明确回一个错误再断开，让它立刻失败。
+		var extra = _tcp_server.take_connection()
+		extra.poll()
+		var reject = JSON.stringify({
+			"jsonrpc": "2.0",
+			"id": null,
+			"error": {"message": "Another MCP client is already connected to this editor bridge (one client per editor). Close the first one and retry."},
+		}) + "\n"
+		extra.put_data(reject.to_utf8_buffer())
+		extra.disconnect_from_host()
+		printerr("[Godot MCP] Rejected a second concurrent TCP client")
 
 	# Read and handle messages
 	if _peer:
@@ -277,7 +295,10 @@ func _handle_message(raw: String) -> void:
 func _execute_command(method: String, params: Dictionary) -> Dictionary:
 	match method:
 		# ---- Health Check ----
-		"health_check": return {"ok": true, "version": PLUGIN_VERSION, "commands": 117, "undo_support": true}
+		# commands 曾写死 117，而分发表实际只有 115 个键 —— health_check 一直在
+		# 撒谎。数字仍由源码维护，但 test/addon_bridges.test.ts 会解析这个文件
+		# 校验它与真实分支数一致，加/删命令漏改就会测试失败。
+		"health_check": return {"ok": true, "version": PLUGIN_VERSION, "commands": 115, "undo_support": true}
 
 		# ---- Editor State ----
 		"get_open_scene": return _cmd_get_open_scene()
@@ -826,14 +847,16 @@ func _cmd_stop_project() -> Dictionary:
 
 
 func _cmd_pause_project() -> Dictionary:
-	# 注意：插件运行在编辑器进程内，get_tree() 是编辑器的 SceneTree，
-	# 无法暂停正在运行的游戏（运行中的游戏是独立进程/树）。
-	# 这里只切换编辑器树的 paused 状态，避免误导调用方。
-	var tree = get_tree()
-	if tree:
-		tree.paused = not tree.paused
-		var is_paused = tree.paused
-		return {"ok": true, "paused": is_paused, "scope": "editor", "message": ("Editor tree paused" if is_paused else "Editor tree resumed") + " (running game is a separate process and is unaffected)"}
+	# 以前这里会 toggle 编辑器自己的 SceneTree.paused。插件就活在那棵树上：
+	# 一旦被暂停，`_process`/`_physics_process` 全停，TCP 轮询与 stdin 读取跟着死，
+	# 整个桥"自杀"，只能重启编辑器才能恢复 —— 而这个效果跟"暂停游戏"毫无关系
+	# （运行中的游戏是独立进程/树，根本不会被暂停）。
+	# 所以：如实说做不到，并指向真正的做法（runtime_freeze / runtime_unfreeze）。
+	return {
+		"error": "Cannot pause the running game from the editor: it lives in a separate process/SceneTree. " +
+			"Use runtime_freeze / runtime_unfreeze (needs the runtime_bridge.gd autoload) to freeze the live game. " +
+			"(Pausing the editor's own tree would kill this plugin's TCP/stdin polling.)"
+	}
 	return {"error": "No scene tree available"}
 
 
@@ -922,7 +945,7 @@ func _cmd_cut_selected() -> Dictionary:
 		})
 		ur.add_do_method(n.get_parent(), "remove_child", n)
 		ur.add_undo_method(n.get_parent(), "add_child", n)
-		ur.add_undo_reference(n)
+		ur.add_do_reference(n)
 	ur.commit_action()
 	
 	EditorInterface.get_selection().clear()
@@ -1080,7 +1103,7 @@ func _cmd_delete_selected() -> Dictionary:
 		ur.add_undo_method(parent, "add_child", n)
 		ur.add_undo_method(parent, "move_child", n, n.get_index())
 		ur.add_undo_method(self, "_restore_owners", _collect_owner_map(n))
-		ur.add_undo_reference(n)
+		ur.add_do_reference(n)
 	ur.commit_action()
 	return {"ok": true, "deleted": targets.size(), "undoable": true}
 
@@ -1168,7 +1191,7 @@ func _cmd_remove_node(params: Dictionary) -> Dictionary:
 	ur.add_undo_method(parent, "add_child", node)
 	ur.add_undo_method(parent, "move_child", node, idx)
 	ur.add_undo_method(self, "_restore_owners", owner_map)
-	ur.add_undo_reference(node)
+	ur.add_do_reference(node)
 	ur.commit_action()
 
 	_maybe_save_scene(params)
@@ -1679,10 +1702,12 @@ func _cmd_open_dock(params: Dictionary) -> Dictionary:
 		"node", "scene":
 			EditorInterface.set_main_screen_editor("Node")
 		"output", "console":
-			# Show the bottom panel via editor main screen
-			EditorInterface.set_main_screen_editor("Script")
+			# 以前这里切到 "Script" 主屏然后回 ok:true —— 用户要的是底部 Output 面板，
+			# 得到的是脚本编辑器，而返回值还说成功了。EditorInterface 没有公开
+			# "打开底部面板"的 API，所以如实说做不到，别拿假成功糊弄调用方。
+			return {"error": "Cannot open the Output panel from here: Godot exposes no EditorInterface API for bottom panels. Valid docks: filesystem, inspector, scene"}
 		_:
-			return {"error": "Unknown dock: " + dock_name + ". Valid: filesystem, inspector, scene, output"}
+			return {"error": "Unknown dock: " + dock_name + ". Valid: filesystem, inspector, scene"}
 
 	return {"ok": true, "dock": dock_name}
 
@@ -1998,7 +2023,11 @@ func _cmd_disable_plugin(params: Dictionary) -> Dictionary:
 # 插件自更新：server 把 addon 文件同步到磁盘后，发 reload_addon 让本实例重新加载。
 func _cmd_reload_addon(params: Dictionary) -> Dictionary:
 	var to_version = str(params.get("to", ""))
-	_reload_self()
+	# 必须先让调用方拿到响应，再去禁用自己：_reload_self() 一旦把插件禁用，
+	# _process 就不再轮询，任何还没写出去的响应都永远发不出去 —— server 侧会
+	# 干等到 30s 超时（还会误判成 TCP 不可用而切到 spawn 模式）。
+	# call_deferred 把真正的重载推到本帧空闲，响应在本函数返回后立即写出。
+	call_deferred("_reload_self")
 	var msg = "Godot MCP addon updated"
 	if to_version != "":
 		msg += " to v" + to_version
@@ -2163,9 +2192,9 @@ func _cmd_get_editor_camera() -> Dictionary:
 		if c is Camera3D: cam = c; break
 	if cam:
 		return {"position": str(cam.position), "rotation": str(cam.rotation), "fov": cam.fov}
-	# Fallback: check spatial editor
-	var spatial_editor = EditorInterface.get_editor_main_screen()
-	return {"position": "Vector3(0,0,0)", "note": "Camera data may not be directly accessible"}
+	# 找不到就报错。以前这里兜底返回 Vector3(0,0,0) + 一句 "may not be accessible"，
+	# 调用方会以为相机确实在原点（进而把别的相机对齐过去）—— 那是编出来的数据。
+	return {"error": "No Camera3D found under the editor main screen viewport (open a 3D scene first)"}
 
 func _cmd_set_editor_camera(params: Dictionary) -> Dictionary:
 	var pos_str = params.get("position", "")

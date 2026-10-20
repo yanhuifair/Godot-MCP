@@ -76,6 +76,14 @@ func _poll() -> void:
 			var avail := _peer.get_available_bytes()
 			if avail > 0:
 				_buffer += _peer.get_string(min(avail, 65536))
+				# 只增不减的缓冲区 = 一条不带换行的畸形流就能把游戏内存吃干。
+				# 超过 1MB 还没见到换行，判定为异常对端，直接断开重来。
+				if _buffer.length() > 1048576:
+					printerr("[godot-mcp-runtime] Oversized request without newline — dropping connection")
+					_peer.disconnect_from_host()
+					_peer = null
+					_buffer = ""
+					return
 				while "\n" in _buffer:
 					var idx := _buffer.find("\n")
 					var line := _buffer.substr(0, idx).strip_edges()
@@ -90,11 +98,14 @@ func _handle(raw: String) -> void:
 	var json := JSON.new()
 	var err := json.parse(raw)
 	if err != OK:
-		_respond({"error": "invalid json: " + json.get_error_message()})
+		# 解析失败也要尽力回 id：响应不带 id 就匹配不上任何 pending 请求，
+		# server 侧只能干等到 15s 超时（看起来像"桥挂了"，其实是自己丢了个包）。
+		var bad_id = _last_parse_id(raw)
+		_respond({"jsonrpc": "2.0", "id": bad_id, "error": {"message": "invalid json: " + json.get_error_message()}})
 		return
 	var msg: Dictionary = json.get_data()
 	if typeof(msg) != TYPE_DICTIONARY:
-		_respond({"error": "expected json object"})
+		_respond({"jsonrpc": "2.0", "id": 0, "error": {"message": "expected json object"}})
 		return
 	var method: String = msg.get("method", msg.get("command", ""))
 	var params: Dictionary = msg.get("params", {})
@@ -103,6 +114,27 @@ func _handle(raw: String) -> void:
 	var id = msg.get("id", 0)
 	var result: Dictionary = _dispatch(method, params)
 	_respond({"jsonrpc": "2.0", "id": id, "result": result})
+
+# 整段 JSON 解析失败时，尽力把 "id" 抠出来（{"...","id":7,...}）。
+# 拿不到就给 0 —— 至少响应带 id 字段，server 侧能立刻解 pending，而不是干等超时。
+func _last_parse_id(raw: String) -> int:
+	var key := raw.find("\"id\"")
+	if key == -1:
+		return 0
+	var colon := raw.find(":", key)
+	if colon == -1:
+		return 0
+	var rest := raw.substr(colon + 1).strip_edges()
+	if rest.begins_with("\""):
+		return 0 # 字符串 id 不猜，交给 server 侧超时处理
+	var digits := ""
+	for i in rest.length():
+		var c := rest.substr(i, 1)
+		if c >= "0" and c <= "9":
+			digits += c
+		elif digits != "" or c == "}" or c == ",":
+			break
+	return digits.to_int() if digits != "" else 0
 
 func _dispatch(method: String, params: Dictionary) -> Dictionary:
 	match method:
@@ -197,12 +229,21 @@ func _emit_signal(params: Dictionary) -> Dictionary:
 	if not node.has_signal(sig):
 		return {"error": "no such signal: " + sig}
 	var args: Array = params.get("args", [])
-	if args.is_empty():
-		node.emit_signal(sig)
-	elif args.size() == 1:
-		node.emit_signal(sig, args[0])
-	else:
-		node.emit_signal(sig, args)
+	# 逐个展开，不能图省事写 emit_signal(sig, args) —— 那样整个 Array 会被当成
+	# **一个**实参传出去，槽函数收到的第一个参数是 Array，于是"发两个参数"变成
+	# "发一个数组"，对端拿到的是错的类型。
+	# 注意 Godot 4 已经没有 emit_signalv 了（get_method_list() 里只有 emit_signal），
+	# 所以只能手写展开；超过 6 个参数如实报错，而不是悄悄发错。
+	match args.size():
+		0: node.emit_signal(sig)
+		1: node.emit_signal(sig, args[0])
+		2: node.emit_signal(sig, args[0], args[1])
+		3: node.emit_signal(sig, args[0], args[1], args[2])
+		4: node.emit_signal(sig, args[0], args[1], args[2], args[3])
+		5: node.emit_signal(sig, args[0], args[1], args[2], args[3], args[4])
+		6: node.emit_signal(sig, args[0], args[1], args[2], args[3], args[4], args[5])
+		_:
+			return {"error": "too many signal arguments (%d): this bridge forwards up to 6" % args.size()}
 	return {"ok": true}
 
 # NOTE: must NOT be named `_input` — that collides with the built-in virtual

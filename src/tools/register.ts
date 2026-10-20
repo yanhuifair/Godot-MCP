@@ -816,7 +816,9 @@ export function registerAllTools(registry: ToolRegistry): void {
   registry.register({ name: 'create_collision_polygon', description: 'Create CollisionPolygon2D.', schema: createCollisionPolygonSchema, handler: handleCreateCollisionPolygon });
   registry.register({ name: 'set_shape_points', description: 'Set shape on CollisionShape2D.', schema: setShapePointsSchema, handler: handleSetShapePoints });
   registry.register({ name: 'read_collision_polygon', description: 'Read CollisionPolygon2D points from a scene.', schema: readCollisionPolygonSchema, handler: handleReadCollisionPolygon });
-  registry.register({ name: 'simplify_polygon', description: 'Simplify a polygon via Douglas-Peucker and write it back.', schema: simplifyPolygonSchema, handler: handleSimplifyPolygon });
+  // 描述别再写 "and write it back" —— 它只返回简化后的点数组，不碰任何文件；
+  // 客户端照着描述会以为多边形已经写回场景了。
+  registry.register({ name: 'simplify_polygon', description: 'Simplify a polygon via Douglas-Peucker and return the reduced point list (pure computation — nothing is written to disk).', schema: simplifyPolygonSchema, handler: handleSimplifyPolygon });
 
   // Rendering (5)
   registry.setCategory('Rendering');

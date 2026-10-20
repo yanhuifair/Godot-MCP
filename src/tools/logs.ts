@@ -426,6 +426,15 @@ export function handleClearGameLogs(
       }
     }
 
+    // 一个都没删掉（且确实有东西要删）时必须报错：返回 "Deleted 0 log file(s)"
+    // 会让客户端以为清理成功，而磁盘上的日志一个都没少。
+    if (failed.length > 0 && deleted.length === 0) {
+      return toolError(
+        ErrorCode.INTERNAL_ERROR,
+        `Failed to delete ${failed.length} log file(s) in ${info.logDirAbs}: ${failed.join(', ')}`
+      );
+    }
+
     const lines = [`Deleted ${deleted.length} log file(s) from ${info.logDirAbs}`];
     for (const d of deleted) lines.push(`  - ${d}`);
     if (failed.length) {
@@ -526,6 +535,21 @@ export function handleConfigureFileLogging(
         return toolError(
           ErrorCode.INVALID_ARGUMENT,
           'log_path must not contain a line break'
+        );
+      }
+      // log_path 会被 Godot 当成**绝对路径**解析：写 `/etc/passwd` 就会让游戏
+      // 把日志写到工程外（配合 read_game_log 就是任意文件读，已 PoC 过）。
+      // 只接受 Godot 自己的虚拟前缀 —— 它们才是"工程内/用户目录内"的语义。
+      if (path.isAbsolute(args.log_path) || /^[a-zA-Z]:[\\/]/.test(args.log_path)) {
+        return toolError(
+          ErrorCode.PATH_TRAVERSAL,
+          `log_path must be a res:// or user:// path, not a filesystem path: ${args.log_path}`
+        );
+      }
+      if (!/^(res|user):\/\//.test(args.log_path)) {
+        return toolError(
+          ErrorCode.INVALID_ARGUMENT,
+          `log_path must start with res:// or user:// — got: ${args.log_path}`
         );
       }
       doc.sections['debug']['file_logging/log_path'] = cfgQuote(args.log_path);
