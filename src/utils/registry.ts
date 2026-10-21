@@ -136,6 +136,8 @@ export function isWriteTool(name: string): boolean {
 // the full tool catalog without threading the registry instance through every
 // handler. Returns null before registration completes.
 let _activeRegistry: ToolRegistry | null = null;
+/** 解析出来的工程根目录（meta 工具的诊断信息要用，见 get_status）。 */
+let _activeProjectRoot: string | null = null;
 
 export function setActiveRegistry(registry: ToolRegistry): void {
   _activeRegistry = registry;
@@ -143,6 +145,18 @@ export function setActiveRegistry(registry: ToolRegistry): void {
 
 export function getActiveRegistry(): ToolRegistry | null {
   return _activeRegistry;
+}
+
+/**
+ * 记录当前工程的根目录。放在这里而不是让 meta.ts 去 import server.ts：
+ * server → register → meta 已经是一条依赖链，反向 import 会成环。
+ */
+export function setActiveProjectRoot(root: string | null): void {
+  _activeProjectRoot = root;
+}
+
+export function getActiveProjectRoot(): string | null {
+  return _activeProjectRoot;
 }
 
 export class ToolRegistry {

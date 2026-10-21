@@ -10,7 +10,7 @@
 import { z } from 'zod';
 import { ToolResult } from '../utils/types.js';
 import { ErrorCode, toolError } from '../utils/errors.js';
-import { getActiveRegistry } from '../utils/registry.js';
+import { getActiveRegistry, getActiveProjectRoot } from '../utils/registry.js';
 import { probeEditor } from './editor_bridge.js';
 import { probeGameRuntime } from './runtime_bridge.js';
 
@@ -40,7 +40,7 @@ export function handleSearchTools(args: { keyword: string; limit?: number; write
   const words = kw.split(/\s+/).filter(Boolean);
   const all = registry.list(); // already filters write tools in read-only mode
 
-  const scored: { name: string; description: string; score: number }[] = [];
+  const scored: { name: string; description: string; score: number; category: string; schema: Record<string, any> }[] = [];
   for (const t of all) {
     const hay = `${t.name} ${t.description}`.toLowerCase();
     // every word must appear somewhere (AND)
@@ -49,8 +49,7 @@ export function handleSearchTools(args: { keyword: string; limit?: number; write
     let score = 0;
     if (words.every((w) => t.name.toLowerCase().includes(w))) score += 10;
     if (t.description.toLowerCase().includes(kw)) score += 3;
-    score += Math.min(t.name.length, 20) * 0; // no-op, keeps sort stable-ish
-    scored.push({ name: t.name, description: t.description, score });
+    scored.push({ name: t.name, description: t.description, score, category: t.category ?? 'Uncategorized', schema: t.schema ?? {} });
   }
 
   scored.sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
@@ -61,9 +60,21 @@ export function handleSearchTools(args: { keyword: string; limit?: number; write
   }
   const lines = [`Found ${scored.length} tool(s) for "${args.keyword}" (showing ${top.length}):`, ''];
   for (const r of top) {
-    lines.push(`• ${r.name} — ${r.description}`);
+    // 带出签名：只给名字 + 一句话，模型还得再猜参数名（`path` 还是
+    // `scene_path`？），猜错就是一次 VALIDATION_ERROR 往返。直接给必填参数，
+    // 第一次调用就能对。
+    const required = Object.entries(r.schema)
+      .filter(([, s]) => typeof (s as any).isOptional === 'function' && !(s as any).isOptional())
+      .map(([k]) => k);
+    const optionalCount = Object.keys(r.schema).length - required.length;
+    const sig = required.length === 0
+      ? '(no required args)'
+      : `(${required.join(', ')}${optionalCount > 0 ? ', …' : ''})`;
+    lines.push(`• ${r.name}${sig} — ${r.description}  [${r.category}]`);
   }
-  lines.push('', 'Tip: call the tool by its exact name (snake_case). Use get_status to verify the editor/runtime are connected.');
+  lines.push('');
+  lines.push('Tip: parameters are snake_case; required ones are shown in parentheses.');
+  lines.push('Use get_status to verify the editor/runtime are connected before calling editor_*/runtime_* tools.');
   return { content: [{ type: 'text', text: lines.join('\n') }] };
 }
 
@@ -113,7 +124,16 @@ export async function handleGetStatus(args: { probe_runtime?: boolean }): Promis
     }
   }
 
-  out.push(`Tools total   : ${total}`);
+  // 工程根目录 / 只读模式：这两条是排错时最先要知道的事实。
+  // 以前 get_status 根本不打印 projectRoot，而 INTERNAL_ERROR 的修复建议里
+  // 却写着"get_status 会告诉你解析到的工程根目录" —— 建议本身就是空话。
+  const root = getActiveProjectRoot();
+  out.push(`Project root  : ${root ?? '(not detected — pass -p <path> or run from a Godot project)'}`);
+  if (registry?.isReadOnly === true) {
+    out.push('Mode          : READ-ONLY (write/side-effect tools are hidden from tools/list and blocked with READ_ONLY)');
+  }
+
+  out.push(`Tools total   : ${total}${registry ? ` in ${registry.categories().length} categories` : ''}`);
   out.push('', 'Subsystems available via this server:');
   // 别硬编码工具数：以前这里写死 235，加一个工具就变谎话。直接从注册表算——
   // "file-path tools" = 不需要编辑器桥/运行时桥的那些（即非 editor_/runtime_）。

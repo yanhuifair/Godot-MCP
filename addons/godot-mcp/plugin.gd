@@ -5,7 +5,7 @@ extends EditorPlugin
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 # ============================================================
-# Godot MCP Editor Plugin v1.12.12
+# Godot MCP Editor Plugin v1.12.13
 # ============================================================
 # ⚠️  Godot 4.x only. Godot 3 is NOT supported.
 # Dual-mode communication with the MCP server:
@@ -20,7 +20,7 @@ const DEFAULT_PORT = 9876
 const MAX_OUTPUT_LINES = 500
 const BUFFER_SIZE = 65536
 const RESPONSE_MARKER = "__MCP__:"
-const PLUGIN_VERSION = "1.12.12"
+const PLUGIN_VERSION = "1.12.13"
 
 # TCP 接收缓冲上限：超过且无完整行时丢弃，防止恶意客户端灌数据撑爆内存
 const TCP_BUFFER_LIMIT = 1024 * 1024
@@ -960,7 +960,15 @@ func _cmd_copy_selected() -> Dictionary:
 	if nodes.is_empty(): return {"ok": true, "copied": 0}
 	_clipboard_nodes = []
 	for n in nodes:
-		_clipboard_nodes.append({"type": n.get_class(), "name": n.name, "parent_path": _get_node_path(n.get_parent()) if n.get_parent() else ""})
+		var parent_path = _get_node_path(n.get_parent()) if n.get_parent() else ""
+		_clipboard_nodes.append({
+			"type": n.get_class(),
+			"name": n.name,
+			"parent_path": parent_path,
+			# 必须一起存属性：以前 copy 只记 type/name，paste 里那段"恢复属性"
+			# 的代码永远拿到空字典 —— 复制粘贴出来的节点跟自己一点关系都没有。
+			"properties": _serialize_node_properties(n),
+		})
 	return {"ok": true, "copied": nodes.size()}
 
 func _cmd_paste() -> Dictionary:
@@ -980,18 +988,24 @@ func _cmd_paste() -> Dictionary:
 		if not ClassDB.class_exists(t): continue
 		var node = ClassDB.instantiate(t)
 		node.name = item["name"]
-		parent.add_child(node)
-		node.set_owner(root)
-		
-		# Restore serialized properties
+
+		# 不能在这里手动 add_child / set_owner：commit_action() 默认就执行
+		# do_method，下面已经登记了 add_child —— 手动加一次再让 undo 系统加一次
+		# = 同一个节点被 add_child 两次（Godot 会报 "already has a parent"）。
+		# owner 也必须在节点进树之后设置，所以同样交给 do_method。
 		var props = item.get("properties", {})
 		if typeof(props) == TYPE_DICTIONARY:
 			for key in props:
-				_node_set_property(node, key, str(props[key]))
-		
+				var raw = str(props[key])
+				# 对象型属性（script 等）序列化出来是 "<GDScript#...>"，还原不了；
+				# 强 set 只会往编辑器控制台刷错误。
+				if raw.begins_with("<"): continue
+				_node_set_property(node, key, raw)
+
 		ur.add_do_method(parent, "add_child", node)
 		ur.add_do_method(node, "set_owner", root)
 		ur.add_undo_method(parent, "remove_child", node)
+		ur.add_do_reference(node)
 		pasted += 1
 	ur.commit_action()
 	EditorInterface.save_scene()

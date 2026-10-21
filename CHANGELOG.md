@@ -1,4 +1,14 @@
 # Changelog
+## v1.12.13 (2026-10-21)
+Editing-experience pass: the tools now describe themselves accurately to a client, and a wrong argument tells you how to fix it instead of leaving you guessing.
+
+- **Every tool now carries MCP `annotations`** (`readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`) plus a human-readable `title`. They are *computed* from the tool name and `WRITE_TOOLS`, so they cannot drift from the read-only whitelist — a test asserts `readOnlyHint === !isWriteTool(name)` for all 386 tools. Before this, clients had to treat every tool as potentially destructive and prompt on every call.
+- **Self-healing validation errors.** Zod silently drops unknown keys, so `add_node({path: ...})` used to produce only `scene_path: Required` — with no hint that `path` had been ignored. The error now lists the missing required parameters, the full accepted signature (required vs optional), and names each dropped key with a suggestion when it is recognisably a rename (`path` → `scene_path`, `node_type` → `type`). Verified over a real stdio round-trip.
+- **`search_tools` prints the call signature**: `add_node(scene_path, name, type, …) — … [Scene]`. Previously only the name and a one-liner, which left the model guessing parameter names (and burning a round-trip per guess). The tip line also points at `get_status` for editor/runtime availability.
+- **`get_status` now reports the resolved project root, the read-only state, and the category count.** `INTERNAL_ERROR`'s suggested fix said "get_status reports the resolved project root" — it did not. It does now.
+- **`editor_get_errors` / `editor_clear_errors` no longer pretend to work.** The plugin has never captured the editor console (Godot exposes no public hook for it), so "Errors (0)" was a lie that could make an agent ship broken code. The response and the tool descriptions now say the console is not intercepted and point at `validate_script` / `validate_shader` / `read_game_log` / `monitor_output`.
+- **Editor copy/paste was broken twice over**: `paste` called `parent.add_child(node)` and *also* registered the same call as the undo action's `do_method`, so `commit_action()` added the node twice ("already has a parent"); and `copy` stored only type/name, so the property-restore loop always received an empty dictionary — a pasted node was a blank copy of its own type. Copies now carry serialized properties, paste lets the undo system do the tree insertion, and non-restorable object properties (`<GDScript#…>`) are skipped instead of spamming the console.
+
 ## v1.12.12 (2026-10-21)
 A correctness / "stop reporting false success" pass, from a full audit of the transports, the tool layer, and both GDScript bridges.
 

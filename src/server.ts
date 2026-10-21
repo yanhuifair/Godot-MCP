@@ -1,7 +1,7 @@
 // Copyright (c) 2026 FairYan
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // ============================================================
-// Godot MCP Server - Server Factory & Handlers (v1.12.12)
+// Godot MCP Server - Server Factory & Handlers (v1.12.13)
 // ============================================================
 // 将 MCP Server 创建、工具注册、请求处理抽离为独立工厂函数，
 // 供 Stdio、SSE、Streamable HTTP 三种传输层共用。
@@ -16,7 +16,7 @@ import { z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 
 import { findProjectRoot } from './utils/file_utils.js';
-import { ToolRegistry } from './utils/registry.js';
+import { ToolRegistry, isWriteTool, setActiveProjectRoot } from './utils/registry.js';
 import { ErrorCode, toolError } from './utils/errors.js';
 import { registerAllTools } from './tools/register.js';
 import { VERSION } from './utils/version.js';
@@ -40,8 +40,11 @@ export function initSharedResources(projectRoot?: string): { registry: ToolRegis
     sharedRegistry = new ToolRegistry({ readOnly });
     registerAllTools(sharedRegistry);
   }
-  if (sharedProjectRoot === undefined || sharedProjectRoot === null) {
+  if (sharedProjectRoot === null) {
     sharedProjectRoot = projectRoot || findProjectRoot() || null;
+    // get_status 要报告"当前解析到的工程根目录"，否则它给出的排错建议
+    // （"get_status 会告诉你 projectRoot"）自己就是空话。
+    setActiveProjectRoot(sharedProjectRoot);
   }
   return { registry: sharedRegistry, projectRoot: sharedProjectRoot };
 }
@@ -74,11 +77,24 @@ export function createMcpServer(_options: CreateServerOptions = {}): Server {
 
   // ---- List tools ----
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
-    tools: registry.list().map((t) => ({
-      name: t.name,
-      description: t.description,
-      inputSchema: buildJsonSchema(t.schema),
-    })),
+    tools: registry.list().map((t) => {
+      const meta = toolAnnotations(t.name);
+      return {
+        name: t.name,
+        title: meta.title,
+        description: t.description,
+        inputSchema: buildJsonSchema(t.schema),
+        // MCP 标准注解：客户端据此决定是否弹权限确认、能否自动批准。
+        // 以前一个都不给，客户端只能把所有 386 个工具都当"可能破坏性"，
+        // 于是每次调用都弹窗 —— 这是编辑体验里最烦的一环。
+        annotations: {
+          readOnlyHint: meta.readOnlyHint,
+          destructiveHint: meta.destructiveHint,
+          idempotentHint: meta.idempotentHint,
+          openWorldHint: meta.openWorldHint,
+        },
+      };
+    }),
   }));
 
   // ---- Call tool ----
@@ -114,13 +130,158 @@ export function createMcpServer(_options: CreateServerOptions = {}): Server {
     } catch (err: any) {
       if (err instanceof z.ZodError) {
         return toolError(ErrorCode.VALIDATION_ERROR,
-          err.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', '));
+          describeArgumentError(name, tool.schema, normalizedArgs, err));
       }
       return toolError(ErrorCode.INTERNAL_ERROR, err.message);
     }
   });
 
   return server;
+}
+
+// ---- Argument-error descriptions ----
+
+/** 逐字符 Levenshtein，只用来给"未知参数"猜一个最近的合法名（参数名都很短）。 */
+function editDistance(a: string, b: string): number {
+  const m = a.length, n = b.length;
+  if (!m) return n;
+  if (!n) return m;
+  let prev = Array.from({ length: n + 1 }, (_, j) => j);
+  for (let i = 1; i <= m; i++) {
+    const cur = [i];
+    for (let j = 1; j <= n; j++) {
+      cur[j] = Math.min(
+        prev[j] + 1,
+        cur[j - 1] + 1,
+        prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)
+      );
+    }
+    prev = cur;
+  }
+  return prev[n];
+}
+
+/**
+ * 给"未知参数"猜最近的合法名。
+ *
+ * 只看编辑距离不够：`node_type` → `type`（距离 5）、`path` → `scene_path`（距离 6）
+ * 都超出阈值，可它们恰恰是模型最常犯的错。所以先按**词元**判断
+ * （snake_case 用 `_` 切分），词元被包含的关系远比字符距离更能说明意图。
+ * 有歧义时宁可不猜 —— 错误的建议比没有建议更糟。
+ */
+function closestKey(unknown: string, keys: string[]): string | null {
+  const ut = unknown.toLowerCase().split('_').filter(Boolean);
+  const scored: { key: string; score: number }[] = [];
+
+  for (const k of keys) {
+    const kt = k.toLowerCase().split('_').filter(Boolean);
+    let score = 0;
+
+    if (k.toLowerCase() === unknown.toLowerCase()) return k;
+    // 词元是候选的子集（node_type ⊂ {node,type} 不成立，但 type ⊂ node_type 成立）
+    if (ut.length && ut.every((t) => kt.includes(t))) score += 100;
+    else {
+      const shared = ut.filter((t) => kt.includes(t)).length;
+      if (shared) score += 20 * shared;
+    }
+    // 后缀命中（path ⊂ scene_path 的尾部）也算强信号
+    if (k.toLowerCase().endsWith('_' + unknown.toLowerCase())) score += 30;
+
+    score -= editDistance(unknown.toLowerCase(), k.toLowerCase());
+    if (score > 0) scored.push({ key: k, score });
+  }
+
+  scored.sort((a, b) => b.score - a.score);
+  if (scored.length === 0) return null;
+  // 平分 = 猜不准，干脆不猜
+  if (scored.length > 1 && scored[0].score === scored[1].score) return null;
+  return scored[0].key;
+}
+
+/**
+ * 把 Zod 的 "scene_path: Required" 变成能直接照着改的说明。
+ *
+ * 编辑体验的关键：模型第一次调错参数时必须能自己改对。Zod 默认**静默丢弃**
+ * 未声明的 key，所以传 `path` 而不是 `scene_path` 时，用户看到的只有
+ * "scene_path: Required"，完全不知道是自己拼错了参数名 —— 于是反复重试。
+ */
+export function describeArgumentError(
+  toolName: string,
+  schema: Record<string, z.ZodTypeAny>,
+  args: Record<string, unknown>,
+  err: z.ZodError
+): string {
+  const accepted = Object.entries(schema).map(([k, s]) => {
+    const optional = typeof (s as any).isOptional === 'function' && (s as any).isOptional();
+    return optional ? `${k}?` : `${k} (required)`;
+  });
+  const unknown = Object.keys(args).filter((k) => !(k in schema));
+  const missing = err.errors
+    .filter((e) => e.code === 'invalid_type' && (e as any).received === 'undefined')
+    .map((e) => e.path.join('.'));
+
+  const lines: string[] = [];
+  lines.push(`Invalid arguments for "${toolName}".`);
+  if (missing.length) {
+    lines.push(`Missing required: ${missing.join(', ')}`);
+  }
+  const other = err.errors.filter((e) => !missing.includes(e.path.join('.')));
+  if (other.length) {
+    lines.push(`Bad values: ${other.map((e) => `${e.path.join('.')} (${e.message})`).join(', ')}`);
+  }
+  lines.push(`Accepted parameters: ${accepted.join(', ') || '(none)'}`);
+
+  for (const u of unknown) {
+    const near = closestKey(u, Object.keys(schema));
+    lines.push(near
+      ? `"${u}" is not a parameter of this tool — did you mean "${near}"?`
+      : `"${u}" is not a parameter of this tool and was IGNORED.`);
+  }
+  lines.push('Tip: parameters are snake_case; call search_tools "<keyword>" to see the exact signature.');
+  return lines.join('\n');
+}
+
+// ---- Tool metadata (annotations) ----
+
+/** 名字里带这些动词的工具是破坏性的（删除/清空/重置类）。 */
+const DESTRUCTIVE_NAME_RE = /(^|_)(delete|remove|clear|reset|drop|kill|truncate|overwrite|discard)(_|$)/;
+/** 这些前缀的写工具重复调用是幂等的（设置类天然幂等）。 */
+const IDEMPOTENT_WRITE_RE = /(^|_)set_|^editor_(set|select|open|focus)_/;
+
+function humanizeToolName(name: string): string {
+  return name
+    .split('_')
+    .map((w) => {
+      const special: Record<string, string> = {
+        '2d': '2D', '3d': '3D', uid: 'UID', gdscript: 'GDScript', csg: 'CSG',
+        csharp: 'C#', png: 'PNG', udp: 'UDP', tcp: 'TCP', fov: 'FOV', lod: 'LOD',
+      };
+      return special[w] ?? (w.charAt(0).toUpperCase() + w.slice(1));
+    })
+    .join(' ');
+}
+
+/**
+ * 从工具名推导 MCP annotations。全部是**计算**出来的，不另存一份元数据表 ——
+ * 加工具时不会漏标，也不会和 WRITE_TOOLS 打架（同一份事实只有一个来源）。
+ */
+export function toolAnnotations(name: string): {
+  title: string;
+  readOnlyHint: boolean;
+  destructiveHint: boolean;
+  idempotentHint: boolean;
+  openWorldHint: boolean;
+} {
+  const readOnly = !isWriteTool(name);
+  const destructive = !readOnly && DESTRUCTIVE_NAME_RE.test(name);
+  const idempotent = readOnly || IDEMPOTENT_WRITE_RE.test(name);
+  return {
+    title: humanizeToolName(name),
+    readOnlyHint: readOnly,
+    destructiveHint: destructive,
+    idempotentHint: idempotent,
+    openWorldHint: false, // 所有工具都只操作本机工程，不触网
+  };
 }
 
 // ---- JSON Schema Builder ----

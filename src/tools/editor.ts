@@ -696,12 +696,30 @@ export async function handleEditorRemoveInputAction(args: { name: string }): Pro
 }
 
 // Errors
+/** 编辑器侧的错误捕获其实并不存在（Godot 没有公开的 console hook），所以
+ *  "Errors (0)" 是彻头彻尾的谎：它什么都没看，却让调用方以为"没有错误"。 */
+const EDITOR_ERROR_CAPTURE_NOTE =
+  'NOTE: this bridge does not intercept the Godot editor console (no public API for it), ' +
+  'so an empty list means "nothing was captured here", NOT "no errors". ' +
+  'To actually find problems, use: validate_script / validate_shader (static checks), ' +
+  'read_game_log (errors from a game run), or monitor_output (editor stdout/stderr when the ' +
+  'server launched the editor).';
+
 export async function handleEditorGetErrorList(): Promise<ToolResult> {
-  try { const r = await sendEditorCommand('get_error_list'); return { content: [{ type: 'text', text: `Errors (${r.count}):\n${(r.output||[]).join('\n')}` }] }; }
+  try {
+    const r = await sendEditorCommand('get_error_list');
+    const lines: string[] = r.out || r.output || [];
+    const count = typeof r.count === 'number' ? r.count : lines.length;
+    const body = count > 0 ? `Captured entries (${count}):\n${lines.join('\n')}` : 'Captured entries: 0';
+    return { content: [{ type: 'text', text: `${body}\n\n${EDITOR_ERROR_CAPTURE_NOTE}` }] };
+  }
   catch (e: any) { return wrapError(ErrorCode.EDITOR_NOT_REACHABLE, e); }
 }
 export async function handleEditorClearErrors(): Promise<ToolResult> {
-  try { await sendEditorCommand('clear_errors'); return { content: [{ type: 'text', text: 'Error list cleared.' }] }; }
+  try {
+    await sendEditorCommand('clear_errors');
+    return { content: [{ type: 'text', text: `Cleared the (empty) editor capture buffer.\n\n${EDITOR_ERROR_CAPTURE_NOTE}` }] };
+  }
   catch (e: any) { return wrapError(ErrorCode.EDITOR_NOT_REACHABLE, e); }
 }
 
