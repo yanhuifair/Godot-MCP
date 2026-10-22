@@ -20,8 +20,9 @@ export const readSceneSchema = {
 
 export const createSceneSchema = {
   path: z.string().min(1).describe('Output path for new scene (relative to project root, e.g. "scenes/main.tscn")'),
-  template: z.enum(['Node2D', 'Control', 'Node3D']).describe('Root node type template'),
-  root_name: z.string().optional().describe('Custom root node name (default: derived from template)'),
+  template: z.enum(['Node2D', 'Control', 'Node3D']).optional().describe('Preset root template (convenience shortcut). Omit when using root_type.'),
+  root_type: z.string().optional().describe('Any Godot root node class, e.g. "CharacterBody3D", "Area2D", "Node". Takes precedence over template.'),
+  root_name: z.string().optional().describe('Custom root node name (default: derived from the root type)'),
 };
 
 export const editSceneSchema = {
@@ -190,15 +191,30 @@ export function handleReadScene(
 
 export function handleCreateScene(
   projectRoot: string,
-  args: { path: string; template: SceneTemplateType; root_name?: string }
+  args: { path: string; template?: SceneTemplateType; root_type?: string; root_name?: string }
 ): ToolResult {
   try {
-    const rootName = args.root_name || args.template;
-    const content = generateSceneTemplate(args.template, rootName);
+    // root_type 允许任意 Node 类（CharacterBody3D / Area2D / Node …）。
+    // 以前只有 Node2D|Control|Node3D 三个模板，连"创建一个 CharacterBody3D 场景"
+    // 都做不到，只能 create_scene 之后再想办法改类型（而 modify_node 改不了类型）。
+    const rootType = (args.root_type || args.template || 'Node2D').trim();
+    if (!/^[A-Z][A-Za-z0-9]*$/.test(rootType)) {
+      return toolError(
+        ErrorCode.INVALID_ARGUMENT,
+        `root_type must be a Godot class name in PascalCase (e.g. "Node3D", "CharacterBody3D"), got: "${rootType}"`
+      );
+    }
+    if (!args.template && !args.root_type) {
+      return toolError(ErrorCode.INVALID_ARGUMENT, 'Provide either template ("Node2D"|"Control"|"Node3D") or root_type (any Godot node class).');
+    }
+    const rootName = args.root_name || rootType;
+    const content = args.root_type
+      ? `[gd_scene format=3 uid=""]\n\n[node name="${rootName}" type="${rootType}"]\n`
+      : generateSceneTemplate(args.template as SceneTemplateType, rootName);
     const absPath = resolveProjectPath(projectRoot, args.path);
     writeTextFile(absPath, content);
     return {
-      content: [{ type: 'text', text: `Scene created: ${args.path} (root: ${rootName}, type: ${args.template})` }],
+      content: [{ type: 'text', text: `Scene created: ${args.path} (root: ${rootName}, type: ${rootType})` }],
     };
   } catch (err: any) {
         return toolError(ErrorCode.INTERNAL_ERROR, `Error creating scene: ${err.message}`);

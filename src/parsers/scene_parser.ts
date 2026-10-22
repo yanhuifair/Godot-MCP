@@ -484,6 +484,9 @@ export interface SceneEditReport {
  * 传入 `report` 时会记录每次失败/跳过。**必须传**——不传的话「删了一个不存在的
  * 节点」和「真的删掉了」在返回值上完全一样，调用方只能报一个假成功。
  */
+/** 节点头部字段：它们不是可编辑属性，写进 properties 只会产出非法场景。 */
+const RESERVED_NODE_KEYS = new Set(['type', 'name', 'parent', 'instance', 'owner', 'index', 'groups']);
+
 export function editScene(content: string, operations: SceneOperation[], report?: SceneEditReport): string {
   const doc = parseScene(content);
 
@@ -608,6 +611,23 @@ export function editScene(content: string, operations: SceneOperation[], report?
           break;
         }
         if (op.properties) {
+          // `type` / `name` / `parent` / `instance` 是**节点头部**的一部分，不是属性。
+          // 以前 modify_node({properties:{type:"CharacterBody3D"}}) 会写出
+          // `type = CharacterBody3D` 这一行 —— 节点类型没变，文件却多了个非法属性
+          // （Godot 报 invalid property），而工具回 "modified"。必须拒绝。
+          const structural = Object.keys(op.properties).filter((k) => RESERVED_NODE_KEYS.has(k));
+          if (structural.length) {
+            for (const k of structural) delete (op.properties as Record<string, unknown>)[k];
+            if (Object.keys(op.properties).length === 0) {
+              skipped(
+                'modify_node',
+                op.node_path,
+                `${structural.join(', ')} cannot be changed as a property — node type/name/parent/instance are structural. ` +
+                `Use add_node / remove_node to recreate the node, or rename_node to rename it.`
+              );
+              break;
+            }
+          }
           Object.assign(info.node.properties, op.properties);
         }
         if (op.new_name) {

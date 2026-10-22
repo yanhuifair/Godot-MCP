@@ -1,4 +1,12 @@
 # Changelog
+## v1.12.16 (2026-10-22)
+First round of validation against a **real, pre-existing project** (`/Users/Fair/godot_mcp_test`, Godot 4.7.2). It immediately surfaced two gaps the synthetic fixtures could not.
+
+- **`create_scene` can now create any root class** via the new optional `root_type` (`CharacterBody3D`, `Area2D`, `Node`, …). The old fixed enum (`Node2D|Control|Node3D`) made it impossible to create, say, a player scene — and there was no way to fix it afterwards, because…
+- **`modify_node` no longer writes structural keys as properties.** `modify_node({properties: {type: "CharacterBody3D"}})` used to emit `type = CharacterBody3D` as a property line: the node type did not change, the file gained an invalid property, and the tool answered "modified". `type` / `name` / `parent` / `instance` / `owner` / `index` / `groups` are now rejected (dropped if mixed with real properties, with an error when they are all that was asked for), and the message points at `add_node` / `remove_node` / `rename_node`.
+- **Repaired a real project scene that earlier versions had corrupted.** Its `player.tscn` contained `id="1_player_script"`, `shape = SubResource("res://shapes/root_shape.tres")`, `script = ExtResource("res://player.gd")`, child nodes without `parent="."`, and a truncated tail — the accumulated scars of several fixed bugs (id double-quoting, a `res://` path smuggled into `SubResource()`, a path used where an id belongs). Rebuilt with the current tools (`create_scene` + `add_node` + `attach_script` + `set_collision_shape`) and verified by instantiating it in Godot: `CharacterBody3D` root, `Head/Camera3D` resolves, script attached, capsule shape present. The project-wide engine audit went from 18/19 to **19/19 loadable**.
+- Test count: `test/tool_correctness.test.ts` now 22 cases (root_type, template still working, rejection paths, and the structural-key guard).
+
 ## v1.12.15 (2026-10-22)
 Tool-by-tool correctness audit, with the engine as the judge: smoke now loads every file the tools wrote in real Godot and fails the build when one of them is unparsable. That check found most of the bugs below.
 

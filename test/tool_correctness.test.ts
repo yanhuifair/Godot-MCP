@@ -16,7 +16,7 @@ import { ErrorCode, refineErrorCode, toolError } from '../src/utils/errors.js';
 import { findNodeByName, findNodeByPath, isRootPath } from '../src/utils/scene_walk.js';
 import { handleCreateGradient, handleCreateNoiseTexture, handleCreateMultimesh } from '../src/tools/domain.js';
 import { handleCreateScript, handleWriteScript, handleWriteShader } from '../src/tools/script.js';
-import { handleSetCollisionShape, handleSetNodeRotation } from '../src/tools/scene.js';
+import { handleSetCollisionShape, handleSetNodeRotation, handleCreateScene, handleModifyNode } from '../src/tools/scene.js';
 import { handleCreateAtlasTexture } from '../src/tools/utility.js';
 import { handleCreateWorldEnvironment } from '../src/tools/environment.js';
 import { handleCreateWorld } from '../src/tools/extension.js';
@@ -253,6 +253,45 @@ describe('generated resources never contain dangling references', () => {
     }
     // 传 res:// 前缀时不能拼出 res://res://
     expect(read('world.tres')).not.toContain('res://res://');
+  });
+});
+
+describe('scene creation and node editing', () => {
+  it('create_scene accepts any root class via root_type', () => {
+    const r = handleCreateScene(root, { path: 'player.tscn', root_type: 'CharacterBody3D', root_name: 'Player' });
+    expect(r.isError).toBeFalsy();
+    expect(read('player.tscn')).toContain('[node name="Player" type="CharacterBody3D"]');
+  });
+
+  it('create_scene keeps the three preset templates working', () => {
+    expect(handleCreateScene(root, { path: 'a.tscn', template: 'Node2D' }).isError).toBeFalsy();
+    expect(read('a.tscn')).toContain('type="Node2D"');
+  });
+
+  it('create_scene rejects a non-class root_type and asks for one of the two inputs', () => {
+    const bad = handleCreateScene(root, { path: 'b.tscn', root_type: 'character body' });
+    expect(bad.isError).toBe(true);
+    expect(text(bad)).toContain('[INVALID_ARGUMENT]');
+
+    const none = handleCreateScene(root, { path: 'c.tscn' });
+    expect(none.isError).toBe(true);
+    expect(text(none)).toContain('template');
+  });
+
+  it('modify_node refuses structural keys instead of writing "type = …" as a property', () => {
+    handleCreateScene(root, { path: 'p.tscn', root_type: 'Node3D', root_name: 'P' });
+    const before = read('p.tscn');
+    const r = handleModifyNode(root, { scene_path: 'p.tscn', node_path: '.', properties: { type: 'CharacterBody3D' } });
+    expect(r.isError).toBe(true);           // 全被拒 = 必须报错
+    expect(read('p.tscn')).toBe(before);    // 文件没被动过
+    expect(text(r)).toContain('structural');
+
+    // 混在一起时：合法属性照写，结构性键被丢弃
+    const mixed = handleModifyNode(root, { scene_path: 'p.tscn', node_path: '.', properties: { type: 'Node2D', position: 'Vector3(1, 2, 3)' } });
+    expect(mixed.isError).toBeFalsy();
+    const out = read('p.tscn');
+    expect(out).toContain('position = Vector3(1, 2, 3)');
+    expect(out).not.toContain('type = Node2D');
   });
 });
 
