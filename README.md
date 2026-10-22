@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="godot.png" width="96" alt="Godot MCP">
+
 # Godot MCP
 
 ### The most complete MCP server for Godot Engine — **386 tools** that give your AI assistant real hands inside your game project.
@@ -26,7 +28,7 @@
 - 🎮 **Reaches inside the running game** — inspect the live scene tree, call methods, inject input, **freeze the game, step it one frame at a time, and screenshot the result.** No other public Godot MCP does this.
 - 🔎 **Stays usable at scale** — `search_tools` finds the right tool out of 386, `get_status` tells you exactly what is connected, and every error returns a typed code plus a repair hint.
 
-**386 tools · 30 categories · 22 AI clients · 4 communication paths · one-command setup.**
+**386 tools · 30 categories · 21 AI clients · 4 communication paths · one-command setup.**
 
 ```bash
 npx @yanhuifair/godot-mcp --enable-plugin -p .
@@ -77,6 +79,9 @@ If you have ever wanted to say *"run the game, freeze it at the moment the playe
 13. [Supported Formats](#supported-formats)
 14. [Development](#development)
 15. [Build VSIX](#build-vsix)
+16. [Limitations](#limitations)
+17. [FAQ](#faq)
+18. [License](#license)
 
 ---
 
@@ -104,7 +109,7 @@ npx @yanhuifair/godot-mcp --enable-plugin -p .
 > `npx @yanhuifair/godot-mcp --enable-plugin -p /Users/me/games/my-game`
 
 > **Always installs the latest version.** `npx` fetches the newest release every time. To force it or pin a specific version:
-> `npx @yanhuifair/godot-mcp@latest --enable-plugin -p .` (latest) · `npx @yanhuifair/godot-mcp@1.12.3 --enable-plugin -p .` (pinned)
+> `npx @yanhuifair/godot-mcp@latest --enable-plugin -p .` (latest) · `npx @yanhuifair/godot-mcp@1.12.16 --enable-plugin -p .` (pinned)
 
 **What this does:** copies the plugin into `addons/godot-mcp/` and switches it on inside `project.godot`. Nothing to click in Godot.
 
@@ -358,7 +363,7 @@ godot-mcp/
 │   └── godot-mcp/            # Godot editor plugin
 │       ├── plugin.cfg         # Plugin metadata
 │       └── plugin.gd          # stdin reader, TCP server, 102 command handlers
-├── test/                     # Vitest suite (224 tests: 154 runnable + 70 integration requiring a live Godot project) + legacy .mjs suites
+├── test/                     # Vitest suite (unit + integration; the integration half needs a live Godot project) + legacy .mjs suites
 │   ├── test_all.mjs          # Legacy standalone suite (176 tool checks)
 │   ├── test_editor.mjs       # Legacy editor bridge TCP tests
 │   ├── test_runner.mjs       # Early integration test runner
@@ -516,7 +521,7 @@ Starts: Stdio + SSE (`/sse`) + Streamable HTTP (`/mcp`) + Health Check (`/health
 
 ```bash
 curl http://127.0.0.1:3000/health
-# {"status":"ok","version":"1.12.16","projectRoot":"/path/to/project","endpoints":{...}}
+# {"status":"ok","version":"1.12.17","projectRoot":"/path/to/project","endpoints":{...}}
 ```
 
 > `/health` is deliberately **not** token-protected so probe tools can use it, but it only echoes
@@ -589,7 +594,7 @@ After any install method, confirm everything is in place:
 
 | Check | How | Expected |
 |---|---|---|
-| Server version | `npx @yanhuifair/godot-mcp --version` | A version number (e.g. `1.12.3`) |
+| Server version | `npx @yanhuifair/godot-mcp --version` | A version number (e.g. `1.12.16`) |
 | Plugin files | Look in `addons/godot-mcp/` | `plugin.cfg`, `plugin.gd`, `runtime_bridge.gd` |
 | Plugin enabled | Open `project.godot` | `[editor_plugins]` has `enabled = PackedStringArray("res://addons/godot-mcp/plugin.cfg")` |
 | Server starts | `npx @yanhuifair/godot-mcp -p .` (Ctrl+C to stop) | Prints the tool count, e.g. `386 tools` |
@@ -620,14 +625,24 @@ rm -rf addons/godot-mcp && npx -y @yanhuifair/godot-mcp@latest --enable-plugin -
 
 > On Windows PowerShell use `rm -r addons/godot-mcp` (no `-f` flag).
 
-- **Pin a version** — `npx @yanhuifair/godot-mcp@1.12.3 …`; **force latest** — `npx @yanhuifair/godot-mcp@latest …`.
+- **Pin a version** — `npx @yanhuifair/godot-mcp@1.12.16 …`; **force latest** — `npx @yanhuifair/godot-mcp@latest …`.
 - **Global install** — `npm update -g @yanhuifair/godot-mcp`.
 - **From source** — `git pull && npm run build`.
 - **Check your version** — `npx @yanhuifair/godot-mcp --version`.
 
 > **Upgrading from v1.9.0?** That release shipped an editor plugin whose `runtime_bridge.gd` failed to parse in Godot 4.7 (a `_input` function colliding with the built-in `Node._input`, plus an untyped `_resolve`). If your editor logs those parse errors, delete `addons/godot-mcp` and re-run `--enable-plugin` to install the fixed plugin.
 
-See [CHANGELOG](CHANGELOG.md) for the complete history. **v1.12.16** is the first pass validated against a real, pre-existing project rather than synthetic fixtures: `create_scene` gained `root_type` (any Godot class, not just Node2D/Control/Node3D), and `modify_node` no longer writes `type = …` as a property (it silently did nothing while reporting success). It also rebuilt a `player.tscn` that older versions had corrupted, taking that project's engine audit from 18/19 to 19/19 loadable. **v1.12.15** is a tool-by-tool correctness audit adjudicated by the engine itself: smoke now loads every file the tools produced in real Godot and fails when one is unparsable, which caught `create_gradient` writing illegal `PackedColorArray` literals, `create_noise_texture` referencing a sub-resource before declaring it, `create_atlas_texture` emitting a dangling `ExtResource`, `set_collision_shape` mislabelling external resources, and non-numeric transforms corrupting scenes. It also makes `.` mean the scene root everywhere, guards the code writers against clobbering a scene, and refines `INTERNAL_ERROR` into accurate codes. **v1.12.14** unifies parameter naming without breaking anyone: `path` / `scene_path` / `file_path` / `output_path` (and `name` / `new_name`, `type` / `node_type`, …) are accepted interchangeably wherever a tool takes just one of them, ambiguous tools are never guessed for, and conflicting spellings are rejected instead of silently resolved. **v1.12.13** is an editing-experience pass: every tool now ships MCP `annotations` (`readOnlyHint` / `destructiveHint` / `idempotentHint`) and a human title, so clients stop prompting on read-only tools; a wrong argument now tells you which parameter you probably meant (`path` → `scene_path`) instead of just `scene_path: Required`; `search_tools` prints each tool's required parameters; and `get_status` finally reports the resolved project root. **v1.12.12** is a correctness and honesty pass: `attach_script` now registers the `ext_resource` it references (it used to write scenes Godot cannot parse while reporting success), `editor_pause_project` refuses to pause the editor's own tree (which killed the bridge) and points at `runtime_freeze` instead, the editor bridge finally honours the documented `godot_mcp/auth_token` / `godot_mcp/editor_port` project settings, read-only mode blocks five more effectful tools (223 total), and several tools that used to report success on total failure now report failure. **v1.12.11** makes the HTTP auth token persistent: it is generated once, written to `<project>/.godot/mcp_http_token` (`0600`), and reused on every later start, so an already-configured HTTP client no longer gets `401` after a restart. **v1.12.10** makes `get_status` tell the truth about the live-game bridge: it now performs a real TCP connect plus `ping` on 127.0.0.1:9877 instead of reading a 5-second cache, so a running game is no longer reported as down. **v1.12.9** adds addon self-update on project open: the editor plugin now detects a stale addon automatically and pulls the matching copy from the running server, so you can no longer get stuck on a broken older addon. **v1.12.3** is a security release: it closes three sandbox escapes proven by PoC (arbitrary file read via `log_path`, `[autoload]` injection through `write_project_config`, and a symlink write escape in `resolveProjectPath`), stops `edit_scene` reporting success for operations it never applied, keeps comments in place when rewriting `project.godot`, and adds 20 sandbox regression tests plus doc-drift gates to CI.
+### What's new
+
+| Version | What changed |
+|---|---|
+| **1.12.16** | `create_scene` accepts any `root_type`; `modify_node` rejects structural keys instead of writing `type = …` |
+| **1.12.15** | Correctness audit gated by the engine itself — smoke now loads every generated asset in real Godot, which caught corrupted gradient / noise / atlas / collision-shape output |
+| **1.12.14** | Synonym parameter aliases (`path` / `scene_path` / `file_path` / `output_path`) — ambiguous tools are never guessed |
+| **1.12.13** | MCP `annotations` on every tool, self-healing argument errors, `search_tools` prints each signature |
+| **1.12.12** | `attach_script` registers the resource it references; `editor_pause_project` stops killing the bridge |
+
+[Full changelog →](CHANGELOG.md) · [All releases](https://github.com/yanhuifair/Godot-MCP/releases)
 
 ### Command-Line Options
 
@@ -637,7 +652,7 @@ See [CHANGELOG](CHANGELOG.md) for the complete history. **v1.12.16** is the firs
 | `-g, --godot-path <path>` | Path to the Godot executable. Auto-detected if omitted (see the detection order below). |
 | `--enable-plugin` | Copy the editor plugin into `addons/` **and** switch it on in `project.godot`. Requires `-p`. **This is the one you want.** |
 | `--install-addons` | Copy the plugin files only — you enable it yourself in Godot's Plugins tab. |
-| `--read-only` | Safe mode: rejects the 218 tools that write files or cause side effects. Great for letting an AI explore an unfamiliar project. |
+| `--read-only` | Safe mode: rejects the 223 tools that write files or cause side effects. Great for letting an AI explore an unfamiliar project. |
 | `-t, --transport <mode>` | `stdio` (default) · `sse` · `streamable-http` · `all`. See [Transport Modes](#transport-modes). |
 | `--port <number>` | HTTP port for `sse` / `streamable-http`. Default `3000`. |
 | `--host <string>` | HTTP bind address. Default `127.0.0.1`. Binding anything else **requires** `GODOT_MCP_TOKEN`. |
@@ -1578,7 +1593,9 @@ npx @yanhuifair/godot-mcp --enable-plugin -p /path/to/your/godot/project
 
 This installs the plugin to `addons/godot-mcp/` and auto-enables it in `project.godot`. No manual steps required.
 
-### Editor Commands (140 tools)
+### Editor Tools (140 tools)
+
+> These are the MCP-side tools. The plugin implements **115** bridge commands; a few tools are thin wrappers over one command (e.g. `editor_set_camera_param` → `set_node_properties`).
 
 **View & Selection:** `editor_get_selection` `editor_set_selection` `editor_get_open_scene` `editor_read_current_scene` `editor_get_info` `editor_get_rect` `editor_focus` `editor_show_in_filesystem` `editor_open_dock`
 
@@ -2072,7 +2089,7 @@ Click each category to expand and see all tools with descriptions.
 npm install          # Install dependencies
 npm run build        # Build TypeScript to dist/
 npm run dev          # Dev mode (tsx hot reload)
-npm test             # Run vitest suite (224 tests: 154 runnable + 70 integration requiring a live Godot project); node test/test_all.mjs for 176 legacy checks
+npm test             # Run the vitest suite; node test/test_all.mjs for 176 legacy checks
 npm run lint         # ESLint (flat config). `npm run lint:errors` hides the `any` warnings
 npm run test:watch   # Watch mode
 npm run check:godot  # Load every fixture in a real headless Godot and verify
@@ -2081,19 +2098,7 @@ npm run check:godot  # Load every fixture in a real headless Godot and verify
 
 ### CLI Options
 
-| Flag | Description |
-|---|---|
-| `-p, --project-path` | Path to Godot project root |
-| `-g, --godot-path` | Path to Godot binary (optional) |
-| `-t, --transport` | Transport mode: `stdio`, `sse`, `streamable-http`, `all` |
-| `--port` | HTTP port (default: 3000) |
-| `--host` | HTTP bind address (default: 127.0.0.1) |
-| `--install-addons` | Copy editor plugin to target Godot project |
-| `--enable-plugin` | Install and auto-enable the editor plugin |
-| `--read-only` | Reject 223 write/side-effect tools (security mode) |
-| `--no-sse` | Disable SSE endpoint |
-| `--no-streamable-http` | Disable Streamable HTTP endpoint |
-| `-h, --help` | Show help |
+See [Command-Line Options](#command-line-options) for the full table (it lives once, in the installation section).
 
 ### Tech Stack
 
@@ -2111,13 +2116,13 @@ npm run check:godot  # Load every fixture in a real headless Godot and verify
 
 ```bash
 npm run vsix
-# Output: godot-mcp-1.12.3.vsix
+# Output: godot-mcp-<version>.vsix
 ```
 
 Install in VS Code:
 
 ```bash
-code --install-extension godot-mcp-1.12.3.vsix
+code --install-extension godot-mcp-<version>.vsix
 ```
 
 ---

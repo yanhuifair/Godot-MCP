@@ -1,4 +1,15 @@
 # Changelog
+## v1.12.17 (2026-10-22)
+Documentation pass — no behaviour change.
+
+- **The README stopped carrying a changelog in its own body.** "Upgrading to the latest version" had accumulated one ~4,000-character paragraph restating every release since 1.12.3. It is now a five-row "What's new" table plus links to `CHANGELOG.md` and the releases page, so the version history lives in exactly one place.
+- **Stale numbers corrected**: read-only mode blocks 223 tools (said 218), the test suite is 276 tests / 206 runnable (said 224 / 154), and the pinned-version examples and VSIX artifact name no longer hardcode `1.12.3` (the VSIX is now `godot-mcp-<version>.vsix`).
+- **Removed a duplicated CLI table**: the Development section had an abridged copy of the flags that could drift from the full table. It now links to the one in the installation section.
+- **Client count is honest**: 21 named client setups, not 22.
+- **`Editor Commands (140 tools)` → `Editor Tools (140 tools)`** with a note that the plugin implements 115 bridge commands, since the two numbers are different things.
+- **Header shows the logo** (`godot.png`, already in the repo) and the table of contents now covers Limitations / FAQ / License.
+- **New gate `test/readme_links.test.ts`**: verifies every `](#anchor)` in both languages resolves against the real headings (GitHub's slug rules), that the two versions link to each other, and that no local absolute path or hardcoded VSIX version leaks into the docs.
+
 ## v1.12.16 (2026-10-22)
 First round of validation against a **real, pre-existing project** (`/Users/Fair/godot_mcp_test`, Godot 4.7.2). It immediately surfaced two gaps the synthetic fixtures could not.
 
