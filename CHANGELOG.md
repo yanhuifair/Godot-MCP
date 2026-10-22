@@ -1,4 +1,13 @@
 # Changelog
+## v1.12.14 (2026-10-22)
+Naming pass: the parameter names grew organically (`path` in 116 tools, `scene_path` in 79), so the same concept was spelled differently depending on which tool you called. Renaming the keys would break every existing client, so instead the server now accepts the synonyms — both spellings work, and nothing that worked before stops working.
+
+- **Synonym aliases** (`src/utils/naming.ts`): when a tool takes exactly one file path, `path` / `scene_path` / `file_path` / `output_path` are interchangeable in both directions (`add_node(path=…)` and `create_scene(scene_path=…)` both work). The same applies to the small exact groups `name`/`new_name`/`node_name`/`root_name`, `type`/`node_type`, `parent_path`/`parent_node_path`, `value`/`property_value`, `method`/`method_name`. The canonical key advertised by `tools/list` is unchanged.
+- **It refuses to guess when guessing could be wrong.** A tool with two different paths (`attach_script` = scene + script, `load_sprite` = scene + texture) gets no generic alias at all — `path` stays a validation error there rather than being silently bound to one of them.
+- **Conflicting spellings are rejected, not silently resolved**: sending `scene_path="a.tscn"` together with `path="b.tscn"` returns `Ambiguous arguments for "add_node" …`, while the same value under both keys is de-duplicated.
+- Aliasing runs after the camelCase→snake_case normalisation, so `{scenePath, nodeType}` and `{path, node_type}` are handled by the same step and cannot fight each other.
+- `test/tool_metadata.test.ts` covers both directions, the ambiguous case, the conflict, and the de-duplication; verified again over a real stdio round-trip (alias call succeeds, canonical call still succeeds, conflict is reported).
+
 ## v1.12.13 (2026-10-21)
 Editing-experience pass: the tools now describe themselves accurately to a client, and a wrong argument tells you how to fix it instead of leaving you guessing.
 

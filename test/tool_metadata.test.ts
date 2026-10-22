@@ -14,7 +14,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { z } from 'zod';
-import { toolAnnotations, describeArgumentError, normalizeParameterNames } from '../src/server.js';
+import { toolAnnotations, describeArgumentError, normalizeParameterNames, resolveToolArguments } from '../src/server.js';
 import { ToolRegistry, WRITE_TOOLS, isWriteTool, setActiveRegistry } from '../src/utils/registry.js';
 import { registerAllTools } from '../src/tools/register.js';
 import { handleSearchTools } from '../src/tools/meta.js';
@@ -118,5 +118,59 @@ describe('parameter normalization still accepts camelCase', () => {
   it('maps snake-ish camelCase onto the schema keys', () => {
     expect(normalizeParameterNames({ scenePath: 'a', nodeType: 'Node2D' }))
       .toEqual({ scene_path: 'a', node_type: 'Node2D' });
+  });
+});
+
+describe('synonym parameter aliases', () => {
+  const registry = (() => {
+    const r = new ToolRegistry();
+    registerAllTools(r);
+    return r;
+  })();
+  const call = (toolName: string, args: Record<string, unknown>) => {
+    const tool = registry.find(toolName);
+    expect(tool, `tool ${toolName} must exist`).toBeTruthy();
+    return resolveToolArguments(tool!, args);
+  };
+
+  it('accepts the generic `path` where the schema says scene_path', () => {
+    const { args, error } = call('add_node', { path: 'main.tscn', node_type: 'Node2D', name: 'X' });
+    expect(error).toBeUndefined();
+    expect(args).toMatchObject({ scene_path: 'main.tscn', type: 'Node2D', name: 'X' });
+  });
+
+  it('accepts semantic names where the schema says `path` (create_scene)', () => {
+    const { args, error } = call('create_scene', { scene_path: 'res://new.tscn', root_name: 'Main' });
+    expect(error).toBeUndefined();
+    expect(args).toMatchObject({ path: 'res://new.tscn', root_name: 'Main' });
+  });
+
+  it('accepts `name` for a tool whose schema calls it new_name (rename_node)', () => {
+    const { args, error } = call('rename_node', {
+      scene_path: 'main.tscn', node_path: 'A', name: 'B',
+    });
+    expect(error).toBeUndefined();
+    expect(args).toMatchObject({ new_name: 'B' });
+  });
+
+  it('does NOT guess when a tool takes two different paths (attach_script)', () => {
+    const { args } = call('attach_script', { path: 'main.tscn', node_path: 'A' });
+    // `path` 到底是场景还是脚本说不清，别瞎映射
+    expect(args).toMatchObject({ path: 'main.tscn' });
+    expect(args.scene_path).toBeUndefined();
+  });
+
+  it('reports a conflict instead of silently picking one value', () => {
+    const { error } = call('add_node', { scene_path: 'a.tscn', path: 'b.tscn', name: 'X', type: 'Node' });
+    expect(error?.isError).toBe(true);
+    expect(error!.content[0].text).toMatch(/Ambiguous arguments for "add_node"/);
+    expect(error!.content[0].text).toMatch(/scene_path/);
+  });
+
+  it('drops a duplicate alias when both keys carry the same value', () => {
+    const { args, error } = call('add_node', { scene_path: 'a.tscn', path: 'a.tscn', name: 'X', type: 'Node' });
+    expect(error).toBeUndefined();
+    expect(args).toMatchObject({ scene_path: 'a.tscn' });
+    expect(args.path).toBeUndefined();
   });
 });

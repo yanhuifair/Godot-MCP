@@ -1,7 +1,7 @@
 // Copyright (c) 2026 FairYan
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // ============================================================
-// Godot MCP Server - Server Factory & Handlers (v1.12.13)
+// Godot MCP Server - Server Factory & Handlers (v1.12.14)
 // ============================================================
 // 将 MCP Server 创建、工具注册、请求处理抽离为独立工厂函数，
 // 供 Stdio、SSE、Streamable HTTP 三种传输层共用。
@@ -18,8 +18,10 @@ import { zodToJsonSchema } from 'zod-to-json-schema';
 import { findProjectRoot } from './utils/file_utils.js';
 import { ToolRegistry, isWriteTool, setActiveProjectRoot } from './utils/registry.js';
 import { ErrorCode, toolError } from './utils/errors.js';
+import type { ToolResult } from './utils/types.js';
 import { registerAllTools } from './tools/register.js';
 import { VERSION } from './utils/version.js';
+import { deriveParamAliases, applyParamAliases } from './utils/naming.js';
 
 // ---- 共享资源 ----
 
@@ -106,12 +108,17 @@ export function createMcpServer(_options: CreateServerOptions = {}): Server {
     // send camelCase by mapping camelCase → snake_case. The inverse mapping would
     // break every tool, because the inputSchema keys advertised to clients are
     // themselves snake_case.
-    const normalizedArgs = normalizeParameterNames(args || {});
-
     const tool = registry.find(name);
     if (!tool) {
       return toolError(ErrorCode.NOT_FOUND, `Unknown tool: ${name}`);
     }
+
+    // ---- 同义参数归一化（path / scene_path / file_path …）----
+    // 参数名是历史累积的，同一概念有多种写法；别名层两种都收，避免因为猜错
+    // 名字白白多一轮往返（规则见 utils/naming.ts）。
+    const prepared = resolveToolArguments(tool, args || {});
+    if (prepared.error) return prepared.error;
+    const validatedArgs = prepared.args;
 
     // ---- READ-ONLY 模式：拒绝所有写/副作用工具 ----
     if (!registry.canCall(name)) {
@@ -123,14 +130,14 @@ export function createMcpServer(_options: CreateServerOptions = {}): Server {
 
     try {
       const schema = z.object(tool.schema);
-      const validatedArgs = schema.parse(normalizedArgs);
+      const parsedArgs = schema.parse(validatedArgs);
       const effectiveRoot = sharedProjectRoot || process.cwd();
-      const { content, isError } = await tool.handler(effectiveRoot, validatedArgs);
+      const { content, isError } = await tool.handler(effectiveRoot, parsedArgs);
       return { content, isError } as any;
     } catch (err: any) {
       if (err instanceof z.ZodError) {
         return toolError(ErrorCode.VALIDATION_ERROR,
-          describeArgumentError(name, tool.schema, normalizedArgs, err));
+          describeArgumentError(name, tool.schema, validatedArgs, err));
       }
       return toolError(ErrorCode.INTERNAL_ERROR, err.message);
     }
@@ -139,8 +146,35 @@ export function createMcpServer(_options: CreateServerOptions = {}): Server {
   return server;
 }
 
-// ---- Argument-error descriptions ----
+/**
+ * 把客户端传来的原始参数整理成"schema 接受的形状"：
+ *   1. camelCase → snake_case（兼容老客户端）
+ *   2. 同义参数归一化（path / scene_path / file_path …）
+ *
+ * 抽出来是为了能单独测试 —— 这段逻辑一旦出错，所有工具都会莫名其妙地报缺参数。
+ */
+export function resolveToolArguments(
+  tool: { name: string; description?: string; schema: Record<string, z.ZodTypeAny> },
+  rawArgs: Record<string, unknown>
+): { args: Record<string, unknown>; error?: ToolResult } {
+  const normalized = normalizeParameterNames(rawArgs);
+  const plan = applyParamAliases(
+    normalized,
+    deriveParamAliases(tool.name, tool.description ?? '', tool.schema)
+  );
+  if (plan.conflicts.length) {
+    const detail = plan.conflicts
+      .map(({ from, to }) => `"${from}" and "${to}" were both given with different values — pass only one of them (canonical: "${to}").`)
+      .join(' ');
+    return {
+      args: plan.args,
+      error: toolError(ErrorCode.VALIDATION_ERROR, `Ambiguous arguments for "${tool.name}". ${detail}`),
+    };
+  }
+  return { args: plan.args };
+}
 
+// ---- Argument-error descriptions ----
 /** 逐字符 Levenshtein，只用来给"未知参数"猜一个最近的合法名（参数名都很短）。 */
 function editDistance(a: string, b: string): number {
   const m = a.length, n = b.length;

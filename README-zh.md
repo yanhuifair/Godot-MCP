@@ -429,6 +429,7 @@ godot-mcp/
 - **结构化错误**：工具失败统一返回 `{ content, isError: true }` 结构；关键路径携带类型化错误码（`READ_ONLY`、`EDITOR_NOT_REACHABLE`、`EDITOR_COMMAND_FAILED`、`NOT_FOUND` 等）。引擎侧失败绝不会被当作成功返回——编辑器拒绝了命令，工具就会带着引擎自己的报错信息抛出 `EDITOR_COMMAND_FAILED`
 - **客户端可见注解**：每个工具都带 MCP `annotations`（`readOnlyHint`、`destructiveHint`、`idempotentHint`、`openWorldHint`）和人类可读标题，与只读模式用的是同一份白名单——客户端可以对只读工具自动放行，只对真正的写操作弹确认
 - **自愈式参数报错**：`VALIDATION_ERROR` 会列出完整签名，并指出被忽略的参数名及建议（`path` → `scene_path`、`node_type` → `type`），而不是 Zod 那句冷冰冰的 `Required`
+- **参数别名**：工具 schema 是逐年长出来的，同一个概念有 `path`、`scene_path`、`file_path`、`output_path` 等写法。与其破坏客户端，不如两种都收：当工具**只有一个路径参数**时，这些同义写法可以互换（`add_node(path=…)` 与 `create_scene(scene_path=…)` 都能用）；当一个工具有两个不同路径（`attach_script`）时**不猜**。同一个参数写了两个名字且取值不同会明确报错，而不是悄悄选一个。`tools/list` 仍然只公布规范名
 
 ---
 
@@ -515,7 +516,7 @@ npx @yanhuifair/godot-mcp -t all --port 3000 -p /path/to/your/godot/project
 
 ```bash
 curl http://127.0.0.1:3000/health
-# {"status":"ok","version":"1.12.13","projectRoot":"/path/to/project","endpoints":{...}}
+# {"status":"ok","version":"1.12.14","projectRoot":"/path/to/project","endpoints":{...}}
 ```
 
 ---
@@ -620,7 +621,7 @@ rm -rf addons/godot-mcp && npx -y @yanhuifair/godot-mcp@latest --enable-plugin -
 
 > **从 v1.9.0 升级？** 那个版本自带的编辑器插件里 `runtime_bridge.gd` 在 Godot 4.7 会解析失败（`_input` 函数与内置的 `Node._input` 冲突，且 `_resolve` 缺少返回类型）。如果编辑器报这些解析错误，删掉 `addons/godot-mcp` 再重跑 `--enable-plugin` 即可装上修复后的插件。
 
-完整变更历史见 [CHANGELOG](CHANGELOG.md)。**v1.12.13** 是一次编辑体验优化：每个工具都带上 MCP `annotations`（`readOnlyHint` / `destructiveHint` / `idempotentHint`）和人类可读标题，客户端不再对只读工具弹确认；参数写错时会告诉你大概率想写哪个（`path` → `scene_path`），而不只是 `scene_path: Required`；`search_tools` 直接列出必需参数；`get_status` 终于会报出解析到的工程根目录。**v1.12.12** 是一次"说真话"的修正：`attach_script` 现在会登记它引用的 `ext_resource`（以前产出的场景 Godot 根本解析不了却还报成功）；`editor_pause_project` 不再去暂停编辑器自己的树（那会让桥自杀），改为如实报错并指向 `runtime_freeze`；编辑器桥终于认 README 里写的项目设置 `godot_mcp/auth_token` 与 `godot_mcp/editor_port`；只读模式再拦下 5 个有副作用的工具（共 223）；另有几个"全失败也报成功"的工具改为如实报错。**v1.12.11** 让 HTTP 鉴权令牌可持久化：首次启动生成后写入 `<工程>/.godot/mcp_http_token`（权限 `0600`），之后每次启动复用同一个，已配好的客户端不会因为重启变成 401。**v1.12.10** 让 `get_status` 对运行中的游戏说实话：现在真的会连 127.0.0.1:9877 并发一次 `ping`，而不是读一个 5 秒过期的缓存，游戏在跑就不会再被报成未运行。**v1.12.9** 让插件在工程打开时自动检测版本并更新：编辑器插件现在会自动发现落后的 addon，并从运行中的 server 拉取匹配版本，从此不会再卡在坏掉的旧 addon 上。**v1.12.3** 是一次安全版本：修掉了三个已用 PoC 证实的沙箱逃逸（`log_path` 任意文件读取、`write_project_config` 注入 `[autoload]`、`resolveProjectPath` 符号链接写逃逸），终结了 `edit_scene` 对未执行操作谎报成功，重写 `project.godot` 时不再打乱注释位置，并新增 20 项沙箱回归测试与文档漂移门禁。
+完整变更历史见 [CHANGELOG](CHANGELOG.md)。**v1.12.14** 在不破坏兼容的前提下统一了参数命名：当工具只有一个路径参数时，`path` / `scene_path` / `file_path` / `output_path`（以及 `name` / `new_name`、`type` / `node_type` 等）可以互换使用；有歧义的从不瞎猜；两个写法取值冲突时明确报错而不是悄悄选一个。**v1.12.13** 是一次编辑体验优化：每个工具都带上 MCP `annotations`（`readOnlyHint` / `destructiveHint` / `idempotentHint`）和人类可读标题，客户端不再对只读工具弹确认；参数写错时会告诉你大概率想写哪个（`path` → `scene_path`），而不只是 `scene_path: Required`；`search_tools` 直接列出必需参数；`get_status` 终于会报出解析到的工程根目录。**v1.12.12** 是一次"说真话"的修正：`attach_script` 现在会登记它引用的 `ext_resource`（以前产出的场景 Godot 根本解析不了却还报成功）；`editor_pause_project` 不再去暂停编辑器自己的树（那会让桥自杀），改为如实报错并指向 `runtime_freeze`；编辑器桥终于认 README 里写的项目设置 `godot_mcp/auth_token` 与 `godot_mcp/editor_port`；只读模式再拦下 5 个有副作用的工具（共 223）；另有几个"全失败也报成功"的工具改为如实报错。**v1.12.11** 让 HTTP 鉴权令牌可持久化：首次启动生成后写入 `<工程>/.godot/mcp_http_token`（权限 `0600`），之后每次启动复用同一个，已配好的客户端不会因为重启变成 401。**v1.12.10** 让 `get_status` 对运行中的游戏说实话：现在真的会连 127.0.0.1:9877 并发一次 `ping`，而不是读一个 5 秒过期的缓存，游戏在跑就不会再被报成未运行。**v1.12.9** 让插件在工程打开时自动检测版本并更新：编辑器插件现在会自动发现落后的 addon，并从运行中的 server 拉取匹配版本，从此不会再卡在坏掉的旧 addon 上。**v1.12.3** 是一次安全版本：修掉了三个已用 PoC 证实的沙箱逃逸（`log_path` 任意文件读取、`write_project_config` 注入 `[autoload]`、`resolveProjectPath` 符号链接写逃逸），终结了 `edit_scene` 对未执行操作谎报成功，重写 `project.godot` 时不再打乱注释位置，并新增 20 项沙箱回归测试与文档漂移门禁。
 
 ### 命令行参数
 
