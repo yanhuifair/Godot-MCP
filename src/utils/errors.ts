@@ -109,6 +109,41 @@ const SOLUTION_MAP: Partial<Record<ErrorCode, string[]>> = {
 };
 
 /**
+ * 把兜底错误码refine成具体错误码。
+ *
+ * 全仓 200+ 个 handler 都写 `catch { toolError(INTERNAL_ERROR, err.message) }`，
+ * 于是"文件不存在"也变成 INTERNAL_ERROR —— smoke 里 28 个 INTERNAL_ERROR 有 23 个
+ * 其实是文件问题。错误码错了，SOLUTION_MAP 给的修复建议也就错了：用户看到
+ * "这是未处理的错误"而不是"路径写错了"。
+ *
+ * 只对 INTERNAL_ERROR 生效：调用方明确给出的错误码永远不被覆盖。
+ */
+const FS_ERROR_HINTS: ReadonlyArray<readonly [RegExp, ErrorCode]> = [
+  [/\bENOENT\b|no such file or directory|file not found|cannot find (the )?file/i, ErrorCode.FILE_NOT_FOUND],
+  [/\bENOTDIR\b|not a directory/i, ErrorCode.INVALID_ARGUMENT],
+  [/\bEISDIR\b|is a directory/i, ErrorCode.INVALID_ARGUMENT],
+  [/\bEACCES\b|\bEPERM\b|permission denied/i, ErrorCode.PERMISSION_DENIED],
+  [/\bEEXIST\b|already exists/i, ErrorCode.ALREADY_EXISTS],
+  // 类型不匹配（"File is not a TileSet"、"Node "." is Node2D, not Sprite2D"）
+  // 是调用方参数问题，不是内部错误。
+  [/File is not an? \w+/i, ErrorCode.INVALID_ARGUMENT],
+  [/\bis \w+(?:\dD)?, not \w+/i, ErrorCode.INVALID_ARGUMENT],
+  // 场景里缺少预期的节点/资源（"No AnimationPlayer node found"）
+  [/^No \w[\w0-9]* (node|resource|bus) (found|in )/i, ErrorCode.NOT_FOUND],
+  // 必填组合缺失（"No transform parameters provided. Specify at least one: ..."）
+  [/^No .+ provided\. Specify at least one/i, ErrorCode.INVALID_ARGUMENT],
+  [/^Specify (either|at least one)/i, ErrorCode.INVALID_ARGUMENT],
+];
+
+export function refineErrorCode(code: ErrorCode, message: string): ErrorCode {
+  if (code !== ErrorCode.INTERNAL_ERROR) return code;
+  for (const [pattern, refined] of FS_ERROR_HINTS) {
+    if (pattern.test(message)) return refined;
+  }
+  return code;
+}
+
+/**
  * Create a structured ToolResult error.
  */
 export function toolError(
@@ -116,10 +151,11 @@ export function toolError(
   message: string,
   detail?: string
 ): ToolResult {
+  const effective = refineErrorCode(code, `${message} ${detail ?? ''}`);
   const lines: string[] = [];
-  lines.push(`[${code}] ${message}`);
+  lines.push(`[${effective}] ${message}`);
   if (detail) lines.push(`Detail: ${detail}`);
-  const solutions = SOLUTION_MAP[code];
+  const solutions = SOLUTION_MAP[effective];
   if (solutions && solutions.length > 0) {
     lines.push('Possible solutions:');
     for (const s of solutions) lines.push(`  - ${s}`);

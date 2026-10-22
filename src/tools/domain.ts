@@ -201,6 +201,35 @@ export function handleReadGradient(
   }
 }
 
+/**
+ * Godot 的 .tres 文本格式里，`PackedColorArray` 存的是**扁平浮点数**
+ * （`PackedColorArray(0, 0, 0, 1, 1, 1, 1, 1)`），不是 `Color(...)` 构造函数。
+ * 以前这里直接拼 `PackedColorArray(Color(0,0,0,1), ...)`，Godot 报
+ * "Parse Error: Expected float in constructor" —— 工具却说 "Gradient created"。
+ * 用真实 Godot 加载做验收时才暴露（smoke 的引擎级检查）。
+ */
+function colorToFloats(spec: string): number[] {
+  const s = spec.trim();
+  const fn = /^Color\(\s*([^)]*)\)$/.exec(s);
+  if (fn) {
+    const parts = fn[1].split(',').map((p) => parseFloat(p.trim()));
+    const [r = 0, g = 0, b = 0, a = 1] = parts;
+    return [r, g, b, a];
+  }
+  const hex = /^#([0-9a-f]{3,8})$/i.exec(s);
+  if (hex) {
+    let h = hex[1];
+    if (h.length === 3) h = h.split('').map((c) => c + c).join('');
+    if (h.length === 6) h += 'ff';
+    if (h.length === 8) {
+      const n = (i: number) => parseInt(h.slice(i, i + 2), 16) / 255;
+      return [n(0), n(2), n(4), n(6)];
+    }
+  }
+  // 只给了名字（"red" 之类）或解析失败：退回白色，别产出非法文件
+  return [1, 1, 1, 1];
+}
+
 export function handleCreateGradient(
   projectRoot: string,
   args: { path: string; colors?: Record<string, string>[]; interpolation_mode?: string }
@@ -213,13 +242,13 @@ export function handleCreateGradient(
       const colorVals: string[] = [];
       args.colors.forEach(c => {
         offsets.push(parseFloat(c.offset || '0'));
-        colorVals.push(c.color || 'Color(1, 1, 1, 1)');
+        colorVals.push(...colorToFloats(c.color || 'Color(1, 1, 1, 1)').map(String));
       });
       content += `offsets = PackedFloat32Array(${offsets.join(', ')})\n`;
       content += `colors = PackedColorArray(${colorVals.join(', ')})\n`;
     } else {
       content += `offsets = PackedFloat32Array(0, 1)\n`;
-      content += `colors = PackedColorArray(Color(0, 0, 0, 1), Color(1, 1, 1, 1))\n`;
+      content += `colors = PackedColorArray(0, 0, 0, 1, 1, 1, 1, 1)\n`;
     }
 
     if (args.interpolation_mode) {
@@ -445,22 +474,28 @@ export function handleCreateNoiseTexture(
 ): ToolResult {
   try {
     const noiseTypes: Record<string, number> = { simplex: 0, cellular: 1, perlin: 2, value: 3 };
+    const width = args.width ?? 256;
+    const height = args.height ?? 256;
+    const seamless = args.seamless ?? false;
+    const noiseType = args.noise_type || 'simplex';
+    // [sub_resource] 必须写在引用它的 [resource] **之前**：反过来 Godot 解析时
+    // 还没登记这个 id，报 "Condition !int_resources.has(id)" 并整个文件加载失败。
     const template = `[gd_resource type="NoiseTexture2D" format=3 uid=""]
 
-[resource]
-width = ${args.width ?? 256}
-height = ${args.height ?? 256}
-seamless = ${args.seamless ?? false}
-noise = SubResource("FastNoiseLite_resource")
-
 [sub_resource type="FastNoiseLite" id="FastNoiseLite_resource"]
-noise_type = ${noiseTypes[args.noise_type || 'simplex'] || 0}
+noise_type = ${noiseTypes[noiseType] ?? 0}
+
+[resource]
+width = ${width}
+height = ${height}
+seamless = ${seamless}
+noise = SubResource("FastNoiseLite_resource")
 `;
 
     const absPath = resolveProjectPath(projectRoot, args.path);
     writeTextFile(absPath, template, false);
 
-    return { content: [{ type: 'text', text: `NoiseTexture2D created: ${args.path} (${args.width}x${args.height}, ${args.noise_type || 'simplex'})` }] };
+    return { content: [{ type: 'text', text: `NoiseTexture2D created: ${args.path} (${width}x${height}, ${noiseType})` }] };
   } catch (err: any) {
     return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
   }

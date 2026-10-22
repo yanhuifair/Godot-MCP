@@ -4,12 +4,13 @@
 // Godot MCP Server - Scene Tools
 // ============================================================
 
+import fs from 'node:fs';
 import { z } from 'zod';
 import { toolError, ErrorCode } from '../utils/errors.js';
 import { ToolResult, SceneOperation, SceneTemplateType, GodotDocument, NodeDefinition } from '../utils/types.js';
 import { readTextFile, writeTextFile, findFilesByExtension, resolveProjectPath, toResPath } from '../utils/file_utils.js';
 import { parseScene, serializeScene, generateSceneTemplate, editScene, SceneEditReport } from '../parsers/scene_parser.js';
-import { collectNodes, findNodeByName } from '../utils/scene_walk.js';
+import { collectNodes, findNodeByName, findNodeByPath } from '../utils/scene_walk.js';
 
 // ---- Tool Schemas ----
 
@@ -665,19 +666,50 @@ function detectNodeDimension(nodeType: string): '2D' | '3D' {
   return '2D'; // default
 }
 
+/** Godot 的浮点字面量（允许科学计数法、允许多余空格）。 */
+const FLOAT_TOKEN_RE = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/;
+
+/**
+ * 校验向量/旋转里的每一个数字。
+ *
+ * 以前这里完全不校验：`set_node_rotation(node_path: ".", value: "smoke")` 会原样
+ * 写出 `rotation = smoke` —— 整个 .tscn 变成 Godot 无法解析的文件，工具却回成功。
+ * （smoke 的引擎级验收就是这么发现 `_smoke.tscn` 加载失败的。）
+ */
+function assertNumericToken(token: string, field: string, raw: string): string {
+  const t = token.trim();
+  if (!FLOAT_TOKEN_RE.test(t)) {
+    throw new Error(
+      `Invalid ${field} value "${raw}": "${t}" is not a number. ` +
+      `Use "x,y" / "x,y,z" or a Vector2(...)/Vector3(...) literal.`
+    );
+  }
+  return t;
+}
+
+function assertNumericVectorLiteral(value: string, field: string): string {
+  const inner = value.slice(value.indexOf('(') + 1, value.lastIndexOf(')'));
+  const tokens = inner.split(',').filter((s) => s.trim() !== '');
+  if (tokens.length === 0) throw new Error(`Invalid ${field} value "${value}": empty vector.`);
+  for (const t of tokens) assertNumericToken(t, field, value);
+  return value;
+}
+
 function normalizeVector(value: string, dim: '2D' | '3D', field: 'position' | 'scale'): string {
   // Already in Vector2/Vector3 format
-  if (value.startsWith('Vector2(') || value.startsWith('Vector3(')) return value;
+  if (value.startsWith('Vector2(') || value.startsWith('Vector3(')) {
+    return assertNumericVectorLiteral(value, field);
+  }
 
   // Shorthand: "100,200" or "0,5,0"
-  const parts = value.split(',').map(s => s.trim());
+  const parts = value.split(',').map((s) => s.trim());
   if (field === 'position' || field === 'scale') {
     if (dim === '2D') {
       if (parts.length < 2) throw new Error(`2D ${field} needs 2 values: "x,y". Got: "${value}"`);
-      return `Vector2(${parts[0]}, ${parts[1]})`;
+      return `Vector2(${assertNumericToken(parts[0], field, value)}, ${assertNumericToken(parts[1], field, value)})`;
     } else {
       if (parts.length < 3) throw new Error(`3D ${field} needs 3 values: "x,y,z". Got: "${value}"`);
-      return `Vector3(${parts[0]}, ${parts[1]}, ${parts[2]})`;
+      return `Vector3(${assertNumericToken(parts[0], field, value)}, ${assertNumericToken(parts[1], field, value)}, ${assertNumericToken(parts[2], field, value)})`;
     }
   }
 
@@ -685,17 +717,20 @@ function normalizeVector(value: string, dim: '2D' | '3D', field: 'position' | 's
 }
 
 function normalizeRotation(value: string, dim: '2D' | '3D'): string {
-  if (value.startsWith('Vector3(')) return value;
-  const parts = value.split(',').map(s => s.trim());
+  if (value.startsWith('Vector2(') || value.startsWith('Vector3(')) {
+    return assertNumericVectorLiteral(value, 'rotation');
+  }
+  const parts = value.split(',').map((s) => s.trim());
   if (dim === '2D') {
-    return value; // plain float, fine
+    // 2D 旋转就是一个 float —— 但它必须是数字
+    return assertNumericToken(value, 'rotation', value);
   }
   // 3D: shorthand "0,1.57,0" → "Vector3(0,1.57,0)"
   if (parts.length >= 3) {
-    return `Vector3(${parts[0]}, ${parts[1]}, ${parts[2]})`;
+    return `Vector3(${assertNumericToken(parts[0], 'rotation', value)}, ${assertNumericToken(parts[1], 'rotation', value)}, ${assertNumericToken(parts[2], 'rotation', value)})`;
   }
   // Single value for 3D? Wrap as Z rotation
-  return `Vector3(0, 0, ${value})`;
+  return `Vector3(0, 0, ${assertNumericToken(parts[0], 'rotation', value)})`;
 }
 
 export function handleTransformNode(
@@ -707,30 +742,10 @@ export function handleTransformNode(
     const { content } = readTextFile(absPath);
     const doc = parseScene(content);
 
-    // Find the target node
-    const pathParts = args.node_path.split('/');
-    let found: any = null;
-
-    function find(nodes: any[], target: string): any | null {
-      for (const n of nodes) {
-        if (n.name === target) return n;
-        const r = find(n.children || [], target);
-        if (r) return r;
-      }
-      return null;
-    }
-
-    if (pathParts.length === 1) {
-      found = find(doc.nodes, pathParts[0]);
-    } else {
-      let current = doc.nodes;
-      for (let i = 0; i < pathParts.length; i++) {
-        const match = find(current, pathParts[i]);
-        if (!match) break;
-        if (i === pathParts.length - 1) { found = match; break; }
-        current = match.children || [];
-      }
-    }
+    // Find the target node —— 统一走 scene_walk（它认 "." = 根节点、也处理
+    // "Root/Child" 与 "./Child"）。以前这里内联了一份 find()，于是同一个
+    // node_path 在 transform_node 里不认 "."，在 edit_scene 里却认。
+    const found = findNodeByPath(doc.nodes as any, args.node_path);
 
     if (!found) {
             return toolError(ErrorCode.FILE_NOT_FOUND, `Node "${args.node_path}" not found in ${args.scene_path}.`);
@@ -852,6 +867,24 @@ const SHAPE_DEFAULTS: Record<string, Record<string, string>> = {
 /** Godot shape classes always end in Shape2D / Shape3D (e.g. CapsuleShape2D, ConcavePolygonShape3D). */
 const SHAPE_TYPE_RE = /^[A-Za-z][A-Za-z0-9]*Shape(2D|3D)$/;
 
+/**
+ * 读出文本资源文件头里的真实类型（`[gd_resource type="BoxShape3D" ...]`）。
+ *
+ * ext_resource 的 type 必须和目标文件一致，否则 Godot 加载场景时直接报错。
+ * 路径走沙箱解析；文件不存在 / 不是文本资源时返回 null。
+ */
+function readResourceType(projectRoot: string, resPath: string): string | null {
+  try {
+    const rel = resPath.startsWith('res://') ? resPath.slice('res://'.length) : resPath;
+    const abs = resolveProjectPath(projectRoot, rel);
+    const { content } = readTextFile(abs);
+    const m = /^\s*\[gd_resource\s+type\s*=\s*"([^"]+)"/m.exec(content);
+    return m ? m[1] : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Allocate a resource id that is not already used by an ext_resource or sub_resource. */
 function uniqueResourceId(doc: GodotDocument, prefix: string): string {
   const taken = new Set<string>([
@@ -893,19 +926,22 @@ export function handleSetCollisionShape(
 
     // The node must already exist — editScene silently ignores unknown paths,
     // which would otherwise report success while doing nothing.
-    const known = new Set<string>();
-    (function index(nodes: NodeDefinition[], parentPath: string): void {
-      for (const node of nodes) {
-        const full = parentPath ? `${parentPath}/${node.name}` : node.name;
-        known.add(full);
-        index(node.children, full);
-      }
-    })(doc.nodes, '');
-    if (!known.has(args.node_path)) {
+    // 用 findNodeByPath 而不是"全路径集合查表"：其它工具都接受裸节点名
+    // （`Shape`）和 "."，只有这里以前要求写成 `Main/Shape` 才认。
+    const node = findNodeByPath(doc.nodes as any, args.node_path);
+    if (!node) {
+      const known: string[] = [];
+      (function index(nodes: NodeDefinition[], parentPath: string): void {
+        for (const n of nodes) {
+          const full = parentPath ? `${parentPath}/${n.name}` : n.name;
+          known.push(full);
+          index(n.children, full);
+        }
+      })(doc.nodes, '');
       return toolError(
         ErrorCode.NOT_FOUND,
         `Node "${args.node_path}" not found in ${args.scene_path}. ` +
-        `Available nodes: ${[...known].join(', ') || '(none)'}`
+        `Available nodes: ${known.join(', ') || '(none)'}`
       );
     }
 
@@ -919,7 +955,31 @@ export function handleSetCollisionShape(
       const path = toResPath(args.shape_resource_path);
       let ext = doc.extResources.find(e => e.path === path);
       if (!ext) {
-        ext = { type: args.shape_type, path, id: uniqueResourceId(doc, args.shape_type) };
+        // ext_resource 的 type 必须等于**目标文件真实的类型**。以前直接写
+        // `args.shape_type`（默认 BoxShape3D），于是把 PhysicsMaterial 标成
+        // BoxShape3D 塞进场景 —— Godot 打开就报错，工具却说成功。
+        const actualType = readResourceType(projectRoot, path);
+        if (actualType === null) {
+          // 文件读不出来（不存在 / 二进制 .res）：不存在一定要报错 ——
+          // 悬空的 ext_resource 会让整个场景在 Godot 里加载失败。
+          const rel = path.startsWith('res://') ? path.slice('res://'.length) : path;
+          let exists = false;
+          try { exists = fs.existsSync(resolveProjectPath(projectRoot, rel)); } catch { exists = false; }
+          if (!exists) {
+            return toolError(ErrorCode.FILE_NOT_FOUND, `Shape resource not found: "${path}".`);
+          }
+          // 存在但是二进制资源：读不到真实类型，退回到调用方声明的 shape_type
+          // （以前的行为），至少不会静默拒绝。
+        }
+        if (actualType !== null && !SHAPE_TYPE_RE.test(actualType)) {
+          return toolError(
+            ErrorCode.INVALID_ARGUMENT,
+            `"${path}" is a ${actualType}, not a Shape2D/Shape3D resource. ` +
+            `Pass a shape resource (e.g. a BoxShape3D .tres) or omit shape_resource_path to create an inline shape.`
+          );
+        }
+        const extType = actualType ?? args.shape_type;
+        ext = { type: extType, path, id: uniqueResourceId(doc, extType) };
         doc.extResources.push(ext);
       }
       reference = `ExtResource("${ext.id}")`;

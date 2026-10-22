@@ -182,6 +182,11 @@ describe('set_collision_shape', () => {
 
   it('registers an ext_resource for an external .tres', async () => {
     const { handleSetCollisionShape } = await import('../src/tools/scene.js');
+    // 目标资源必须真实存在：悬空的 ext_resource 会让整个场景在 Godot 里加载失败，
+    // 所以工具现在会先读文件头确认真实类型（而不是盲信 shape_type）。
+    fs.mkdirSync(path.join(dir, 'shapes'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'shapes', 'box.tres'),
+      '[gd_resource type="RectangleShape2D" format=3]\n\n[resource]\nsize = Vector2(10, 10)\n');
     handleSetCollisionShape(dir, {
       scene_path: 'scenes/p.tscn', node_path: 'Player/Col',
       shape_type: 'RectangleShape2D', shape_resource_path: 'res://shapes/box.tres',

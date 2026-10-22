@@ -8,7 +8,7 @@ import { z } from 'zod';
 import { toolError, ErrorCode } from '../utils/errors.js';
 import { ToolResult } from '../utils/types.js';
 import fs from 'node:fs';
-import { resolveProjectPath, findFilesByExtension, writeTextFile } from '../utils/file_utils.js';
+import { resolveProjectPath, findFilesByExtension, writeTextFile, toResPath } from '../utils/file_utils.js';
 
 // ---- Tool Schemas ----
 
@@ -134,22 +134,20 @@ export function handleCreateWorld(
   args: { path: string; environment_path?: string }
 ): ToolResult {
   try {
-    let content = '[gd_resource type="World3D" format=3 uid=""]\n\n';
-    content += '[resource]\n';
-
+    let content: string;
     if (args.environment_path) {
-      content += `environment = ExtResource("1_environment")\n`;
-    }
-
-    if (args.environment_path) {
-      // Add ext_resource
+      // toResPath 负责去重 res:// 前缀：以前直接拼 `res://${args.environment_path}`，
+      // 调用方传 "res://env.tres" 就会写出 `res://res://env.tres`（悬空引用）。
+      const envPath = toResPath(args.environment_path);
       content = `[gd_resource type="World3D" load_steps=2 format=3 uid=""]
 
-[ext_resource type="Environment" path="res://${args.environment_path}" id="1_environment"]
+[ext_resource type="Environment" path="${envPath}" id="1_environment"]
 
 [resource]
 environment = ExtResource("1_environment")
 `;
+    } else {
+      content = '[gd_resource type="World3D" format=3 uid=""]\n\n[resource]\n';
     }
 
     const absPath = resolveProjectPath(projectRoot, args.path);

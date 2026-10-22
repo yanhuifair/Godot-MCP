@@ -67,8 +67,30 @@ export function countNodes(nodes: SceneNode[]): number {
   return n;
 }
 
-/** 按 name 找第一个匹配的节点（可选 type 过滤）。 */
+/**
+ * Godot 的 NodePath 语义里 `.`（以及空串、`./`）表示**场景根节点**。
+ * 以前 findNodeByName('.') 一个都匹配不上，于是 `attach_script` / `set_node_position`
+ * / `transform_node` 等 8 个工具传 `node_path: "."`（最自然的写法）全部报
+ * "Node "." not found"，而 `edit_scene` 里同样的 "." 又能用 —— 同一套节点路径
+ * 在不同工具里语义不一致。
+ */
+export function isRootPath(nodePath: string | null | undefined): boolean {
+  const p = (nodePath ?? '').trim();
+  return p === '' || p === '.' || p === './';
+}
+
+/** 场景根节点（解析出来的第一棵树的第一项）。 */
+export function sceneRoot(nodes: SceneNode[]): SceneNode | null {
+  return nodes.length > 0 ? nodes[0] ?? null : null;
+}
+
+/** 按 name 找第一个匹配的节点（可选 type 过滤）。`.` 表示场景根节点。 */
 export function findNodeByName(nodes: SceneNode[], name: string, types?: string[]): SceneNode | null {
+  if (isRootPath(name)) {
+    const root = sceneRoot(nodes);
+    if (root && (!types || types.length === 0 || types.includes(root.type))) return root;
+    return null;
+  }
   let found: SceneNode | null = null;
   forEachNode(nodes, (node) => {
     if (node.name === name && (!types || types.length === 0 || types.includes(node.type))) {
@@ -83,11 +105,19 @@ export function findNodeByName(nodes: SceneNode[], name: string, types?: string[
  * 按节点路径查找，形如 `"Main/Body/CollisionShape2D"`。
  *
  * 与既有各处实现保持一致的容错：
+ *   - `.` / `./` / 空串 → 场景根节点（Godot NodePath 语义）
+ *   - 前导 `./` 被忽略（相对路径写法）
  *   - 前导 `/root/` 会被忽略（运行时绝对路径）
  *   - 单个组件（`"/"` 分隔后只剩一段）时，在整棵树里按 name 找第一个匹配
  */
 export function findNodeByPath(nodes: SceneNode[], nodePath: string): SceneNode | null {
-  const parts = nodePath.split('/').filter(Boolean);
+  if (isRootPath(nodePath)) return sceneRoot(nodes);
+
+  // 相对路径写法 `./Body/Camera` 等价于 `Body/Camera`
+  const normalized = nodePath.trim().replace(/^\.\/+/, '');
+  if (isRootPath(normalized)) return sceneRoot(nodes);
+
+  const parts = normalized.split('/').filter(Boolean);
   if (parts.length === 0) return null;
 
   if (parts.length === 1) {

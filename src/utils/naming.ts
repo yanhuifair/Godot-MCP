@@ -25,6 +25,14 @@ export const PARAM_GROUPS: readonly (readonly string[])[] = [
   ['parent_path', 'parent_node_path', 'new_parent'],
   ['value', 'property_value'],
   ['method', 'method_name'],
+  ['signal', 'signal_name'],
+  ['param', 'param_name'],
+  ['property', 'property_name'],
+  ['func_name', 'function_name'],
+  ['var_name', 'variable_name'],
+  ['var_type', 'variable_type'],
+  ['source', 'source_path'],
+  ['destination', 'dest_path', 'target_path'],
 ];
 
 /**
@@ -61,14 +69,22 @@ export function deriveParamAliases(
   if (pathKeys.length === 1) {
     const canonical = pathKeys[0];
     if (canonical === 'path') {
+      // 工具只有一个路径参数，而且它就叫 `path`：那"任何具体路径名"都只能是它，
+      // 全收（模型写 write_script 时很可能说 script_path）。
       const hint = `${name} ${description}`.toLowerCase();
-      if (SCENE_HINT_RE.test(hint)) aliases['scene_path'] = 'path';
-      if (/^(create_|export_|write_|generate_)/.test(name)) aliases['output_path'] = 'path';
-      if (/^(read_|validate_|diff_|compile_)/.test(name)) aliases['file_path'] = 'path';
+      for (const k of FILE_PATH_KEYS) {
+        if (k === 'path') continue;
+        // 只在语义对得上时收，避免把 `texture_path` 硬塞给一个纯文本工具
+        if (k === 'scene_path' && !SCENE_HINT_RE.test(hint)) continue;
+        aliases[k] = 'path';
+      }
     } else {
-      aliases['path'] = canonical;
-      if (canonical === 'scene_path') aliases['file_path'] = 'scene_path';
-      if (canonical === 'output_path') aliases['file_path'] = 'output_path';
+      // 规范名是**具体**的（layout_path / scene_path / texture_path…）：
+      // 只接受通用写法，绝不把另一个具体名映射过来
+      // （否则 add_audio_bus 会接受 texture_path → layout_path，纯属瞎猜）。
+      for (const k of ['path', 'file_path', 'output_path']) {
+        if (k !== canonical) aliases[k] = canonical;
+      }
     }
   }
 

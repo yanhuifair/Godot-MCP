@@ -22,7 +22,7 @@
 //   * 每个 handler 调用都有 8s 超时兜底。
 
 import * as require_fs from 'node:fs';
-import { cpSync, rmSync, mkdtempSync, readFileSync, existsSync } from 'node:fs';
+import { cpSync, rmSync, mkdtempSync, readFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -191,13 +191,13 @@ const OVERRIDES = {
   rename_node: { scene_path: 'scenes/_smoke.tscn', node_path: 'SmokeClone', new_name: 'SmokeR' },
   connect_signal: { scene_path: 'scenes/_smoke.tscn', signal_name: 'ready', from_node: '.', to_node: '.', method_name: '_on_ready' },
   disconnect_signal: { scene_path: 'scenes/_smoke.tscn', signal_name: 'ready', from_node: '.', to_node: '.', method_name: '_on_ready' },
-  set_node_position: { scene_path: 'scenes/_smoke.tscn', node_path: '.', x: 1, y: 2 },
-  set_node_rotation: { scene_path: 'scenes/_smoke.tscn', node_path: '.', rotation: 1 },
-  set_node_scale: { scene_path: 'scenes/_smoke.tscn', node_path: '.', x: 1, y: 1 },
+  set_node_position: { scene_path: 'scenes/_smoke.tscn', node_path: '.', value: '3,4' },
+  set_node_rotation: { scene_path: 'scenes/_smoke.tscn', node_path: '.', value: '0.5' },
+  set_node_scale: { scene_path: 'scenes/_smoke.tscn', node_path: '.', value: '2,2' },
   transform_node: { scene_path: 'scenes/_smoke.tscn', node_path: '.' },
   attach_script: { scene_path: 'scenes/_smoke.tscn', node_path: '.', script_path: 'scripts/main.gd' },
   load_sprite: { scene_path: 'scenes/_smoke.tscn', node_path: '.', texture_path: 'icon.svg' },
-  set_collision_shape: { scene_path: 'scenes/_smoke.tscn', node_path: '.', shape_resource_path: 'resources/test_physics_material.tres' },
+  set_collision_shape: { scene_path: 'scenes/_smoke.tscn', node_path: 'SmokeShape', shape_type: 'RectangleShape2D' },
 
   create_script: { script_path: 'scripts/_smoke.gd' },
   write_script: { script_path: 'scripts/_smoke.gd', content: 'extends Node\n' },
@@ -232,7 +232,7 @@ const OVERRIDES = {
   create_sprite_frames: { resource_path: 'resources/_smoke_sf.tres' },
   create_theme: { resource_path: 'resources/_smoke_theme.tres' },
   create_tileset: { resource_path: 'resources/_smoke_ts.tres' },
-  create_atlas_texture: { resource_path: 'resources/_smoke_atlas.tres', texture_path: 'icon.svg' },
+  create_atlas_texture: { resource_path: 'resources/_smoke_atlas.tres', atlas_texture: 'icon.svg' },
   create_image_texture: { resource_path: 'resources/_smoke_imgtex.tres', image_path: 'icon.svg' },
   create_sky: { resource_path: 'resources/_smoke_sky.tres' },
   create_multimesh: { resource_path: 'resources/_smoke_mm.tres' },
@@ -336,10 +336,124 @@ function detectBridgeTools(registerJs) {
 }
 
 // ------------------------------------------------------------
+// 预置"输入"文件
+// ------------------------------------------------------------
+// 工具是按注册表顺序跑的，`add_node` / `attach_script` 等 20 多个工具都以
+// `scenes/_smoke.tscn` 为**输入**，而那个场景要等 `create_scene` 才被创建 ——
+// 排在它前面的工具全部报 "File not found"，于是它们真正的实现路径一次都没被测到。
+// 这里先把输入文件写好，让这些工具跑在真实内容上（写出来的东西后面还要过 Godot）。
+function seedInputFixtures(P) {
+  const w = (rel, content) => {
+    const abs = join(P, rel);
+    mkdirSync(dirname(abs), { recursive: true });
+    writeFileSync(abs, content);
+  };
+
+  w('scenes/_smoke.tscn', [
+    '[gd_scene load_steps=2 format=3]',
+    '',
+    '[node name="SmokeRoot" type="Node2D"]',
+    '',
+    '[node name="SmokeChild" type="Node2D" parent="."]',
+    'position = Vector2(1, 2)',
+    '',
+    // 碰撞/多边形类工具要有真实目标节点，否则只能测到 "not a CollisionShape" 分支
+    '[node name="SmokeShape" type="CollisionShape2D" parent="."]',
+    '',
+    '[node name="SmokePoly" type="CollisionPolygon2D" parent="."]',
+    'polygon = PackedVector2Array(0, 0, 1, 0, 0, 1)',
+    '',
+  ].join('\n'));
+
+  w('scripts/_smoke.gd', 'extends Node\n\n\nfunc _ready() -> void:\n\tpass\n');
+  w('resources/_smoke.gdshader', 'shader_type canvas_item;\n\nvoid fragment() {\n\tCOLOR = vec4(1.0);\n}\n');
+  w('resources/_smoke.gdshaderinc', '// smoke include\n');
+  // add_audio_bus 需要工程根下的 AudioBusLayout
+  w('default_bus_layout.tres', [
+    '[gd_resource type="AudioBusLayout" format=3]',
+    '',
+    '[resource]',
+    'bus/0/name = &"Master"',
+    'bus/0/solo = false',
+    'bus/0/mute = false',
+    'bus/0/bypass_fx = false',
+    'bus/0/volume_db = 0.0',
+    'bus/0/send = &"Master"',
+    '',
+  ].join('\n'));
+}
+
+// ------------------------------------------------------------
+// 用真实 Godot 加载"被工具写出来的"资源
+// ------------------------------------------------------------
+// 这是唯一能回答"工具说写成功了，产出的文件到底对不对"的检查：MCP 侧的
+// 解析器可能自洽，但只有引擎能判定 .tscn/.tres/.gd 是否真的可解析。
+function godotBinary() {
+  for (const p of [
+    process.env.GODOT_PATH,
+    '/Applications/Godot.app/Contents/MacOS/Godot',
+  ]) {
+    if (p && existsSync(p)) return p;
+  }
+  return null;
+}
+
+async function auditAssetsWithGodot(P) {
+  const bin = godotBinary();
+  const auditScript = 'audit_load.gd';
+  writeFileSync(join(P, auditScript), [
+    'extends SceneTree',
+    '',
+    'func _walk(dir: String, out: Array) -> void:',
+    '\tvar d := DirAccess.open(dir)',
+    '\tif d == null: return',
+    '\tfor f in d.get_files():',
+    '\t\tvar p := dir.path_join(f)',
+    '\t\tif p.ends_with(".tscn") or p.ends_with(".tres") or p.ends_with(".gd") or p.ends_with(".gdshader"):',
+    '\t\t\tout.append(p)',
+    '\tfor sub in d.get_directories():',
+    '\t\tif sub == ".godot": continue',
+    '\t\t_walk(dir.path_join(sub), out)',
+    '',
+    'func _initialize() -> void:',
+    '\tvar files: Array = []',
+    '\t_walk("res://", files)',
+    '\tvar bad := 0',
+    '\tfor f in files:',
+    '\t\tif f == "res://audit_load.gd": continue  # 正在执行的脚本，load 自己会死锁',
+    '\t\tvar r = ResourceLoader.load(f, "", ResourceLoader.CACHE_MODE_IGNORE)',
+    '\t\tif r == null:',
+    '\t\t\tbad += 1',
+    '\t\t\tprint("AUDIT_FAIL ", f)',
+    '\tprint("AUDIT_DONE files=", files.size(), " failed=", bad)',
+    '\tquit(0)',
+    '',
+  ].join('\n'));
+
+  const { spawn } = await import('node:child_process');
+  return await new Promise((resolve) => {
+    const child = spawn(bin, ['--headless', '--path', P, '--script', 'res://' + auditScript], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let out = '';
+    const timer = setTimeout(() => child.kill('SIGKILL'), 120000);
+    child.stdout.on('data', (d) => { out += d.toString(); });
+    child.stderr.on('data', (d) => { out += d.toString(); });
+    child.on('close', () => {
+      clearTimeout(timer);
+      const fails = [...out.matchAll(/AUDIT_FAIL (\S+)/g)].map((m) => m[1]);
+      const done = /AUDIT_DONE files=(\d+) failed=(\d+)/.exec(out);
+      resolve({ fails, total: done ? Number(done[1]) : 0, ok: !!done });
+    });
+  });
+}
+
+// ------------------------------------------------------------
 async function main() {
   const sandbox = mkdtempSync(join(tmpdir(), 'godot-mcp-smoke-'));
   const P = join(sandbox, 'test-project');
   cpSync(SRC_PROJECT, P, { recursive: true });
+  seedInputFixtures(P);
 
   const seenEditor = new Set();
   const seenRuntime = new Set();
@@ -347,6 +461,7 @@ async function main() {
   try { editorStub = await startStubBridge(9876, seenEditor); } catch { /* 端口被真 Godot 占用 */ }
   try { runtimeStub = await startStubBridge(9877, seenRuntime); } catch { /* ignore */ }
 
+  const { resolveToolArguments } = await import('../dist/server.js');
   const { ToolRegistry } = await import('../dist/utils/registry.js');
   const { registerAllTools } = await import('../dist/tools/register.js');
   const registry = new ToolRegistry();
@@ -373,10 +488,24 @@ async function main() {
     if (SPAWNS_PROCESS.has(tool.name)) { skipCount++; continue; }
     if (liveEditor && bridgeTools.has(tool.name)) { bridgeSkipped++; continue; }
 
-    const args = { ...buildArgs(tool), ...(OVERRIDES[tool.name] ?? {}) };
+    // 覆盖项先过一遍归一化再合并 —— 顺序很重要：先合并再归一化的话，兜底值
+    // （如 path=scenes/ui_demo.tscn）和覆盖值（scene_path=_smoke.tscn）会同时
+    // 存在，触发 "Ambiguous arguments"，等于白测。
+    const ov = OVERRIDES[tool.name] ?? {};
+    const ovPrepared = resolveToolArguments(tool, ov);
+    if (ovPrepared.error) {
+      errored.push({ name: tool.name, msg: ovPrepared.error.content[0].text.slice(0, 160).replace(/\s+/g, ' ') });
+      continue;
+    }
+    const args = { ...buildArgs(tool), ...ovPrepared.args };
+    const prepared = resolveToolArguments(tool, args);
+    if (prepared.error) {
+      errored.push({ name: tool.name, msg: prepared.error.content[0].text.slice(0, 160).replace(/\s+/g, ' ') });
+      continue;
+    }
     let res;
     try {
-      res = await withTimeout(tool.handler(P, args), CALL_TIMEOUT_MS, tool.name);
+      res = await withTimeout(tool.handler(P, prepared.args), CALL_TIMEOUT_MS, tool.name);
     } catch (e) {
       const msg = `${e?.message ?? e}`;
       if (msg.startsWith('__TIMEOUT__')) timedOut.push({ name: tool.name, args });
@@ -464,9 +593,29 @@ async function main() {
   if (bridgeSkipped) console.log(`  ${D}BRIDGE   ${bridgeSkipped}  (真实 Godot 在跑，跳过动态调用)${N}`);
   console.log(`  ${D}TOTAL    ${tools.length}${N}`);
 
-  rmSync(sandbox, { recursive: true, force: true });
+  // ---- 引擎级验收：工具写出来的每个资源都必须能被 Godot 加载 ----
+  // 这一项才是"实现是否正确"的硬证据：MCP 侧的解析器可以和自己的序列化互相
+  // 自洽，但只有引擎能判定产出的 .tscn/.tres/.gd 是不是真的合法。
+  const audit = await auditAssetsWithGodot(P);
+  let assetFailures = 0;
+  if (!audit.ok) {
+    console.log(`\n${Y}━━━ 引擎级资源验收：跳过（找不到 Godot 或加载超时）${N}`);
+  } else {
+    assetFailures = audit.fails.length;
+    console.log(`\n${B}━━━ 引擎级资源验收${N}`);
+    console.log(`  Godot 可加载 ${audit.total - assetFailures}/${audit.total} 个资源/脚本`);
+    if (assetFailures) {
+      console.log(`  ${R}✗ ${assetFailures} 个文件加载失败（工具报告成功但产物非法）:${N}`);
+      for (const f of audit.fails.slice(0, 25)) console.log(`      ${R}${f}${N}`);
+    } else {
+      console.log(`  ${G}✓ 全部可加载${N}`);
+    }
+  }
 
-  const fatal = crashed.length + timedOut.length + missingEditor.length + missingRuntime.length;
+  if (!process.env.SMOKE_KEEP) rmSync(sandbox, { recursive: true, force: true });
+  else console.log(`  keep: ${P}`);
+
+  const fatal = crashed.length + timedOut.length + missingEditor.length + missingRuntime.length + assetFailures;
   if (fatal > 0) { console.log(`\n${R}FAILED${N}`); process.exit(1); }
   console.log(`\n${G}PASSED${N}`);
 

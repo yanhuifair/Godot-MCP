@@ -169,11 +169,36 @@ export function handleReadScript(
   }
 }
 
+/**
+ * 代码类写入器的扩展名守卫。
+ *
+ * `write_script` / `write_shader` 以前对目标文件不做任何检查，于是
+ * `write_shader({path: "scenes/main.tscn", content: "shader_type ..."})` 会把一份
+ * 场景**覆盖成 shader 源码**，还回 "Shader written"。smoke 的引擎级验收就是这样
+ * 把一个 .tscn 写坏后才发现（工具报告成功、Godot 打不开）。
+ * 内容类型和目标扩展名对不上时，宁可拒绝也不破坏用户的文件。
+ */
+function extensionError(tool: string, relPath: string, allowed: string[]): ToolResult {
+  return toolError(
+    ErrorCode.INVALID_ARGUMENT,
+    `${tool} writes ${allowed.join(' / ')} content, but the target is "${relPath}". ` +
+    `Refusing to overwrite a file with a non-matching extension — pick a path ending in one of: ${allowed.join(', ')}.`
+  );
+}
+
+function hasAllowedExtension(relPath: string, allowed: string[]): boolean {
+  const lower = relPath.toLowerCase();
+  return allowed.some((ext) => lower.endsWith(ext));
+}
+
 export function handleWriteScript(
   projectRoot: string,
   args: { path: string; content: string; create_backup?: boolean }
 ): ToolResult {
   try {
+    if (!hasAllowedExtension(args.path, ['.gd', '.cs'])) {
+      return extensionError('write_script', args.path, ['.gd', '.cs']);
+    }
     const absPath = resolveProjectPath(projectRoot, args.path);
     writeTextFile(absPath, args.content, args.create_backup !== false);
     return {
@@ -195,6 +220,12 @@ export function handleCreateScript(
 
     if (!content) {
             return toolError(ErrorCode.INVALID_ARGUMENT, `Unknown template: ${args.template}. Available: ${Object.keys(templates).join(', ')}`);
+    }
+
+    // 生成 GDScript 却写进 .cs（或反之）= 产出一个 Godot 打不开的文件。
+    const expected = args.type === 'gdscript' ? ['.gd'] : ['.cs'];
+    if (!hasAllowedExtension(args.path, expected)) {
+      return extensionError('create_script', args.path, expected);
     }
 
     // Apply class_name for GDScript
@@ -390,6 +421,10 @@ export function handleCreateShader(
             return toolError(ErrorCode.INVALID_ARGUMENT, `Unknown shader type: ${args.type}. Available: ${Object.keys(ShaderTemplates).join(', ')}`);
     }
 
+    if (!hasAllowedExtension(args.path, ['.gdshader'])) {
+      return extensionError('create_shader', args.path, ['.gdshader']);
+    }
+
     const absPath = resolveProjectPath(projectRoot, args.path);
     writeTextFile(absPath, template);
 
@@ -425,6 +460,9 @@ export function handleWriteShader(
   args: { path: string; content: string; create_backup?: boolean }
 ): ToolResult {
   try {
+    if (!hasAllowedExtension(args.path, ['.gdshader', '.gdshaderinc'])) {
+      return extensionError('write_shader', args.path, ['.gdshader', '.gdshaderinc']);
+    }
     const absPath = resolveProjectPath(projectRoot, args.path);
     writeTextFile(absPath, args.content, args.create_backup !== false);
     return {

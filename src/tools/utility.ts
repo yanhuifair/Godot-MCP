@@ -11,7 +11,7 @@ import { toolError, ErrorCode } from '../utils/errors.js';
 import { forEachScene } from '../utils/scene_files.js';
 import { ToolResult } from '../utils/types.js';
 import fs from 'node:fs';
-import { readTextFile, resolveProjectPath, findFilesByExtension, writeTextFile } from '../utils/file_utils.js';
+import { readTextFile, resolveProjectPath, findFilesByExtension, writeTextFile, toResPath } from '../utils/file_utils.js';
 import { parseScene } from '../parsers/scene_parser.js';
 import { collectNodes, countNodes } from '../utils/scene_walk.js';
 import { parseResource } from '../parsers/resource_parser.js';
@@ -197,8 +197,36 @@ export function handleCreateAtlasTexture(
   args: { path: string; atlas_texture: string; region?: number[] }
 ): ToolResult {
   try {
+    if (!args.atlas_texture || !args.atlas_texture.trim()) {
+      return toolError(
+        ErrorCode.INVALID_ARGUMENT,
+        'atlas_texture is required: an AtlasTexture must point at a real texture (e.g. "res://icon.svg").'
+      );
+    }
     const region = args.region || [0, 0, 64, 64];
-    const template = `[gd_resource type="AtlasTexture" format=3 uid=""]
+
+    // 以前这里引用了 `ExtResource("1_atlas")` 却**从不声明** ext_resource，
+    // 而且 atlas_texture 参数压根没被使用 —— 产出的 .tres 里 atlas 指向不存在的
+    // id，Godot 直接加载失败（引擎级验收抓到的）。现在：登记真实路径 + 校验存在。
+    const atlasPath = toResPath(args.atlas_texture);
+    const rel = atlasPath.startsWith('res://') ? atlasPath.slice('res://'.length) : atlasPath;
+    let textureExists = false;
+    try {
+      textureExists = fs.existsSync(resolveProjectPath(projectRoot, rel));
+    } catch {
+      return toolError(ErrorCode.PATH_TRAVERSAL, `atlas_texture resolves outside the project: ${args.atlas_texture}`);
+    }
+    if (!textureExists) {
+      return toolError(
+        ErrorCode.FILE_NOT_FOUND,
+        `Atlas texture not found: "${atlasPath}". ` +
+        `A dangling ext_resource makes the .tres unloadable, so nothing was written.`
+      );
+    }
+
+    const template = `[gd_resource type="AtlasTexture" load_steps=2 format=3 uid=""]
+
+[ext_resource type="Texture2D" path="${atlasPath}" id="1_atlas"]
 
 [resource]
 atlas = ExtResource("1_atlas")
@@ -208,7 +236,7 @@ region = Rect2(${region[0]}, ${region[1]}, ${region[2]}, ${region[3]})
     const absPath = resolveProjectPath(projectRoot, args.path);
     writeTextFile(absPath, template, false);
 
-    return { content: [{ type: 'text', text: `AtlasTexture created: ${args.path}\n  Atlas: ${args.atlas_texture}\n  Region: [${region.join(', ')}]` }] };
+    return { content: [{ type: 'text', text: `AtlasTexture created: ${args.path}\n  Atlas: ${atlasPath}\n  Region: [${region.join(', ')}]` }] };
   } catch (err: any) {
     return toolError(ErrorCode.INTERNAL_ERROR, `Error: ${err.message}`);
   }

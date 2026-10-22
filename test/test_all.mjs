@@ -763,9 +763,11 @@ t("read_stylebox", UT, ({ handleReadStylebox }) => {
   r.content[0].text.includes("StyleBox") ? pass("read_stylebox") : fail("read_stylebox", "");
 });
 t("create_atlas_texture", UT, ({ handleCreateAtlasTexture }) => {
-  const r = handleCreateAtlasTexture(P, { path: "resources/_tat.tres" });
+  // 以前这里没传 atlas_texture —— 工具当时直接忽略这个参数、产出一个悬空引用的
+  // 坏文件，测试却因为"没报错"而通过。现在工具要求图集真实存在。
+  const r = handleCreateAtlasTexture(P, { path: "resources/_tat.tres", atlas_texture: "icon.svg" });
   r.isError ? fail("create_atlas_texture", r.content[0].text) : pass("create_atlas_texture");
-  import(FU).then(({ deleteFile }) => deleteFile(P, "resources/_tat.tres"));
+  if (!r.isError) import(FU).then(({ deleteFile }) => deleteFile(P, "resources/_tat.tres"));
 });
 t("list_popups", UT, ({ handleListPopups }) => {
   handleListPopups(P, {});
