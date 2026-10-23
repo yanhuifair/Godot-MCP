@@ -521,7 +521,7 @@ npx @yanhuifair/godot-mcp -t all --port 3000 -p /path/to/your/godot/project
 
 ```bash
 curl http://127.0.0.1:3000/health
-# {"status":"ok","version":"1.12.17","projectRoot":"/path/to/project","endpoints":{...}}
+# {"status":"ok","version":"1.12.18","projectRoot":"/path/to/project","endpoints":{...}}
 ```
 
 ---

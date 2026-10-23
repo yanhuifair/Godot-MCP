@@ -11,7 +11,8 @@
 // "Required" validation errors on real CallTool invocations.
 
 import { describe, it, expect } from 'vitest';
-import { normalizeParameterNames } from '../src/server.js';
+import path from 'node:path';
+import { normalizeParameterNames, resolveProjectRootArg } from '../src/server.js';
 
 describe('normalizeParameterNames', () => {
   it('leaves snake_case keys untouched (they match the Zod schemas)', () => {
@@ -41,5 +42,26 @@ describe('normalizeParameterNames', () => {
   it('returns the input when it is not a plain object', () => {
     expect(normalizeParameterNames(null as any)).toBeNull();
     expect(normalizeParameterNames(undefined as any)).toBeUndefined();
+  });
+});
+
+describe('project root resolution', () => {
+  // Codex / Claude Desktop 以 "cwd = 工程目录" 启动 server，配置里写的是 `-p .`。
+  // 以前这个 "." 被原样存下来，get_status 就报 `Project root : .` ——
+  // 排错时最该看的一行反而没有信息量。
+  it('turns `-p .` into an absolute path', () => {
+    expect(resolveProjectRootArg('.')).toBe(process.cwd());
+    expect(resolveProjectRootArg('./')).toBe(process.cwd());
+  });
+
+  it('keeps an absolute path as-is and resolves relative ones', () => {
+    const absolute = resolveProjectRootArg('/tmp');
+    expect(absolute).toBe('/tmp');
+    expect(resolveProjectRootArg('..')).toBe(path.dirname(process.cwd()));
+  });
+
+  it('never returns a relative path', () => {
+    const r = resolveProjectRootArg('.');
+    expect(r?.startsWith('/') || /^[A-Za-z]:\\/.test(r ?? '')).toBe(true);
   });
 });

@@ -1,4 +1,7 @@
 # Changelog
+## v1.12.18 (2026-10-24)
+- **`-p .` now resolves to an absolute path.** Codex, Claude Desktop and friends launch the server with "cwd = your project" and the documented config is `-p .`; that literal `.` was stored as-is, so `get_status` reported `Project root : .` — the one line you read when something is broken, carrying no information at all. `resolveProjectRootArg()` now calls `path.resolve()` (and is exported, so the behaviour is unit-tested for `.`, `./`, `..` and absolute paths).
+
 ## v1.12.17 (2026-10-22)
 Documentation pass — no behaviour change.
 

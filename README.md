@@ -521,7 +521,7 @@ Starts: Stdio + SSE (`/sse`) + Streamable HTTP (`/mcp`) + Health Check (`/health
 
 ```bash
 curl http://127.0.0.1:3000/health
-# {"status":"ok","version":"1.12.17","projectRoot":"/path/to/project","endpoints":{...}}
+# {"status":"ok","version":"1.12.18","projectRoot":"/path/to/project","endpoints":{...}}
 ```
 
 > `/health` is deliberately **not** token-protected so probe tools can use it, but it only echoes

@@ -1,12 +1,13 @@
 // Copyright (c) 2026 FairYan
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // ============================================================
-// Godot MCP Server - Server Factory & Handlers (v1.12.17)
+// Godot MCP Server - Server Factory & Handlers (v1.12.18)
 // ============================================================
 // 将 MCP Server 创建、工具注册、请求处理抽离为独立工厂函数，
 // 供 Stdio、SSE、Streamable HTTP 三种传输层共用。
 // ============================================================
 
+import path from 'node:path';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import {
   CallToolRequestSchema,
@@ -43,12 +44,24 @@ export function initSharedResources(projectRoot?: string): { registry: ToolRegis
     registerAllTools(sharedRegistry);
   }
   if (sharedProjectRoot === null) {
-    sharedProjectRoot = projectRoot || findProjectRoot() || null;
+    sharedProjectRoot = resolveProjectRootArg(projectRoot);
     // get_status 要报告"当前解析到的工程根目录"，否则它给出的排错建议
     // （"get_status 会告诉你 projectRoot"）自己就是空话。
     setActiveProjectRoot(sharedProjectRoot);
   }
   return { registry: sharedRegistry, projectRoot: sharedProjectRoot };
+}
+
+/**
+ * 把 `-p` 参数落成绝对路径。
+ *
+ * Codex / Claude Desktop 这类客户端是**以 "cwd = 工程目录" 的方式启动** server 的，
+ * 配置里写的 `-p .` 直接存下来会让 `get_status` 报 `Project root : .` ——
+ * 恰恰是排错时最需要看的那一行，却什么信息都没有。
+ */
+export function resolveProjectRootArg(projectRoot?: string): string | null {
+  const raw = projectRoot || findProjectRoot() || null;
+  return raw ? path.resolve(raw) : null;
 }
 
 /**
